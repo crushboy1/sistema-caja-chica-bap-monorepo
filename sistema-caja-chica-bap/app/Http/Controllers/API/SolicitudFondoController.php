@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\SolicitudFondo;
 use App\Models\DetalleGastoProyectado;
-use App\Models\FondoEfectivo; // Necesario para gestionar fondos activos
+use App\Models\FondoEfectivo; // Importar el modelo FondoEfectivo
 use App\Models\HistorialEstadoSolicitud; // Para registrar cambios de estado
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -174,7 +174,7 @@ class SolicitudFondoController extends Controller
                 }
             } elseif ($request->tipo_solicitud === 'Cierre') {
                 // CAMBIO 3: Asegurar que el monto solicitado sea exactamente 0 para un cierre.
-                if (floatval($request->monto_solicitado) !== 0.00) { 
+                if (floatval($request->monto_solicitado) !== 0.00) {
                     throw ValidationException::withMessages(['monto_solicitado' => 'Para solicitudes de tipo Cierre, el monto solicitado debe ser 0.']);
                 }
             }
@@ -198,12 +198,14 @@ class SolicitudFondoController extends Controller
             // - Apertura/Incremento siempre inician en 'Pendiente Aprobación ADM'.
             // - Decremento/Cierre de Jefe de Área/Colaborador inician en 'Pendiente Aprobación ADM'.
             // - Decremento/Cierre de Jefe de Administración/Super Admin inician en 'Pendiente Aprobación GRTE'.
-            $initialStateInDB = 'Pendiente Aprobación ADM'; 
+            $initialStateInDB = 'Pendiente Aprobación ADM';
             $initialHistorialObservation = 'enviada a Administración'; // Observación inicial para historial
 
             // Si es una solicitud de Decremento o Cierre Y el solicitante es Jefe de Administración o Super Admin
-            if (in_array($request->tipo_solicitud, ['Decremento', 'Cierre']) && 
-                ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))) {
+            if (
+                in_array($request->tipo_solicitud, ['Decremento', 'Cierre']) &&
+                ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))
+            ) {
                 $initialStateInDB = 'Pendiente Aprobación GRTE'; // Va directo a Gerente General
                 $initialHistorialObservation = 'enviada directamente a Gerencia General';
             }
@@ -255,11 +257,11 @@ class SolicitudFondoController extends Controller
 
             DB::commit(); // Confirmar la transacción
 
-            // CAMBIO 5: Devolver la solicitud con su código_solicitud en la respuesta del store.
+            // CAMBIO 5: Devolver la solicitud con su codigo_solicitud en la respuesta del store.
             // Es crucial que el frontend reciba este dato inmediatamente.
             return response()->json([
-                'message' => 'Solicitud de fondo creada exitosamente.',
-                'codigo_solicitud' => $solicitud->codigo_solicitud, // <<-- ¡AQUÍ ESTÁ LA CLAVE!
+                'message' => 'Solicitud de fondo creada exitosamente. Código: ' . $solicitud->codigo_solicitud, // Mensaje con el código de solicitud
+                'codigo_solicitud' => $solicitud->codigo_solicitud,
                 'solicitud' => $solicitud->load([
                     'solicitante.area',
                     'solicitante.role',
@@ -320,7 +322,7 @@ class SolicitudFondoController extends Controller
                 'solicitante.role:id,name,display_name',
                 'area:id,name',
                 'revisorAdm:id,name,last_name',
-                'aprobadorGerente:id,name,last_name',
+                'aprobadorGerente:id,name,last_last_name',
                 'detallesGastosProyectados',
                 'historialEstados' => function ($q) {
                     $q->orderBy('created_at', 'asc')
@@ -364,53 +366,33 @@ class SolicitudFondoController extends Controller
     /**
      * Lógica para manejar la creación/actualización de FondosEfectivo
      * cuando una solicitud de fondo es aprobada o cerrada.
+     * Este método ahora DELEGA la lógica al modelo FondoEfectivo.
      *
      * @param SolicitudFondo $solicitud
      * @param mixed $user
+     * @return FondoEfectivo|null El fondo efectivo creado o actualizado, o null si no aplica.
      * @throws \Exception
      */
-    private function manageFondoEfectivo(SolicitudFondo $solicitud, $user)
+    private function manageFondoEfectivo(SolicitudFondo $solicitud, $user): ?FondoEfectivo
     {
         try {
             if ($solicitud->tipo_solicitud === 'Apertura') {
-                // Busca si ya existe un fondo para esta solicitud de apertura, si no, lo crea.
-                // Esto previene duplicados si la función se llama varias veces por error.
-                // CAMBIO 6: Usar generateUniqueFondoCode para generar el código de fondo de forma robusta.
-                $fondoEfectivo = FondoEfectivo::firstOrCreate(
-                    ['id_solicitud_apertura' => $solicitud->id],
-                    [
-                        'codigo_fondo' => $this->generateUniqueFondoCode(), // Genera un código de fondo único
-                        'id_responsable' => $solicitud->id_solicitante,
-                        'id_area' => $solicitud->id_area,
-                        'monto_aprobado' => $solicitud->monto_solicitado,
-                        'fecha_apertura' => now()->toDateString(),
-                        'estado' => 'Activo',
-                    ]
-                );
+                // Delega la creación del FondoEfectivo al método estático en el modelo FondoEfectivo
+                return FondoEfectivo::crearDesdeSolicitudApertura($solicitud);
             } elseif (in_array($solicitud->tipo_solicitud, ['Incremento', 'Decremento', 'Cierre'])) {
-                // Para incremento/decremento/cierre, se modifica el fondo original asociado a la solicitud de apertura
-                $fondoOriginal = FondoEfectivo::where('id_solicitud_apertura', $solicitud->id_solicitud_original)->firstOrFail();
-
-                if ($solicitud->tipo_solicitud === 'Incremento' || $solicitud->tipo_solicitud === 'Decremento') {
-                    // El monto_solicitado de la solicitud de modificación es el NUEVO MONTO TOTAL deseado para el fondo.
-                    $fondoOriginal->monto_aprobado = $solicitud->monto_solicitado;
-                    // 'monto_disponible' ya no se actualiza aquí, ya que no se trabaja con él según el contexto.
-                    // $fondoOriginal->monto_disponible = $solicitud->monto_solicitado; 
-                } elseif ($solicitud->tipo_solicitud === 'Cierre') {
-                    $fondoOriginal->estado = 'Cerrado';
-                    $fondoOriginal->fecha_cierre = now()->toDateString();
-                    $fondoOriginal->motivo_cierre = $solicitud->motivo_detalle; // Usar el motivo de la solicitud de cierre
-                    // CAMBIO 7: Cuando un fondo se cierra, su monto aprobado debe ser 0.
-                    $fondoOriginal->monto_aprobado = 0.00;
-                }
-                $fondoOriginal->save();
+                // Delega la actualización del FondoEfectivo al método estático en el modelo FondoEfectivo
+                return FondoEfectivo::actualizarDesdeSolicitudModificacion($solicitud);
             }
+            return null; // Si el tipo de solicitud no corresponde a la gestión de fondos
         } catch (ModelNotFoundException $e) {
-            Log::error('FondoEfectivo no encontrado para la solicitud de tipo modificación: ' . $solicitud->id, ['error' => $e->getMessage()]);
+            Log::error('Error en manageFondoEfectivo: FondoEfectivo no encontrado para la solicitud: ' . $solicitud->id, ['error' => $e->getMessage()]);
             throw new \Exception('No se pudo encontrar el fondo de efectivo original para actualizar.');
+        } catch (\InvalidArgumentException $e) {
+            Log::error('Error en manageFondoEfectivo: Argumento inválido recibido: ' . $e->getMessage(), ['solicitud_id' => $solicitud->id, 'error' => $e->getTraceAsString()]);
+            throw new \Exception('Error de lógica interna al gestionar el fondo efectivo: ' . $e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Error al gestionar FondoEfectivo para solicitud: ' . $solicitud->id, ['error' => $e->getMessage()]);
-            throw new \Exception('Error interno al gestionar el fondo de efectivo.');
+            Log::error('Error general al gestionar FondoEfectivo para solicitud: ' . $solicitud->id, ['error' => $e->getMessage()]);
+            throw new \Exception('Error interno al gestionar el fondo de efectivo: ' . $e->getMessage());
         }
     }
 
@@ -462,15 +444,17 @@ class SolicitudFondoController extends Controller
             $newState = $oldState; // Inicialmente, el nuevo estado principal es el mismo que el anterior, cambiará en el switch
             $historialState = $requestedState; // Por defecto, el estado a registrar en historial es el solicitado
             $observacionesHistorial = ''; // La variable observacionesHistorial ahora se construirá de forma dinámica
-            
+            $responseMessage = 'Solicitud actualizada exitosamente.';
+            $managedFondoCodigo = null; // Variable para almacenar el código del fondo gestionado
+
             // CAMBIO (Parte 2): Lógica para restricciones de auto-aprobación para Jefe de Administración/Super Admin en Decremento/Cierre
-            $isSolicitanteAdminOrSuperAdmin = ($solicitud->id_solicitante === $user->id && 
-                                                ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin')));
+            $isSolicitanteAdminOrSuperAdmin = ($solicitud->id_solicitante === $user->id &&
+                ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin')));
             $isDecrementoCierre = in_array($solicitud->tipo_solicitud, ['Decremento', 'Cierre']);
 
 
-            DB::beginTransaction(); // Iniciar transacción para el update
-            switch ($requestedState) { // Usar requestedState para el switch para la lógica de permisos/transiciones
+            DB::beginTransaction();
+            switch ($requestedState) {
                 case 'Observada ADM':
                     if (!($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))) {
                         DB::rollBack();
@@ -480,15 +464,15 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser observada por Administración.'], 400);
                     }
-                    // CAMBIO (Parte 2): Restricción de Observar para Jefe ADM/Super Admin que son solicitantes de Decremento/Cierre
                     if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
-                           DB::rollBack();
-                           return response()->json(['message' => 'No puedes observar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
+                        DB::rollBack();
+                        return response()->json(['message' => 'No puedes observar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
                     }
                     $solicitud->motivo_observacion = $request->motivo_observacion;
                     $solicitud->id_revisor_adm = $user->id;
-                    $newState = 'Observada ADM'; // El estado principal de la solicitud cambia a Observada ADM
+                    $newState = 'Observada ADM';
                     $observacionesHistorial = 'Solicitud observada por Administración: ' . $request->motivo_observacion;
+                    $responseMessage = 'Observación enviada exitosamente por Administración.'; // Mensaje personalizado
                     break;
 
                 case 'Aprobada ADM':
@@ -500,36 +484,43 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser aprobada por Administración.'], 400);
                     }
-                    // CAMBIO (Parte 2): Restricción de Aprobar para Jefe ADM/Super Admin que son solicitantes de Decremento/Cierre
                     if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
                         DB::rollBack();
                         return response()->json(['message' => 'No puedes aprobar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
                     }
 
                     $solicitud->id_revisor_adm = $user->id;
-                    $solicitud->motivo_observacion = null; // Limpiar observación previa ADM
-                    $solicitud->motivo_descargo = null; // Limpiar descargo previo ADM
-                    $historialState = 'Aprobada ADM'; // Hito para el historial
+                    $solicitud->motivo_observacion = null;
+                    $solicitud->motivo_descargo = null;
+                    $historialState = 'Aprobada ADM';
 
-                    // CAMBIO (Parte 2): Nueva lógica para determinar el siguiente estado principal ($newState)
-                    // Solicitudes de Apertura o Incremento SIEMPRE pasan a GRTE.
-                    // Solicitudes de Decremento/Cierre de un Jefe de Área/Colaborador son APROBACIÓN FINAL por ADM.
-                    // Solicitudes de Decremento/Cierre de un Jefe ADM/Super Admin SIEMPRE pasan a GRTE.
-                    if (in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento']) || 
-                        ($isDecrementoCierre && $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_administracion') || $solicitud->solicitante->hasRole('super_admin')))) {
-                        
+                    if (
+                        in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento']) ||
+                        ($isDecrementoCierre && $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_administracion') || $solicitud->solicitante->hasRole('super_admin')))
+                    ) {
+
                         $newState = 'Pendiente Aprobación GRTE';
                         $observacionesHistorial = 'Solicitud aprobada por Administración. Pasa a pendiente de aprobación de Gerencia General.';
-                    } else if (in_array($solicitud->tipo_solicitud, ['Decremento', 'Cierre']) && 
-                               $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_area') || $solicitud->solicitante->hasRole('colaborador'))) {
-                        
+                        $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.'; // Mensaje personalizado
+                    } else if (
+                        in_array($solicitud->tipo_solicitud, ['Decremento', 'Cierre']) &&
+                        $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_area') || $solicitud->solicitante->hasRole('colaborador'))
+                    ) {
+
                         $newState = 'Aprobada'; // Aprobación final por ADM
-                        $solicitud->id_aprobador_gerente = $user->id; // ADM actúa como aprobador final
+                        $solicitud->id_aprobador_gerente = $user->id;
                         $observacionesHistorial = 'Solicitud de ' . $solicitud->tipo_solicitud . ' aprobada finalmente por Administración.';
+                        // Gestionar el fondo efectivo (crear/actualizar) una vez la solicitud es aprobada finalmente por ADM
+                        $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
+                        if ($managedFondo) {
+                            $managedFondoCodigo = $managedFondo->codigo_fondo;
+                            $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada por Administración. El fondo " . $managedFondoCodigo . " ha sido " . ($solicitud->tipo_solicitud === 'Cierre' ? 'cerrado.' : 'actualizado.');
+                        } else {
+                            $responseMessage = 'Solicitud aprobada por Administración exitosamente.';
+                        }
                     } else {
-                           // Fallback, aunque con la lógica actual no debería llegar aquí
-                           DB::rollBack();
-                           return response()->json(['message' => 'Lógica de aprobación de ADM no cubierta para este tipo de solicitud y solicitante.'], 400);
+                        DB::rollBack();
+                        return response()->json(['message' => 'Lógica de aprobación de ADM no cubierta para este tipo de solicitud y solicitante.'], 400);
                     }
                     break;
 
@@ -546,9 +537,10 @@ class SolicitudFondoController extends Controller
                         return response()->json(['message' => 'La solicitud no está en estado "Observada ADM" para enviar un descargo.'], 400);
                     }
                     $solicitud->motivo_descargo = $request->motivo_descargo;
-                    $historialState = 'Descargo Enviado ADM'; // Hito para el historial
+                    $historialState = 'Descargo Enviado ADM';
                     $observacionesHistorial = 'Descargo enviado por el solicitante: ' . $request->motivo_descargo . '. La solicitud vuelve a ser revisada por Administración.';
-                    $newState = 'Pendiente Aprobación ADM'; // El estado principal de la solicitud vuelve a este estado
+                    $newState = 'Pendiente Aprobación ADM';
+                    $responseMessage = 'Descargo enviado exitosamente a Administración.'; // Mensaje personalizado
                     Log::info('SolicitudFondoController@update - Descargo Enviado ADM procesado. Nuevo estado:', ['new_state' => $newState]);
                     break;
 
@@ -561,18 +553,14 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser observada por Gerencia.'], 400);
                     }
-                    // CAMBIO (Parte 2): Restricción de Observar para Jefe ADM/Super Admin que son solicitantes de Decremento/Cierre
-                    if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
-                           // El gerente general sí puede observar la solicitud de un ADM/Super Admin.
-                           // No hay restricción aquí para el GRTE.
-                    }
                     $solicitud->motivo_observacion = $request->motivo_observacion;
                     $solicitud->id_aprobador_gerente = $user->id;
-                    $newState = 'Observada GRTE'; // El estado principal de la solicitud cambia a Observada GRTE
+                    $newState = 'Observada GRTE';
                     $observacionesHistorial = 'Solicitud observada por Gerencia General: ' . $request->motivo_observacion . '. Se espera el descargo del solicitante.';
+                    $responseMessage = 'Observación enviada exitosamente por Gerencia General.'; // Mensaje personalizado
                     break;
 
-                case 'Aprobada': // Aprobación final por Gerente General
+                case 'Aprobada':
                     if (!($user->hasRole('gerente_general') || $user->hasRole('super_admin'))) {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Gerente General puede aprobar solicitudes.'], 403);
@@ -581,26 +569,35 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser aprobada por Gerencia.'], 400);
                     }
-                    // CAMBIO (Parte 2): Restricción de Aprobar para Jefe ADM/Super Admin que son solicitantes de Decremento/Cierre
                     if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
-                           DB::rollBack();
-                           return response()->json(['message' => 'No puedes aprobar tu propia solicitud de Decremento/Cierre. Solo el Gerente General (otro usuario) puede hacerlo.'], 403);
+                        DB::rollBack();
+                        return response()->json(['message' => 'No puedes aprobar tu propia solicitud de Decremento/Cierre. Solo el Gerente General (otro usuario) puede hacerlo.'], 403);
                     }
                     $solicitud->id_aprobador_gerente = $user->id;
-                    $solicitud->motivo_observacion = null; // Limpiar observación previa GRTE
-                    $solicitud->motivo_descargo = null; // Limpiar descargo previo GRTE
-                    $historialState = 'Aprobada'; // Hito para el historial (Aprobación Final)
+                    $solicitud->motivo_observacion = null;
+                    $solicitud->motivo_descargo = null;
+                    $historialState = 'Aprobada';
                     $observacionesHistorial = 'Solicitud aprobada finalmente por Gerencia General. Proceso completado.';
 
-                    // Gestionar el fondo efectivo (crear/actualizar) una vez la solicitud es aprobada finalmente
-                    $this->manageFondoEfectivo($solicitud, $user);
-                    $newState = 'Aprobada'; // El estado principal de la solicitud es Aprobada
+                    $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
+                    $newState = 'Aprobada';
+
+                    if ($managedFondo) {
+                        $managedFondoCodigo = $managedFondo->codigo_fondo;
+                        if ($solicitud->tipo_solicitud === 'Apertura') {
+                            $responseMessage = "¡Éxito! Solicitud de Apertura aprobada. Fondo asignado: " . $managedFondoCodigo;
+                        } elseif (in_array($solicitud->tipo_solicitud, ['Incremento', 'Decremento'])) {
+                            $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada. El fondo " . $managedFondoCodigo . " ha sido actualizado.";
+                        } elseif ($solicitud->tipo_solicitud === 'Cierre') {
+                            $responseMessage = "¡Éxito! Solicitud de Cierre aprobada. El fondo " . $managedFondoCodigo . " ha sido cerrado.";
+                        }
+                    } else {
+                        $responseMessage = 'Solicitud aprobada por Gerencia General exitosamente.';
+                    }
                     break;
 
                 case 'Descargo Enviado GRTE':
                     Log::info('SolicitudFondoController@update - Procesando Descargo Enviado GRTE. Old State:', ['old_state' => $oldState]);
-                    // CAMBIO (Parte 2): Aclaración de permisos. Solo el solicitante (incluido Jefe ADM/Super Admin)
-                    // o un super_admin pueden enviar un descargo.
                     if (!($user->id === $solicitud->id_solicitante || $user->hasRole('super_admin'))) {
                         Log::warning('SolicitudFondoController@update - Acceso denegado para Descargo Enviado GRTE.', ['user_id' => $user->id, 'solicitante_id' => $solicitud->id_solicitante, 'user_roles' => $user->getRoleNames()]);
                         DB::rollBack();
@@ -612,9 +609,10 @@ class SolicitudFondoController extends Controller
                         return response()->json(['message' => 'La solicitud no está en estado "Observada GRTE" para enviar un descargo.'], 400);
                     }
                     $solicitud->motivo_descargo = $request->motivo_descargo;
-                    $historialState = 'Descargo Enviado GRTE'; // Hito para el historial
+                    $historialState = 'Descargo Enviado GRTE';
                     $observacionesHistorial = 'Descargo enviado por el solicitante: ' . $request->motivo_descargo . '. La solicitud vuelve a ser revisada por Gerencia General.';
-                    $newState = 'Pendiente Aprobación GRTE'; // El estado principal de la solicitud vuelve a este estado
+                    $newState = 'Pendiente Aprobación GRTE';
+                    $responseMessage = 'Descargo enviado exitosamente a Gerencia General.'; // Mensaje personalizado
                     Log::info('SolicitudFondoController@update - Descargo Enviado GRTE procesado. Nuevo estado:', ['new_state' => $newState]);
                     break;
 
@@ -623,30 +621,28 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Jefe de Administración o Gerente General pueden rechazar solicitudes.'], 403);
                     }
-                    // Cualquier estado previo al rechazo final es válido para ser rechazado
                     if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Observada ADM', 'Descargo Enviado ADM', 'Aprobada ADM', 'Pendiente Aprobación GRTE', 'Observada GRTE', 'Descargo Enviado GRTE'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser rechazada finalmente.'], 400);
                     }
-                    // CAMBIO (Parte 2): Restricción de Rechazar para Jefe ADM/Super Admin que son solicitantes de Decremento/Cierre
                     if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
-                           DB::rollBack();
-                           return response()->json(['message' => 'No puedes rechazar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
+                        DB::rollBack();
+                        return response()->json(['message' => 'No puedes rechazar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
                     }
 
                     if (empty($request->motivo_rechazo_final)) {
                         throw ValidationException::withMessages(['motivo_rechazo_final' => 'El motivo del rechazo final es obligatorio.']);
                     }
                     $solicitud->motivo_rechazo_final = $request->motivo_rechazo_final;
-                    // Registrar quién realizó el rechazo final
                     if ($user->hasRole('jefe_administracion')) {
                         $solicitud->id_revisor_adm = $user->id;
                     } elseif ($user->hasRole('gerente_general')) {
                         $solicitud->id_aprobador_gerente = $user->id;
                     }
-                    $historialState = 'Rechazada Final'; // Hito para el historial
+                    $historialState = 'Rechazada Final';
                     $observacionesHistorial = 'Solicitud rechazada finalmente: ' . $request->motivo_rechazo_final;
-                    $newState = 'Rechazada Final'; // El estado principal de la solicitud es Rechazada Final
+                    $newState = 'Rechazada Final';
+                    $responseMessage = 'Solicitud rechazada definitivamente.'; // Mensaje personalizado
                     break;
 
                 default:
@@ -654,38 +650,30 @@ class SolicitudFondoController extends Controller
                     return response()->json(['message' => 'Transición de estado no válida.'], 400);
             }
 
-            // Actualizar el estado de la solicitud en la base de datos (columna 'estado')
-            // Esto solo se hace si el estado principal ($newState) realmente cambió.
             if ($solicitud->estado !== $newState) {
                 $solicitud->estado = $newState;
                 $solicitud->save();
                 Log::info('SolicitudFondoController@update - Estado de solicitud principal actualizado en DB.', ['solicitud_id' => $solicitud->id, 'new_estado_principal' => $solicitud->estado]);
             }
 
-
-            // Registrar la acción/hitos en el historial de estados
-            // CAMBIO (Parte 1): Se usa $historialState para la entrada del historial.
-            // La observación es la que se construyó en el switch.
             HistorialEstadoSolicitud::create([
                 'id_solicitud_fondo' => $solicitud->id,
                 'estado_anterior' => $oldState,
-                'estado_nuevo' => $historialState, // El estado que representa la acción/hito en el historial
-                'observaciones' => $observacionesHistorial, 
+                'estado_nuevo' => $historialState,
+                'observaciones' => $observacionesHistorial . ($managedFondoCodigo ? " (Fondo: " . $managedFondoCodigo . ")" : ''),
                 'id_usuario_accion' => $user->id,
                 'fecha_cambio' => now(),
             ]);
             Log::info('SolicitudFondoController@update - Historial de estado registrado. Estado registrado: ' . $historialState);
 
-            DB::commit(); // Confirmar la transacción
+            DB::commit();
             Log::info('SolicitudFondoController@update - Transacción de DB confirmada exitosamente.');
 
 
             return response()->json([
-                'message' => 'Solicitud de fondo actualizada exitosamente.',
-                // Cargar todas las relaciones necesarias para la respuesta
+                'message' => $responseMessage,
                 'solicitud' => $solicitud->load([
                     'detallesGastosProyectados',
-                    // Asegurar que la relación 'usuarioAccion' se carga para 'historialEstados'
                     'historialEstados' => function ($q) {
                         $q->orderBy('created_at', 'asc')
                             ->with('usuarioAccion:id,name,last_name');
@@ -695,13 +683,10 @@ class SolicitudFondoController extends Controller
                     'solicitante.area',
                     'solicitante.role',
                     'area',
-                    // Cargar solicitudOriginal con todos los campos necesarios
                     'solicitudOriginal:id,codigo_solicitud,id_solicitante,id_area,tipo_solicitud,motivo_detalle,monto_solicitado,prioridad,estado,motivo_observacion,motivo_descargo,motivo_rechazo_final,id_revisor_adm,id_aprobador_gerente,id_solicitud_original,created_at,updated_at',
-                    // Cargar fondoEfectivo de la solicitudOriginal con sus relaciones anidadas
                     'solicitudOriginal.fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado,estado,id_responsable,id_area,id_solicitud_apertura',
                     'solicitudOriginal.fondoEfectivo.responsable:id,name,last_name,email,cargo',
                     'solicitudOriginal.fondoEfectivo.area:id,name',
-                    // También cargar fondoEfectivo directo (para solicitudes de Apertura)
                     'fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado,estado,id_responsable,id_area,id_solicitud_apertura',
                     'fondoEfectivo.responsable:id,name,last_name,email,cargo',
                     'fondoEfectivo.area:id,name',
@@ -744,7 +729,6 @@ class SolicitudFondoController extends Controller
             ], 500);
         }
     }
-
     /**
      * Elimina una solicitud de fondo.
      * SOLO UN SUPER_ADMIN PUEDE ELIMINAR UNA SOLICITUD EN CUALQUIER ESTADO.
@@ -800,8 +784,8 @@ class SolicitudFondoController extends Controller
 
         // Buscar la última solicitud que comience con el prefijo 'SOL-'
         $latestSolicitud = SolicitudFondo::where('codigo_solicitud', 'like', $fullPrefix . '-%')
-                                        ->latest('id') // Ordenar por ID para obtener la más reciente en caso de códigos no secuenciales por error
-                                        ->first();
+            ->latest('id') // Ordenar por ID para obtener la más reciente en caso de códigos no secuenciales por error
+            ->first();
 
         $nextNumber = 1;
         if ($latestSolicitud) {
@@ -824,27 +808,5 @@ class SolicitudFondoController extends Controller
         return $fullPrefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * Genera un código único secuencial para los fondos de efectivo.
-     * El formato es 'FNRO-NNNNN'.
-     *
-     * @return string
-     */
-    private function generateUniqueFondoCode(): string
-    {
-        $prefix = 'FNRO';
-        $latestFondo = FondoEfectivo::where('codigo_fondo', 'like', $prefix . '-%')
-                                    ->latest('id_fondo') // Asumiendo que 'id_fondo' es autoincremental
-                                    ->first();
-
-        $nextNumber = 1;
-        if ($latestFondo) {
-            $lastCode = $latestFondo->codigo_fondo;
-            if (preg_match('/-(\d+)$/', $lastCode, $matches)) {
-                $nextNumber = (int)$matches[1] + 1;
-            }
-        }
-
-        return $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-    }
+    // El método generateUniqueFondoCode() ha sido movido al modelo FondoEfectivo.php
 }

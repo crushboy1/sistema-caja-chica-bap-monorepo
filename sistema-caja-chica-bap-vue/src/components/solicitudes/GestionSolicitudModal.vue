@@ -279,7 +279,7 @@ const ejecutarAccion = async () => {
 
     let endpoint = `/solicitudes-fondo/${props.solicitud.id}`;
     let payload = {};
-    let successMessage = '';
+    let successMessageFromAPI = ''; // Variable para el mensaje de éxito de la API
     let errorMessage = '';
     let confirmationTitle = '';
     let confirmationText = '';
@@ -289,16 +289,15 @@ const ejecutarAccion = async () => {
 
     try {
         switch (accionActual.value) {
-            case 'aprobarADM': { // Se agregan llaves aquí
+            case 'aprobarADM': {
                 confirmationTitle = 'Confirmar Aprobación';
                 confirmationText = '¿Estás seguro de aprobar esta solicitud por Administración?';
                 confirmButtonText = 'Sí, Aprobar';
                 payload.estado = 'Aprobada ADM'; // El backend determinará el siguiente estado principal
-                successMessage = 'Solicitud aprobada por Administración exitosamente.';
                 errorMessage = 'Error al aprobar por Administración.';
                 break;
             }
-            case 'observarADM': { // Se agregan llaves aquí
+            case 'observarADM': {
                 if (!motivoAccion.value) {
                     Swal.fire('Advertencia', 'El motivo de la observación es obligatorio.', 'warning');
                     isLoadingAction.value = false;
@@ -309,20 +308,18 @@ const ejecutarAccion = async () => {
                 confirmButtonText = 'Sí, Observar';
                 payload.estado = 'Observada ADM';
                 payload.motivo_observacion = motivoAccion.value;
-                successMessage = 'Solicitud observada por Administración exitosamente.';
                 errorMessage = 'Error al observar por Administración.';
                 break;
             }
-            case 'aprobarGRTE': { // Se agregan llaves aquí
+            case 'aprobarGRTE': {
                 confirmationTitle = 'Confirmar Aprobación';
                 confirmationText = '¿Estás seguro de aprobar esta solicitud por Gerencia General? Esta acción es final.';
                 confirmButtonText = 'Sí, Aprobar';
                 payload.estado = 'Aprobada'; // El backend la marcará como Aprobada (final) y gestionará el FondoEfectivo
-                successMessage = 'Solicitud aprobada por Gerencia General exitosamente.';
                 errorMessage = 'Error al aprobar por Gerencia General.';
                 break;
             }
-            case 'observarGRTE': { // Se agregan llaves aquí
+            case 'observarGRTE': {
                 if (!motivoAccion.value) {
                     Swal.fire('Advertencia', 'El motivo de la observación es obligatorio.', 'warning');
                     isLoadingAction.value = false;
@@ -333,11 +330,10 @@ const ejecutarAccion = async () => {
                 confirmButtonText = 'Sí, Observar';
                 payload.estado = 'Observada GRTE';
                 payload.motivo_observacion = motivoAccion.value;
-                successMessage = 'Solicitud observada por Gerencia General exitosamente.';
                 errorMessage = 'Error al observar por Gerencia General.';
                 break;
             }
-            case 'rechazarFinal': { // Se agregan llaves aquí
+            case 'rechazarFinal': {
                 if (!motivoAccion.value) {
                     Swal.fire('Advertencia', 'El motivo del rechazo es obligatorio.', 'warning');
                     isLoadingAction.value = false;
@@ -348,11 +344,10 @@ const ejecutarAccion = async () => {
                 confirmButtonText = 'Sí, Rechazar';
                 payload.estado = 'Rechazada Final';
                 payload.motivo_rechazo_final = motivoAccion.value;
-                successMessage = 'Solicitud rechazada definitivamente.';
                 errorMessage = 'Error al rechazar definitivamente.';
                 break;
             }
-            case 'presentarDescargo': { // Se agregan llaves aquí
+            case 'presentarDescargo': {
                 if (!motivoAccion.value) {
                     Swal.fire('Advertencia', 'El descargo no puede estar vacío.', 'warning');
                     isLoadingAction.value = false;
@@ -373,7 +368,6 @@ const ejecutarAccion = async () => {
                 confirmButtonText = 'Sí, Enviar Descargo';
                 payload.estado = newStateDescargo;
                 payload.motivo_descargo = motivoAccion.value;
-                successMessage = 'Tu descargo ha sido enviado exitosamente.';
                 errorMessage = 'Error al presentar descargo.';
                 break;
             }
@@ -413,13 +407,17 @@ const ejecutarAccion = async () => {
         console.log('Payload:', payload);
         console.log('-----------------------------');
 
-        // Realizar la llamada a la API después de la confirmación (si aplica) o directamente
-        await api.patch(endpoint, payload);
+        // Realizar la llamada a la API y CAPTURAR LA RESPUESTA
+        const response = await api.patch(endpoint, payload);
+        
+        // El mensaje de éxito ahora se tomará directamente de la respuesta de la API
+        // que ya contiene el código del fondo cuando sea relevante.
+        successMessageFromAPI = response.data.message;
 
         // Pequeña pausa antes de mostrar la alerta de éxito para una transición más suave
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        Swal.fire('¡Éxito!', successMessage, 'success');
+        Swal.fire('¡Éxito!', successMessageFromAPI, 'success');
         cerrarModal(true); // Cerrar y refrescar la tabla padre
     } catch (error) {
         console.error(`Error al ejecutar acción '${accionActual.value}':`, error);
