@@ -1,0 +1,23 @@
+/* src/assets/css/forms.css */
+/* src/assets/css/forms.css */
+.input-field {
+  @apply w-full px-5 py-3 border border-gray-300 rounded-full shadow-sm;
+  /* Eliminado: focus:outline-none focus:ring-2 focus:ring-verde-bap */
+
+  /* Aseguramos que no haya outline por defecto del navegador */
+  outline: none; 
+  /* Aplicamos una transición suave para el borde y el box-shadow */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Estado de foco explícito para .input-field */
+.input-field:focus {
+  /* Establecemos el color del borde directamente a verde-bap */
+  border-color: var(--color-verde-bap); 
+  /* Definimos el "ring" como un box-shadow con el color verde-bap y un ligero desenfoque */
+  box-shadow: 0 0 0 4px rgba(118, 196, 157, 0.25); /* Este es el equivalente a focus:ring-2 focus:ring-verde-bap */
+}
+
+.submit-btn {
+  @apply w-full py-3 bg-verde-bap hover:bg-emerald-600 text-white font-semibold rounded-full transition duration-300;
+}

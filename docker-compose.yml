@@ -1,0 +1,94 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: caja-chica-app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      # Monta la carpeta del proyecto Laravel en el directorio de trabajo del contenedor
+      - ./sistema-caja-chica-bap:/var/www/html/sistema-caja-chica-bap
+      # Excluimos vendor y node_modules para no sobrescribir las carpetas del contenedor
+      - /var/www/html/sistema-caja-chica-bap/vendor
+      - /var/www/html/sistema-caja-chica-bap/node_modules
+    depends_on:
+      - db
+    env_file:
+      - ./sistema-caja-chica-bap/.env
+    networks:
+      - caja-chica-network
+    # Instalamos las dependencias después de iniciar el contenedor
+    command: >
+      bash -c "cd /var/www/html/sistema-caja-chica-bap &&
+               composer install --ignore-platform-reqs &&
+               php artisan key:generate --ansi --force &&
+               chown -R www-data:www-data storage bootstrap/cache &&
+               chmod -R 775 storage bootstrap/cache &&
+               apache2-foreground"
+
+  db:
+    image: mysql:8.0
+    container_name: caja-chica-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_DATABASE=${DB_DATABASE:-caja_chica_bap_db}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-123}
+      - MYSQL_ALLOW_EMPTY_PASSWORD=no
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - caja-chica-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: caja-chica-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      - PMA_HOST=${DB_HOST:-db}
+      - PMA_PORT=${DB_PORT:-3306}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-123}
+    depends_on:
+      - db
+    networks:
+      - caja-chica-network
+
+  # Frontend Vue service - Configuración actualizada
+  frontend:
+    image: node:20-alpine
+    container_name: caja-chica-frontend
+    restart: unless-stopped
+    volumes:
+      - ./sistema-caja-chica-bap-vue:/app
+      - /app/node_modules
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    # Comando optimizado con opciones de depuración
+    command: >
+        sh -c "npm install &&
+              npm install -D tailwindcss@3.4.17 postcss@8.5.3 autoprefixer@10.4.21 @tailwindcss/forms @tailwindcss/typography &&
+              echo 'Instalación de dependencias completada' &&
+              if [ ! -f tailwind.config.js ]; then npx tailwindcss init -p; fi &&
+              echo 'Configuración de Tailwind completada' &&
+              npm run dev -- --host 0.0.0.0 --port 3000"
+    networks:
+      - caja-chica-network
+    # Añadimos tty y stdin_open para poder ver mejor los logs
+    tty: true
+    stdin_open: true
+
+networks:
+  caja-chica-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local

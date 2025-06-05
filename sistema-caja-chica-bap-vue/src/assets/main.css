@@ -1,10 +1,24 @@
-@import './base.css';
+/* src/assets/main.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Define tus colores BAP como variables CSS globales */
+:root {
+  --color-verde-bap: #76C49D;
+  --color-amarillo-bap: #FEDE72;
+  --color-rojo-bap: #DB3D47;
+}
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
   font-weight: normal;
+  display: flex;
+  flex-direction: column;
 }
 
 a,
@@ -17,19 +31,58 @@ a,
 
 @media (hover: hover) {
   a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+    /* Corregido: Elimina el fondo al pasar el mouse en enlaces generales */
+    background-color: transparent; /* O 'none' */
   }
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+/* Estilos para los enlaces de navegación en el navbar */
+.nav-link-item {
+  position: relative; /* Necesario para posicionar el pseudo-elemento */
+  padding-bottom: 5px; /* Espacio para la barra inferior */
+  display: inline-block; /* Asegura que el padding y el pseudo-elemento funcionen bien */
+  text-decoration: none; /* Asegura que no haya un subrayado por defecto del navegador */
+  /* El color por defecto ahora viene de text-gray-600 en el template Vue */
+  transition: color 0.3s ease-out; /* Transición para el color del texto */
 }
+
+/* Pseudo-elemento para la barra inferior */
+.nav-link-item::before {
+  content: '';
+  position: absolute;
+  bottom: 0; /* Posiciona la barra en la parte inferior */
+  left: 0;
+  width: 100%;
+  height: 3px; /* Grosor de la barra */
+  /* Usa la variable CSS para el color, con un fallback a verde-bap */
+  background-color: var(--underline-color, var(--color-verde-bap));
+  transform: scaleX(0); /* Inicialmente invisible (ancho 0) */
+  transform-origin: left; /* La animación se origina desde la izquierda */
+  transition: transform 0.3s ease-out; /* Animación suave */
+}
+
+/* Efecto al pasar el cursor: la barra se expande */
+.nav-link-item:hover::before {
+  transform: scaleX(1);
+}
+
+/* Estilo para el enlace activo (router-link-active) */
+/* CAMBIO AQUÍ: Añadimos .router-link-exact-active para que el Dashboard también se vea afectado */
+.router-link-active.nav-link-item,
+.router-link-exact-active.nav-link-item { /* <--- CAMBIO APLICADO AQUÍ */
+  /* Asegura que no haya un fondo de color en el enlace activo */
+  background: none; 
+  /* Texto del enlace activo en verde-bap, forzando la anulación de Tailwind */
+  color: var(--color-verde-bap) !important; 
+  font-weight: bold; /* Texto del enlace activo en negrita */
+}
+
+/* Asegura que la barra esté visible para el enlace activo */
+/* CAMBIO AQUÍ: Añadimos .router-link-exact-active para que el Dashboard también se vea afectado */
+.router-link-active.nav-link-item::before,
+.router-link-exact-active.nav-link-item::before { /* <--- CAMBIO APLICADO AQUÍ */
+  transform: scaleX(1); /* La barra siempre visible para el enlace activo */
+}
+
+/* Eliminamos la regla que establece display: flex y place-items: center en body */
+/* También eliminamos la configuración de grid-template-columns en el #app */

@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 # Instala extensiones PHP necesarias para Laravel
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install pdo_mysql zip gd
+    docker-php-ext-install pdo_mysql zip gd mbstring exif pcntl bcmath
 
 # Instala Composer globalmente
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -43,29 +43,9 @@ COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
 # Establece el directorio de trabajo
 WORKDIR /var/www/html
 
-# IMPORTANTE: Copia primero TODOS los archivos del proyecto
-COPY . .
-
-
-
-# Instala dependencias de PHP con la opción --ignore-platform-reqs
-RUN composer install --ignore-platform-reqs
-
-# Genera la clave de aplicación si no existe
-#RUN php artisan key:generate --force
-
-# Solución específica para problemas de Rollup/Vite en entorno Linux
-RUN rm -rf node_modules package-lock.json && \
-    npm install --no-optional && \
-    npm rebuild && \
-    npm install --platform=linux --arch=x64 @rollup/rollup-linux-x64-gnu
-
-# Compila los assets con Vite
-RUN npm run build
-
-# Asegura que las carpetas necesarias tengan permisos adecuados
-RUN chown -R www-data:www-data storage bootstrap/cache && \
-    chmod -R 775 storage bootstrap/cache
+# El COPY . . se hará mediante volúmenes en docker-compose
+# Para el contenedor, nos ubicamos en la carpeta específica del proyecto Laravel
+WORKDIR /var/www/html/sistema-caja-chica-bap
 
 # Expone el puerto web
 EXPOSE 80
