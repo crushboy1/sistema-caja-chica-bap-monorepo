@@ -31,6 +31,7 @@ class FondoEfectivo extends Model
     // Casteo de atributos
     protected $casts = [
         'monto_aprobado' => 'decimal:2',
+        'monto_disponible' => 'decimal:2',
         'fecha_apertura' => 'date',
         'fecha_cierre' => 'date',
     ];

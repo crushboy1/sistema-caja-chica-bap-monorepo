@@ -64,6 +64,9 @@ class GastoController extends Controller
                 'glosa' => 'required|string|max:1000',
                 'evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
                 'es_declaracion_jurada' => 'required|boolean',
+                'moneda' => 'required|string|max:3',
+                'pertenece_proyecto' => 'required|boolean',
+                'comentario' => 'nullable|string|max:2000',
             ]);
 
             $user = Auth::user();
@@ -81,9 +84,12 @@ class GastoController extends Controller
                 'correlativo_documento' => $validatedData['correlativo_documento'],
                 'monto_total' => $validatedData['monto_total'],
                 'id_cuenta_contable' => $validatedData['id_cuenta_contable'],
+                'moneda' => $validatedData['moneda'],
                 'glosa' => $validatedData['glosa'],
                 'ruta_evidencia' => $path,
                 'es_declaracion_jurada' => $validatedData['es_declaracion_jurada'],
+                'pertenece_proyecto' => $validatedData['pertenece_proyecto'],
+                'comentario' => $validatedData['comentario'],
                 'estado' => 'Pendiente de Aprobación Jefatura',
             ]);
 

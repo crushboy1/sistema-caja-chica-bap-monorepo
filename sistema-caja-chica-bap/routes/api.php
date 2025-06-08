@@ -7,7 +7,7 @@ use App\Http\Controllers\API\SolicitudFondoController;
 use App\Http\Controllers\API\GastoController;
 use App\Http\Controllers\API\FondoEfectivoController;
 use App\Http\Controllers\API\AreaController;
-
+use App\Http\Controllers\API\CuentaContableController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -64,11 +64,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Obtiene el historial de vida completo de un fondo específico (Apertura, Incrementos, etc.).
     Route::get('/fondos-efectivo/{id_fondo}/historial', [FondoEfectivoController::class, 'getFondoHistory']);
-
+    
 
     // --- RUTAS DE UTILITARIOS Y CATÁLOGOS ---
     // Endpoints que devuelven listas de datos para selectores, etc.
-
+    //Obtiene lista de cuentas contables.
+    Route::get('/cuentas-contables', [CuentaContableController::class, 'index']);
     // Obtiene la lista de todas las áreas.
     Route::get('/areas', [AreaController::class, 'index']);
 });

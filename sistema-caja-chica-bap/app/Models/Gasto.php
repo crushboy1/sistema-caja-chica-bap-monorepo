@@ -40,6 +40,8 @@ class Gasto extends Model
         'es_declaracion_jurada',
         'estado',
         'motivo_observacion_adm',
+        'pertenece_proyecto',
+        'comentario',
     ];
     
     /**
