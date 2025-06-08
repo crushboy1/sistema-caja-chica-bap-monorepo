@@ -18,6 +18,7 @@ class FondoEfectivo extends Model
     protected $fillable = [
         'codigo_fondo',
         'monto_aprobado',
+        'monto_disponible',
         'fecha_apertura',
         'estado',
         'fecha_cierre',

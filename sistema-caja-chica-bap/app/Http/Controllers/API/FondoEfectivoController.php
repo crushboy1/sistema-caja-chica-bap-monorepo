@@ -38,7 +38,7 @@ class FondoEfectivoController extends Controller
             'area:id,name',
             'solicitudApertura' => function ($q) {
                 $q->select('id', 'codigo_solicitud', 'id_revisor_adm', 'id_aprobador_gerente')
-                    ->with(['solicitante:id,name,last_name','revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name']);
+                    ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name']);
             }
         ]);
 
@@ -230,6 +230,7 @@ class FondoEfectivoController extends Controller
                 'id_responsable' => $request->id_responsable,
                 'id_area' => $request->id_area,
                 'monto_aprobado' => $request->monto_aprobado,
+                'monto_disponible' => $request->monto_aprobado,
                 'fecha_apertura' => $request->fecha_apertura,
                 'estado' => $request->estado,
                 'id_solicitud_apertura' => $request->id_solicitud_apertura ?? null, // Permite asignar si viene de una solicitud
@@ -325,8 +326,6 @@ class FondoEfectivoController extends Controller
             return response()->json(['message' => 'Ocurrió un error al actualizar el fondo de efectivo.', 'error' => $e->getMessage()], 500);
         }
     }
-
-
     /**
      * Elimina un fondo de efectivo.
      * Esta acción debe ser muy restringida, idealmente solo para super_admin y si el fondo está "Cerrado".
