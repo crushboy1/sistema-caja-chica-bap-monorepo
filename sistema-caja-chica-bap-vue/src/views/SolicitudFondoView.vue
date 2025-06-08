@@ -18,25 +18,17 @@
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
-        <div
-          v-if="showAperturaCard"
-          @click="handleCardClick('apertura')"
-          @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave"
-          class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="showAperturaCard" @click="handleCardClick('apertura')" @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
                  bg-gradient-to-br from-verde-bap to-verde-bap-dark
                  transition-all duration-500 ease-out
                  transform hover:scale-105 hover:-translate-y-3
                  shadow-soft hover:shadow-glow-verde
                  focus:outline-none focus:ring-4 focus:ring-verde-bap/30
                  animate-fade-in-up border-2 border-transparent
-                 hover:border-verde-bap-light/50"
-          :class="getCardClasses('apertura')"
-          style="animation-delay: 0.1s"
-          tabindex="0"
-          @keydown.enter="handleCardClick('apertura')"
-          @keydown.space.prevent="handleCardClick('apertura')"
-        >
+                 hover:border-verde-bap-light/50" :class="getCardClasses('apertura')" style="animation-delay: 0.1s"
+          tabindex="0" @keydown.enter="handleCardClick('apertura')"
+          @keydown.space.prevent="handleCardClick('apertura')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
                        transform -skew-x-12 -translate-x-full
                        group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
@@ -56,9 +48,10 @@
                 <div class="w-12 h-12 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center
                              group-hover:bg-white/35 transition-all duration-500
                              group-hover:scale-110 group-hover:rotate-12 shadow-medium">
-                  <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-white/30
@@ -78,7 +71,7 @@
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-white/60 rounded-full group-hover:bg-white
                            group-hover:scale-150 transition-all duration-300"
-                   :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'apertura' }"></div>
+                :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'apertura' }"></div>
               <div class="w-2 h-2 bg-white/40 rounded-full group-hover:bg-white/80
                            group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-white/30 rounded-full group-hover:bg-white/60
@@ -91,25 +84,17 @@
                        bg-gradient-to-t from-verde-bap-light/20 to-transparent"></div>
         </div>
 
-        <div
-          v-if="showModificacionCard"
-          @click="handleCardClick('modificacion')"
-          @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave"
-          class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="showModificacionCard" @click="handleCardClick('modificacion')" @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
                  bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
                  transition-all duration-500 ease-out
                  transform hover:scale-105 hover:-translate-y-3
                  shadow-soft hover:shadow-glow-amarillo
                  focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
                  animate-fade-in-up border-2 border-transparent
-                 hover:border-amarillo-bap-light/50"
-          :class="getCardClasses('modificacion')"
-          style="animation-delay: 0.2s"
-          tabindex="0"
-          @keydown.enter="handleCardClick('modificacion')"
-          @keydown.space.prevent="handleCardClick('modificacion')"
-        >
+                 hover:border-amarillo-bap-light/50" :class="getCardClasses('modificacion')"
+          style="animation-delay: 0.2s" tabindex="0" @keydown.enter="handleCardClick('modificacion')"
+          @keydown.space.prevent="handleCardClick('modificacion')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent
                        transform -skew-x-12 -translate-x-full
                        group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
@@ -129,9 +114,10 @@
                 <div class="w-12 h-12 bg-white/40 backdrop-blur-sm rounded-2xl flex items-center justify-center
                              group-hover:bg-white/50 transition-all duration-500
                              group-hover:scale-110 group-hover:-rotate-12 shadow-medium">
-                  <svg class="w-6 h-6 text-amarillo-bap-dark group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-6 h-6 text-amarillo-bap-dark group-hover:scale-110 transition-transform duration-300"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-gray-800/20
@@ -151,7 +137,7 @@
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-gray-600/60 rounded-full group-hover:bg-gray-800
                            group-hover:scale-150 transition-all duration-300"
-                   :class="{ 'bg-gray-800 scale-150 animate-pulse-soft': activeSection === 'modificacion' }"></div>
+                :class="{ 'bg-gray-800 scale-150 animate-pulse-soft': activeSection === 'modificacion' }"></div>
               <div class="w-2 h-2 bg-gray-500/40 rounded-full group-hover:bg-gray-700
                            group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-gray-400/30 rounded-full group-hover:bg-gray-600
@@ -160,25 +146,17 @@
           </div>
         </div>
 
-        <div
-          v-if="showSeguimientoCard"
-          @click="handleCardClick('seguimiento')"
-          @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave"
-          class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="showSeguimientoCard" @click="handleCardClick('seguimiento')" @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
                  bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
                  transition-all duration-500 ease-out
                  transform hover:scale-105 hover:-translate-y-3
                  shadow-soft hover:shadow-glow-rojo
                  focus:outline-none focus:ring-4 focus:ring-rojo-bap/30
                  animate-fade-in-up border-2 border-transparent
-                 hover:border-rojo-bap-light/50"
-          :class="getCardClasses('seguimiento')"
-          style="animation-delay: 0.3s"
-          tabindex="0"
-          @keydown.enter="handleCardClick('seguimiento')"
-          @keydown.space.prevent="handleCardClick('seguimiento')"
-        >
+                 hover:border-rojo-bap-light/50" :class="getCardClasses('seguimiento')" style="animation-delay: 0.3s"
+          tabindex="0" @keydown.enter="handleCardClick('seguimiento')"
+          @keydown.space.prevent="handleCardClick('seguimiento')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
                        transform -skew-x-12 -translate-x-full
                        group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
@@ -195,9 +173,10 @@
                 <div class="w-12 h-12 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center
                              group-hover:bg-white/35 transition-all duration-500
                              group-hover:scale-110 group-hover:animate-bounce-gentle shadow-medium">
-                  <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-white/30
@@ -217,7 +196,7 @@
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-white/60 rounded-full group-hover:bg-white
                            group-hover:scale-150 transition-all duration-300"
-                   :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'seguimiento' }"></div>
+                :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'seguimiento' }"></div>
               <div class="w-2 h-2 bg-white/40 rounded-full group-hover:bg-white/80
                            group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-white/30 rounded-full group-hover:bg-white/60
@@ -227,42 +206,27 @@
         </div>
       </div>
 
-      <Transition
-        enter-active-class="transition-all duration-500 ease-out"
+      <Transition enter-active-class="transition-all duration-500 ease-out"
         enter-from-class="opacity-0 transform translate-y-8 scale-95"
         enter-to-class="opacity-100 transform translate-y-0 scale-100"
         leave-active-class="transition-all duration-300 ease-in"
         leave-from-class="opacity-100 transform translate-y-0 scale-100"
-        leave-to-class="opacity-0 transform -translate-y-4 scale-95"
-      >
+        leave-to-class="opacity-0 transform -translate-y-4 scale-95">
         <div v-if="activeSection" class="mt-12">
           <div class="glass rounded-3xl p-8 shadow-strong backdrop-blur-xl border border-white/20">
-            <AperturaFondos
-              v-if="activeSection === 'apertura'"
-              @solicitudEnviada="handleSolicitudEnviada"
-              class="animate-fade-in-up"
-            />
-            <ModificacionFondos
-              v-if="activeSection === 'modificacion'"
-              @close="handleClose"
-              class="animate-fade-in-up"
-            />
-            <SeguimientoSolicitudes
-              v-if="activeSection === 'seguimiento'"
-              @close="handleClose"
-              class="animate-fade-in-up"
-            />
+            <AperturaFondos v-if="activeSection === 'apertura'" @solicitudEnviada="handleSolicitudEnviada"
+              class="animate-fade-in-up" />
+            <ModificacionFondos v-if="activeSection === 'modificacion'" @close="handleClose"
+              class="animate-fade-in-up" />
+            <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" @close="handleClose"
+              class="animate-fade-in-up" />
           </div>
         </div>
       </Transition>
 
-      <Transition
-        enter-active-class="transition-all duration-600 ease-out delay-500"
-        enter-from-class="opacity-0 transform translate-y-4"
-        enter-to-class="opacity-100 transform translate-y-0"
-      >
-        <div v-if="!activeSection"
-              class="relative overflow-hidden rounded-2xl
+      <Transition enter-active-class="transition-all duration-600 ease-out delay-500"
+        enter-from-class="opacity-0 transform translate-y-4" enter-to-class="opacity-100 transform translate-y-0">
+        <div v-if="!activeSection" class="relative overflow-hidden rounded-2xl
                      bg-gradient-to-r from-verde-bap-extralight to-verde-bap-light
                      border-l-4 border-verde-bap p-6 shadow-soft">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent
@@ -272,13 +236,16 @@
             <div class="flex-shrink-0">
               <div class="w-10 h-10 bg-verde-bap-light rounded-full flex items-center justify-center">
                 <svg class="h-6 w-6 text-verde-bap animate-bounce-gentle" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                  <path fill-rule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clip-rule="evenodd" />
                 </svg>
               </div>
             </div>
             <div class="flex-1">
               <p class="text-gray-700 text-base leading-relaxed">
-                <strong class="font-semibold">Nota importante:</strong> Solo los usuarios tipo "Jefatura de Área" en adelante podrán acceder al módulo de solicitudes.
+                <strong class="font-semibold">Nota importante:</strong> Solo los usuarios tipo "Jefatura de Área" en
+                adelante podrán acceder al módulo de solicitudes.
                 Las solicitudes serán aprobadas por la Jefatura de Administración y Gerencia General.
               </p>
             </div>
@@ -448,9 +415,17 @@ onUnmounted(() => {
 <style scoped>
 /* Animaciones adicionales personalizadas */
 @keyframes cardClick {
-  0% { transform: scale(1) translateY(0); }
-  50% { transform: scale(0.98) translateY(2px); }
-  100% { transform: scale(1) translateY(0); }
+  0% {
+    transform: scale(1) translateY(0);
+  }
+
+  50% {
+    transform: scale(0.98) translateY(2px);
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+  }
 }
 
 .animate-card-click {
@@ -498,14 +473,20 @@ onUnmounted(() => {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: transparent; /* Fallback para navegadores que no soportan background-clip */
+  color: transparent;
+  /* Fallback para navegadores que no soportan background-clip */
   background-size: 200% auto;
   animation: pulse-gradient 4s infinite alternate;
 }
 
 /* Keyframes para el gradiente de texto (si no están en tailwind.config.js) */
 @keyframes pulse-gradient {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 100% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 100% 50%;
+  }
 }
 </style>

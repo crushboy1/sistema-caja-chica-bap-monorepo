@@ -40,22 +40,18 @@
                   </svg>
                 </div>
               </div>
-
-              <!-- Filtro Fecha de Apertura -->
-              <div class="relative">
-                <label for="filter_fecha_apertura" class="block text-sm font-medium text-gray-700 mb-1">Fecha de
-                  Apertura</label>
-                <input type="date" id="filter_fecha_apertura" v-model="filtro.fecha_apertura"
+              <!-- Filtro Fecha de Inicio -->
+              <div>
+                <label for="filter_fecha_inicio" class="block text-sm font-medium text-gray-700 mb-1">Fecha
+                  Inicio</label>
+                <input type="date" id="filter_fecha_inicio" v-model="filtro.fecha_inicio"
                   class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
-                <div v-if="buscandoFondos && filtro.fecha_apertura"
-                  class="absolute right-3 top-8 text-gray-400">
-                  <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                    </path>
-                  </svg>
-                </div>
+              </div>
+              <!-- Filtro Fecha de Fin -->
+              <div>
+                <label for="filter_fecha_fin" class="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                <input type="date" id="filter_fecha_fin" v-model="filtro.fecha_fin"
+                  class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
               </div>
 
               <!-- Filtro Área del Fondo (solo para JADM/SA) -->
@@ -254,11 +250,10 @@
                   </div>
                   <div class="flex items-center justify-between">
                     <div>
-                      <label :for="'monto_estimado_' + index"
-                        class="block text-sm font-medium text-gray-700 mb-1">Monto Mensual Estimado (S/.) <span
-                          class="text-rojo-bap">*</span></label>
-                      <input type="number" :id="'monto_estimado_' + index"
-                        v-model.number="gasto.monto_estimado" step="0.01" min="0"
+                      <label :for="'monto_estimado_' + index" class="block text-sm font-medium text-gray-700 mb-1">Monto
+                        Mensual Estimado (S/.) <span class="text-rojo-bap">*</span></label>
+                      <input type="number" :id="'monto_estimado_' + index" v-model.number="gasto.monto_estimado"
+                        step="0.01" min="0"
                         class="mt-1 block w-full p-3 border border-gray-300 rounded-md bg-white shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                         required />
                     </div>
@@ -327,7 +322,7 @@
                   <div>
                     <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo del {{
                       tipoModificacion === 'Incremento' ? 'Incremento' : (tipoModificacion === 'Decremento' ?
-                      'Decremento' : 'Cierre') }} <span class="text-rojo-bap">*</span></label>
+                        'Decremento' : 'Cierre') }} <span class="text-rojo-bap">*</span></label>
                     <textarea id="reason" v-model="motivo" rows="4"
                       class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap resize-none"
                       required></textarea>
@@ -364,23 +359,20 @@ import Swal from 'sweetalert2';
 
 // Emitir 'close' para que el componente padre (SolicitudFondo.vue) pueda cerrarlo
 const emit = defineEmits(['close']);
-
-// --- Variables de Estado Internas ---
-const vistaActual = ref('lista'); // 'lista' (de fondos a elegir) o 'formulario' (de modificación)
-const fondoParaEditar = ref(null); // Almacena el objeto del fondo seleccionado
-
-// --- Variables Reactivas Generales (del usuario y carga de fondos) ---
+// --- Estado y Variables ---
+const vistaActual = ref('lista');
+const fondoParaEditar = ref(null);
 const usuarioActual = ref(null);
 const cargandoUsuario = ref(true);
-const fondosExistentes = ref([]); // Para almacenar los fondos de efectivo existentes (todos los activos para JADM/SA, o solo los del JA)
-const cargandoFondos = ref(false); // Estado de carga para los fondos
-const buscandoFondos = ref(false); // Nuevo: Indica si hay una búsqueda pendiente por debounce
-const areasDisponibles = ref([]); // Para el filtro de áreas (solo si es JADM/SA)
-
+const fondosExistentes = ref([]);
+const cargandoFondos = ref(true); // Inicia en true
+const buscandoFondos = ref(false);
+const areasDisponibles = ref([]);
 // --- Variables para Filtros ---
 const filtro = ref({
   codigo_fondo: '',
-  fecha_apertura: '',
+  fecha_inicio: '',
+  fecha_fin: '',
   area_id: '',
 });
 
@@ -440,84 +432,64 @@ const removerGastoDetallado = (index) => {
 };
 
 // --- Funciones de Carga de Datos ---
+// --- Carga de Datos ---
 const obtenerUsuarioAutenticado = async () => {
+  cargandoUsuario.value = true;
   try {
     const response = await api.get('/user');
     usuarioActual.value = response.data.user;
-    cargandoUsuario.value = false;
   } catch (error) {
     console.error('Error al obtener datos del usuario autenticado:', error);
     Swal.fire({
       icon: 'error',
       title: 'Error de Autenticación',
       text: 'No se pudieron cargar los datos del usuario. Por favor, inicia sesión de nuevo.',
-      confirmButtonText: 'Ir a Login'
-    }).then(() => {
-      router.push('/login');
-    });
+    }).then(() => router.push('/login'));
+  } finally {
     cargandoUsuario.value = false;
   }
 };
 
 const obtenerFondosExistentes = async () => {
-  // Solo mostrar el loader principal si no es una búsqueda debounced
   if (!buscandoFondos.value) {
     cargandoFondos.value = true;
   }
-
+  
   try {
-    // Construir los parámetros de la API para los filtros
     const params = { estado: 'Activo' };
 
     if (filtro.value.codigo_fondo) {
       params.codigo_fondo = filtro.value.codigo_fondo;
     }
-    if (filtro.value.fecha_apertura) {
-      params.fecha_apertura = filtro.value.fecha_apertura;
+    if (filtro.value.fecha_inicio) {
+      params.fecha_inicio = filtro.value.fecha_inicio;
     }
-    // Si el usuario es Jefe de Administración o Super Admin, enviar area_id del filtro
-    if (usuarioActual.value && (usuarioActual.value.role.name === 'jefe_administracion' || usuarioActual.value.role.name === 'super_admin')) {
+    if (filtro.value.fecha_fin) {
+      params.fecha_fin = filtro.value.fecha_fin;
+    }
+    
+    if (usuarioActual.value && (usuarioActual.value.role.name === 'jefe_administracion' || usuarioActual.value.role.name === 'super_admin' || usuarioActual.value.role.name === 'gerente_general')) {
       if (filtro.value.area_id) {
         params.area_id = filtro.value.area_id;
       }
     }
 
     const response = await api.get('/fondos-efectivo', { params });
-
-    // --- CORRECCIÓN CLAVE AQUÍ ---
-    // Cambiamos 'response.data.fondo_efectivo' a 'response.data.fondos'
-    if (response.data && Array.isArray(response.data.fondos)) {
-      fondosExistentes.value = response.data.fondos.map(fondo => ({
-        ...fondo,
-        monto_aprobado: parseFloat(fondo.monto_aprobado)
-      }));
-      console.log('Fondos activos cargados exitosamente:', fondosExistentes.value.length, 'fondos.');
-    } else {
-      console.error('La respuesta de la API no contiene un array de fondos:', response.data);
-      fondosExistentes.value = [];
-      Swal.fire({
-        icon: 'warning',
-        title: 'Datos Inesperados',
-        text: 'La API devolvió un formato de datos inesperado para los fondos de efectivo. Por favor, contacta a soporte.'
-      });
-    }
-
+    fondosExistentes.value = response.data.fondos.map(fondo => ({
+      ...fondo,
+      monto_aprobado: parseFloat(fondo.monto_aprobado)
+    }));
   } catch (error) {
     console.error('Error al obtener fondos existentes:', error);
-    let errorMessage = 'No se pudieron cargar los fondos de efectivo activos. Asegúrate de tener fondos activos o verifica tu conexión.';
-    if (error.response && error.response.status === 404) {
-      errorMessage = 'Error: La ruta para obtener los fondos de efectivo activos no se encontró en el servidor. Por favor, verifica tu configuración de API en el backend.';
-    } else if (error.response && error.response.data && error.response.data.message) {
-      errorMessage = error.response.data.message;
-    }
     Swal.fire({
       icon: 'error',
-      title: 'Error al cargar fondos',
-      text: errorMessage
+      title: 'Error al Cargar Fondos',
+      text: error.response?.data?.message || 'No se pudieron cargar los fondos de efectivo activos.'
     });
+    fondosExistentes.value = [];
   } finally {
     cargandoFondos.value = false;
-    buscandoFondos.value = false; // Resetear indicador de búsqueda pendiente
+    buscandoFondos.value = false;
   }
 };
 
@@ -537,9 +509,7 @@ const obtenerAreas = async () => {
 };
 
 
-const fondosFiltrados = computed(() => {
-  return fondosExistentes.value;
-});
+const fondosFiltrados = computed(() => fondosExistentes.value);
 
 // --- Función para manejar búsquedas con debounce (general) ---
 let debounceTimeout = null;
@@ -560,14 +530,19 @@ const aplicarFiltros = () => {
 };
 
 const limpiarFiltros = () => {
-  filtro.value.codigo_fondo = '';
-  filtro.value.fecha_apertura = '';
-  filtro.value.area_id = '';
-  clearTimeout(debounceTimeout); // Limpiar cualquier debounce pendiente
-  buscandoFondos.value = false; // Resetear indicador de búsqueda pendiente
-  obtenerFondosExistentes(); // Vuelve a llamar a la API sin filtros
+  filtro.value = {
+    codigo_fondo: '',
+    fecha_inicio: '',
+    fecha_fin: '',
+    area_id: '',
+  };
+  clearTimeout(debounceTimeout);
+  buscandoFondos.value = false;
 };
 
+const hayFiltrosActivos = computed(() => {
+  return filtro.value.codigo_fondo || filtro.value.fecha_inicio || filtro.value.fecha_fin || filtro.value.area_id;
+});
 
 // --- Funciones de Navegación de Vistas Internas ---
 const seleccionarFondoParaEditar = (fondo) => {
@@ -756,20 +731,21 @@ const manejarEnvio = async () => {
   });
 };
 
-// --- Watchers para filtros ---
-// Watcher para el filtro de código de fondo (con debounce)
+// --- Watchers para activar el debounce ---
 watch(() => filtro.value.codigo_fondo, () => {
   triggerSearchWithDebounce();
 });
-
-// Watcher para el filtro de fecha de apertura (con debounce)
-watch(() => filtro.value.fecha_apertura, () => {
+watch(() => filtro.value.fecha_inicio, () => {
   triggerSearchWithDebounce();
 });
-
-// Watcher para el filtro de área (sin debounce, ya que es un select)
+watch(() => filtro.value.fecha_fin, () => {
+  triggerSearchWithDebounce();
+});
 watch(() => filtro.value.area_id, () => {
-  obtenerFondosExistentes(); // Llama directamente a la API
+  // Para los select, la búsqueda puede ser inmediata
+  clearTimeout(debounceTimeout);
+  buscandoFondos.value = false;
+  obtenerFondosExistentes();
 });
 
 

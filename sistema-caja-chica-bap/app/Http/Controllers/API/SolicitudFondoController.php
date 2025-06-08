@@ -101,7 +101,7 @@ class SolicitudFondoController extends Controller
             $query->whereDate('created_at', '<=', $request->fecha_fin);
         }
 
-        $solicitudes = $query->orderBy('created_at', 'desc')->get();
+        $solicitudes = $query->orderBy('codigo_solicitud', 'desc')->get();
 
         return response()->json([
             'message' => 'Solicitudes de fondo obtenidas exitosamente.',

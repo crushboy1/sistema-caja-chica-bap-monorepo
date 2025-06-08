@@ -26,81 +26,118 @@ class FondoEfectivoController extends Controller
     {
         $user = Auth::user();
 
-        // Verificar si el usuario está autenticado
         if (!$user) {
             return response()->json(['message' => 'No autenticado.'], 401);
         }
 
-        // Cargar relaciones necesarias para la visualización detallada de los fondos
         $query = FondoEfectivo::query();
 
+        // Carga la solicitud de apertura y sus relaciones para mostrar en la tabla principal.
         $query->with([
-            'responsable:id,name,last_name,email,cargo', // Usuario responsable del fondo
-            'area:id,name', // Área a la que pertenece el fondo
-            'solicitudApertura' => function ($q) { // Cargar la solicitud de apertura
-                $q->select('id', 'codigo_solicitud', 'tipo_solicitud', 'monto_solicitado', 'estado', 'id_revisor_adm', 'id_aprobador_gerente'); // Incluir IDs de revisores/aprobadores
-
-                // Cargar los detalles de gastos proyectados de la solicitud de apertura
-                $q->with('detallesGastosProyectados:id,id_solicitud_fondo,descripcion_gasto,monto_estimado');
-
-                // Cargar los datos del revisor de ADM de la solicitud de apertura
-                $q->with('revisorAdm:id,name,last_name');
-
-                // Cargar los datos del aprobador Gerente de la solicitud de apertura
-                $q->with('aprobadorGerente:id,name,last_name');
-
-                // Cargar el historial de estados de la solicitud de apertura
-                $q->with(['historialEstados' => function ($qHist) {
-                    $qHist->orderBy('created_at', 'asc')->with('usuarioAccion:id,name,last_name');
-                }]);
+            'responsable:id,name,last_name,email,cargo',
+            'area:id,name',
+            'solicitudApertura' => function ($q) {
+                $q->select('id', 'codigo_solicitud', 'id_revisor_adm', 'id_aprobador_gerente')
+                    ->with(['solicitante:id,name,last_name','revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name']);
             }
         ]);
 
-        // Lógica para filtrar fondos según el rol del usuario
+        // Lógica de visibilidad por rol
         if ($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) {
-            // Super Admin, Gerente General y Jefe de Administración pueden ver todos los fondos
-            // Los filtros se aplicarán sobre el conjunto completo de fondos
+            // Acceso total para roles de administración.
         } elseif ($user->hasRole('jefe_area') || $user->hasRole('colaborador')) {
-            // Jefe de Área y Colaborador solo ven los fondos de los que son responsables.
-            $query->where('id_responsable', $user->id); // Solo los fondos donde el usuario es el responsable
+            $query->where('id_responsable', $user->id);
         } else {
-            // Rol no reconocido o sin permisos
-            return response()->json(['message' => 'Acceso denegado. No tienes permisos para ver fondos de efectivo.'], 403);
+            return response()->json(['message' => 'Acceso denegado. Rol no reconocido.'], 403);
         }
 
-        // Aplicar filtros adicionales si vienen en la request
-        if ($request->has('estado') && $request->estado !== 'Todos') {
+        // Aplicar filtros adicionales de la request
+        if ($request->filled('estado') && $request->estado !== 'Todos') {
             $query->where('estado', $request->estado);
         }
-        if ($request->has('codigo_fondo')) {
+        if ($request->filled('codigo_fondo')) {
             $query->where('codigo_fondo', 'like', '%' . $request->codigo_fondo . '%');
         }
-        if ($request->has('fecha_apertura')) {
-            // Asume que la fecha_apertura viene en formato 'YYYY-MM-DD'
-            $query->whereDate('fecha_apertura', $request->fecha_apertura);
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('fecha_apertura', '>=', $request->fecha_inicio);
         }
-
-        // Filtro por nombre de responsable (si se proporciona)
-        if ($request->has('responsable_name')) {
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('fecha_apertura', '<=', $request->fecha_fin);
+        }
+        if ($request->filled('responsable_name')) {
             $searchTerm = strtolower($request->responsable_name);
             $query->whereHas('responsable', function ($q) use ($searchTerm) {
                 $q->where(DB::raw('LOWER(name)'), 'like', '%' . $searchTerm . '%')
                     ->orWhere(DB::raw('LOWER(last_name)'), 'like', '%' . $searchTerm . '%');
             });
         }
-
-        // El filtro por area_id solo se aplica si el usuario es JADM, GG o SA
-        // y si el parámetro area_id está presente en la request.
-        if (($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) && $request->has('area_id')) {
+        if (($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) && $request->filled('area_id')) {
             $query->where('id_area', $request->area_id);
         }
 
-        // Ordenar los resultados
-        $fondos = $query->orderBy('fecha_apertura', 'desc')->get();
+        // Ordenamiento por código de fondo para mostrar los más recientes primero.
+        $fondos = $query->orderBy('codigo_fondo', 'desc')->get();
 
         return response()->json([
             'message' => 'Fondos de efectivo obtenidos exitosamente.',
             'fondos' => $fondos,
+        ]);
+    }
+
+    /**
+     *
+     * @param  int  $id_fondo
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getFondoHistory($id_fondo)
+    {
+        $user = Auth::user();
+        $fondo = FondoEfectivo::findOrFail($id_fondo);
+
+        // Validar permisos: el usuario debe poder ver el fondo para ver su historial.
+        if (!($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion') || $user->id === $fondo->id_responsable)) {
+            return response()->json(['message' => 'Acceso denegado.'], 403);
+        }
+
+        if (!$fondo->id_solicitud_apertura) {
+            return response()->json(['historial' => [], 'message' => 'Este fondo no tiene una solicitud de apertura para rastrear su historial.'], 200);
+        }
+
+        $openingRequestId = $fondo->id_solicitud_apertura;
+
+        // Buscamos la solicitud de apertura Y todas las solicitudes de modificación
+        // que apuntan a ella y que han sido aprobadas.
+        $historialSolicitudes = SolicitudFondo::where(function ($query) use ($openingRequestId) {
+            $query->where('id', $openingRequestId)
+                ->orWhere('id_solicitud_original', $openingRequestId);
+        })
+            ->where('estado', 'Aprobada') // Solo nos interesan las acciones que se concretaron
+            ->with([
+                'revisorAdm:id,name,last_name',
+                'aprobadorGerente:id,name,last_name'
+            ])
+            ->orderBy('updated_at', 'asc') // Ordenamos por fecha de aprobación final
+            ->get();
+
+        // Formatear la respuesta para que sea más fácil de usar en el frontend
+        $formattedHistory = $historialSolicitudes->map(function ($solicitud) {
+            // Determinar el aprobador final basado en el tipo de solicitud y los IDs guardados
+            $aprobador = $solicitud->aprobadorGerente ?? $solicitud->revisorAdm;
+
+            return [
+                'id' => $solicitud->id,
+                'codigo_solicitud' => $solicitud->codigo_solicitud,
+                'tipo' => $solicitud->tipo_solicitud,
+                'monto_final' => $solicitud->monto_solicitado,
+                'motivo' => $solicitud->motivo_detalle,
+                'fecha_aprobacion' => $solicitud->updated_at->format('d/m/Y H:i'),
+                'solicitado_por' => $solicitud->solicitante ? "{$solicitud->solicitante->name} {$solicitud->solicitante->last_name}" : 'N/A',
+                'aprobado_por' => $aprobador ? "{$aprobador->name} {$aprobador->last_name}" : 'Sistema',
+            ];
+        });
+
+        return response()->json([
+            'historial' => $formattedHistory,
         ]);
     }
 
@@ -204,7 +241,6 @@ class FondoEfectivoController extends Controller
                 'message' => 'Fondo de efectivo creado exitosamente.',
                 'fondo' => $fondo,
             ], 201);
-
         } catch (ValidationException $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error de validación.', 'errors' => $e->errors()], 422);
@@ -265,7 +301,7 @@ class FondoEfectivoController extends Controller
                 $fondo->motivo_cierre = $fondo->motivo_cierre ?? 'Cierre manual por Administración.';
                 $fondo->monto_aprobado = 0.00; // Al cerrar, el monto debe ser 0
             } elseif ($fondo->isDirty('estado') && $fondo->estado === 'Activo') {
-                 // Si se reactiva un fondo, limpiar fecha y motivo de cierre
+                // Si se reactiva un fondo, limpiar fecha y motivo de cierre
                 $fondo->fecha_cierre = null;
                 $fondo->motivo_cierre = null;
             }
@@ -277,7 +313,6 @@ class FondoEfectivoController extends Controller
                 'message' => 'Fondo de efectivo actualizado exitosamente.',
                 'fondo' => $fondo,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             DB::rollBack();
             return response()->json(['message' => 'Fondo de efectivo no encontrado.'], 404);

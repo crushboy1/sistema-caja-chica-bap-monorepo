@@ -1,9 +1,9 @@
 // src/router/index.js
-import { createRouter, createWebHistory } from 'vue-router';
-import LoginView from '@/views/LoginView.vue';
-import MainLayout from '@/components/layout/MainLayout.vue'; // Importa el nuevo componente de layout
-import SolicitudFondoView from '@/views/SolicitudFondoView.vue';
-import GestiondeUsuariosView from '@/views/GestionUsuariosView.vue';
+import { createRouter, createWebHistory } from 'vue-router'
+import LoginView from '@/views/LoginView.vue'
+import MainLayout from '@/components/layout/MainLayout.vue' // Importa el nuevo componente de layout
+import SolicitudFondoView from '@/views/SolicitudFondoView.vue'
+import GestiondeUsuariosView from '@/views/GestionUsuariosView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -43,6 +43,11 @@ const router = createRouter({
           component: () => import('@/views/DeclaracionesView.vue'),
         },
         {
+          path: 'fondos',
+          name: 'dashboard-fondos',
+          component: () => import('@/components/fondos/GestionFondos.vue'), // Apuntando a tu componente
+        },
+        {
           path: 'gestion-usuarios',
           name: 'gestion-usuarios',
           component: () => import('@/views/GestionUsuariosView.vue'),
@@ -51,7 +56,7 @@ const router = createRouter({
       ],
     },
   ],
-});
+})
 
 // Opcional: Guardia de navegación para proteger rutas
 // router.beforeEach((to, from, next) => {
@@ -64,4 +69,4 @@ const router = createRouter({
 //   }
 // });
 
-export default router;
+export default router

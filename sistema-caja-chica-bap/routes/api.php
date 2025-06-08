@@ -6,83 +6,69 @@ use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\SolicitudFondoController;
 use App\Http\Controllers\API\GastoController;
 use App\Http\Controllers\API\FondoEfectivoController;
-use App\Http\Controllers\API\AreaController; // <-- ¡NUEVA IMPORTACIÓN!
+use App\Http\Controllers\API\AreaController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| Aquí se registran todas las rutas de la API de la aplicación.
 |
 */
 
-// Rutas de prueba CORS
-Route::get('/test-cors', function (Request $request) {
-    return response()->json([
-        'message' => 'CORS funcionando correctamente',
-        'timestamp' => now(),
-        'origin' => $request->header('Origin'),
-        'method' => $request->method(),
-        'headers' => [
-            'origin' => $request->header('Origin'),
-            'user-agent' => $request->header('User-Agent'),
-            'accept' => $request->header('Accept'),
-            'content-type' => $request->header('Content-Type')
-        ]
-    ]);
-});
+//==========================================================================
+// RUTAS PÚBLICAS
+//==========================================================================
 
-Route::post('/test-cors', function (Request $request) {
-    return response()->json([
-        'message' => 'POST CORS funcionando correctamente',
-        'timestamp' => now(),
-        'origin' => $request->header('Origin'),
-        'method' => $request->method(),
-        'received_data' => $request->all(),
-        'headers' => [
-            'origin' => $request->header('Origin'),
-            'content-type' => $request->header('Content-Type')
-        ]
-    ]);
-});
-
-// Rutas de autenticación (públicas)
+// --- Autenticación ---
+// Endpoints para que los usuarios inicien sesión y se registren.
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/register', [AuthController::class, 'register']);
 });
 
-// Rutas protegidas por Sanctum (requieren autenticación)
-Route::middleware('auth:sanctum')->group(function () {
-    // ✅ Cambiar esta línea para usar el AuthController
-    Route::get('/user', [AuthController::class, 'user']);
-
-    // Rutas de autenticación protegidas
-    Route::prefix('auth')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::get('/me', [AuthController::class, 'me']);
-    });
-
-    // Rutas para Solicitud de Fondo
-    Route::apiResource('solicitudes-fondo', SolicitudFondoController::class);
-    // Rutas para Gestión de Gastos
-    Route::apiResource('gastos', GastoController::class);
-    Route::apiResource('fondos-efectivo', FondoEfectivoController::class)->parameters([
-        'fondos-efectivo' => 'id_fondo'
-    ]);
-    // ✅ ¡NUEVA RUTA PARA OBTENER ÁREAS!
-    Route::get('/areas', [AreaController::class, 'index']);
+// --- Estado de la API ---
+// Endpoint para verificar que la API está funcionando correctamente.
+Route::get('/health', function () {
+    return response()->json(['status' => 'OK', 'timestamp' => now()]);
 });
 
-// Ruta para verificar el estado de la API
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'OK',
-        'timestamp' => now(),
-        'app' => config('app.name'),
-        'version' => '1.0.0'
+
+//==========================================================================
+// RUTAS PROTEGIDAS (Requieren autenticación vía Sanctum)
+//==========================================================================
+Route::middleware('auth:sanctum')->group(function () {
+
+    // --- Gestión de Usuario y Sesión ---
+    Route::get('/user', [AuthController::class, 'user']); // Obtiene la información del usuario autenticado.
+    Route::post('/auth/logout', [AuthController::class, 'logout']); // Cierra la sesión del usuario.
+
+    // --- RECURSOS PRINCIPALES (RESTful) ---
+    // Proporcionan las operaciones CRUD estándar (index, show, store, update, destroy).
+
+    // Gestión de todas las solicitudes (Apertura, Modificación, etc.).
+    Route::apiResource('solicitudes-fondo', SolicitudFondoController::class);
+
+    // Gestión de los fondos de caja chica.
+    Route::apiResource('fondos-efectivo', FondoEfectivoController::class)->parameters([
+        'fondos-efectivo' => 'id_fondo' // Asegura que el parámetro en la URL sea {id_fondo}
     ]);
+
+    // Gestión de los gastos individuales (para el nuevo Módulo de Declaraciones).
+    Route::apiResource('gastos', GastoController::class);
+
+
+    // --- RUTAS ESPECÍFICAS DE RECURSOS ---
+    // Endpoints para acciones que no encajan en el CRUD estándar.
+
+    // Obtiene el historial de vida completo de un fondo específico (Apertura, Incrementos, etc.).
+    Route::get('/fondos-efectivo/{id_fondo}/historial', [FondoEfectivoController::class, 'getFondoHistory']);
+
+
+    // --- RUTAS DE UTILITARIOS Y CATÁLOGOS ---
+    // Endpoints que devuelven listas de datos para selectores, etc.
+
+    // Obtiene la lista de todas las áreas.
+    Route::get('/areas', [AreaController::class, 'index']);
 });

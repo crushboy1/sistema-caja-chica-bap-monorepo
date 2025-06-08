@@ -39,11 +39,13 @@
 
           <!-- Filtro Responsable -->
           <div class="relative">
-            <label for="filter_responsable_name" class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
+            <label for="filter_responsable_name"
+              class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
             <input type="text" id="filter_responsable_name" v-model="filtro.responsable_name"
               class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
               placeholder="Nombre o Apellido" />
-            <div v-if="buscandoFondos && filtro.responsable_name.length > 0" class="absolute right-3 top-8 text-gray-400">
+            <div v-if="buscandoFondos && filtro.responsable_name.length > 0"
+              class="absolute right-3 top-8 text-gray-400">
               <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor"
@@ -65,7 +67,8 @@
           </div>
 
           <!-- Filtro Área del Fondo (solo para JADM/SA) -->
-          <div v-if="usuarioActual && (usuarioActual.role.name === 'jefe_administracion' || usuarioActual.role.name === 'super_admin')">
+          <div
+            v-if="usuarioActual && (usuarioActual.role.name === 'jefe_administracion' || usuarioActual.role.name === 'super_admin')">
             <label for="filter_area" class="block text-sm font-medium text-gray-700 mb-1">Área del Fondo</label>
             <select id="filter_area" v-model="filtro.area_id"
               class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
@@ -164,7 +167,8 @@
                 <td class="py-4 px-4 text-left whitespace-nowrap">{{ fondo.codigo_fondo }}</td>
                 <td class="py-4 px-4 text-left">{{ fondo.responsable?.name }} {{ fondo.responsable?.last_name }}</td>
                 <td class="py-4 px-4 text-left">{{ fondo.area?.name }}</td>
-                <td class="py-4 px-4 text-left font-medium whitespace-nowrap">S/. {{ fondo.monto_aprobado ? parseFloat(fondo.monto_aprobado).toFixed(2) : '0.00' }}</td>
+                <td class="py-4 px-4 text-left font-medium whitespace-nowrap">S/. {{ fondo.monto_aprobado ?
+                  parseFloat(fondo.monto_aprobado).toFixed(2) : '0.00' }}</td>
                 <td class="py-4 px-4 text-left">
                   <span :class="{
                     'bg-green-200 text-green-600': fondo.estado === 'Activo',
@@ -180,10 +184,13 @@
                   {{ fondo.solicitud_apertura?.codigo_solicitud || 'N/A' }}
                 </td>
                 <td class="py-4 px-4 text-left">
-                  {{ fondo.solicitud_apertura?.revisor_adm?.name ? `${fondo.solicitud_apertura.revisor_adm.name} ${fondo.solicitud_apertura.revisor_adm.last_name}` : 'N/A' }}
+                  {{ fondo.solicitud_apertura?.revisor_adm?.name ? `${fondo.solicitud_apertura.revisor_adm.name}
+                  ${fondo.solicitud_apertura.revisor_adm.last_name}` : 'N/A' }}
                 </td>
                 <td class="py-4 px-4 text-left">
-                  {{ fondo.solicitud_apertura?.aprobador_gerente?.name ? `${fondo.solicitud_apertura.aprobador_gerente.name} ${fondo.solicitud_apertura.aprobador_gerente.last_name}` : 'N/A' }}
+                  {{ fondo.solicitud_apertura?.aprobador_gerente?.name ?
+                    `${fondo.solicitud_apertura.aprobador_gerente.name}
+                  ${fondo.solicitud_apertura.aprobador_gerente.last_name}` : 'N/A' }}
                 </td>
                 <td class="py-4 px-4 text-center">
                   <button @click="verHistorialFondo(fondo)"
@@ -205,18 +212,18 @@
           <button @click="paginaAnterior" :disabled="paginaActual === 1" :class="[
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200',
             paginaActual === 1
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-verde-bap text-white hover:bg-verde-bap-dark'
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-verde-bap text-white hover:bg-verde-bap-dark'
           ]">
             Anterior
           </button>
 
           <div class="flex space-x-1">
             <button v-for="pagina in Math.min(totalPaginas, 5)" :key="pagina" @click="irAPagina(pagina)" :class="[
-                'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
-                paginaActual === pagina
-                    ? 'bg-verde-bap text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
+              paginaActual === pagina
+                ? 'bg-verde-bap text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             ]">
               {{ pagina }}
             </button>
@@ -224,10 +231,10 @@
             <span v-if="totalPaginas > 5" class="flex items-center px-2 text-gray-500">...</span>
 
             <button v-if="totalPaginas > 5" @click="irAPagina(totalPaginas)" :class="[
-                'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
-                paginaActual === totalPaginas
-                    ? 'bg-verde-bap text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
+              paginaActual === totalPaginas
+                ? 'bg-verde-bap text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             ]">
               {{ totalPaginas }}
             </button>
@@ -236,8 +243,8 @@
           <button @click="paginaSiguiente" :disabled="paginaActual === totalPaginas" :class="[
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200',
             paginaActual === totalPaginas
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-verde-bap text-white hover:bg-verde-bap-dark'
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-verde-bap text-white hover:bg-verde-bap-dark'
           ]">
             Siguiente
           </button>
@@ -250,8 +257,8 @@
     </div>
 
     <!-- Modal para el historial de estados de la solicitud de apertura -->
-    <HistorialEstadosModal :mostrar="mostrarHistorialModal" :solicitud="solicitudHistorialSeleccionada"
-      @close="cerrarHistorialModal" />
+    <HistorialFondoModal :mostrar="mostrarHistorialFondoModal" :fondo="fondoParaHistorial"
+      @close="cerrarHistorialFondoModal" />
   </div>
 </template>
 
@@ -261,7 +268,7 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
 // Asumiendo que ya tienes este modal:
-import HistorialEstadosModal from './HistorialEstadosModal.vue';
+import HistorialFondoModal from './HistorialFondoModal.vue'; 
 
 // --- Variables de Estado ---
 const usuarioActual = ref(null);
@@ -271,9 +278,9 @@ const cargandoFondos = ref(true);
 const buscandoFondos = ref(false); // Indica si hay una búsqueda pendiente por debounce
 const areasDisponibles = ref([]);
 
-// Variables para el modal de historial de estados
-const mostrarHistorialModal = ref(false);
-const solicitudHistorialSeleccionada = ref(null); // Almacenará la solicitud de apertura asociada al fondo
+// Variables para el modal de historial
+const mostrarHistorialFondoModal = ref(false);
+const fondoParaHistorial = ref(null);
 
 // --- Variables para Filtros y Búsqueda ---
 const filtro = ref({
@@ -301,17 +308,17 @@ const rolUsuario = computed(() => {
 
 const hayFiltrosActivos = computed(() => {
   return filtro.value.codigo_fondo.length > 0 ||
-         filtro.value.responsable_name.length > 0 ||
-         filtro.value.estado !== 'Todos' ||
-         filtro.value.area_id !== '';
+    filtro.value.responsable_name.length > 0 ||
+    filtro.value.estado !== 'Todos' ||
+    filtro.value.area_id !== '';
 });
 
 // Filtros para la lista mostrada (se aplica al array 'fondos')
 const fondosFiltrados = computed(() => {
-    // La lógica de filtrado principal se hará en el backend.
-    // Este computed simplemente retorna los fondos tal como los recibe.
-    // Esto se mantiene así porque la paginación local trabaja sobre el array completo de fondos.
-    return fondos.value;
+  // La lógica de filtrado principal se hará en el backend.
+  // Este computed simplemente retorna los fondos tal como los recibe.
+  // Esto se mantiene así porque la paginación local trabaja sobre el array completo de fondos.
+  return fondos.value;
 });
 
 // Paginación
@@ -471,41 +478,18 @@ const paginaSiguiente = () => {
 };
 
 // --- Funciones para el Historial de Fondos ---
-const verHistorialFondo = async (fondo) => {
-    // Para ver el historial de un fondo, necesitamos la solicitud de apertura original
-    // ya que es a la solicitud de apertura a la que se le adjunta el historial de estados
-    // y las solicitudes de incremento/decremento/cierre.
-    if (!fondo.id_solicitud_apertura) {
-        Swal.fire('Información', 'Este fondo no tiene una solicitud de apertura asociada para ver el historial.', 'info');
-        return;
-    }
-
-    try {
-        // Obtenemos la solicitud de apertura completa con su historial
-        // El backend ya debería cargar las relaciones de revisor_adm y aprobador_gerente
-        // si la solicitud de apertura las tiene.
-        // NOTA: Si el `fondo` ya trae la relación `solicitud_apertura` completa (con historial, revisores),
-        // no sería necesario hacer otra llamada a `/solicitudes-fondo/{id}`.
-        // Para simplificar, asumimos que `obtenerFondos` ya carga `solicitudApertura` con todo lo necesario.
-        solicitudHistorialSeleccionada.value = fondo.solicitud_apertura;
-        mostrarHistorialModal.value = true;
-    } catch (error) {
-        console.error('Error al obtener la solicitud de apertura para el historial:', error);
-        let errorMessage = 'No se pudo cargar el historial de la solicitud. Por favor, inténtalo de nuevo.';
-        if (error.response && error.response.data && error.response.data.message) {
-            errorMessage = error.response.data.message;
-        }
-        Swal.fire({
-            icon: 'error',
-            title: 'Error de Historial',
-            text: errorMessage
-        });
-    }
+const verHistorialFondo = (fondo) => {
+    // 3. La lógica se simplifica: solo se necesita pasar el objeto 'fondo' completo.
+    // La llamada a la API y la carga del historial ahora son responsabilidad del modal.
+    if (!fondo) return;
+    fondoParaHistorial.value = fondo;
+    mostrarHistorialFondoModal.value = true;
 };
 
-const cerrarHistorialModal = () => {
-  mostrarHistorialModal.value = false;
-  solicitudHistorialSeleccionada.value = null;
+const cerrarHistorialFondoModal = () => {
+    // 4. Se actualiza la función de cierre.
+    mostrarHistorialFondoModal.value = false;
+    fondoParaHistorial.value = null;
 };
 
 
@@ -556,19 +540,19 @@ onMounted(() => {
 
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .fade-slide-enter-from,
 .fade-slide-leave-to {
-    opacity: 0;
-    transform: translateY(20px);
+  opacity: 0;
+  transform: translateY(20px);
 }
 
 /* Estilos para el spinner de carga en los inputs */
 .relative input[type="text"],
 .relative input[type="date"] {
-  padding-right: 2.5rem; /* Espacio para el spinner */
+  padding-right: 2.5rem;
+  /* Espacio para el spinner */
 }
-
 </style>

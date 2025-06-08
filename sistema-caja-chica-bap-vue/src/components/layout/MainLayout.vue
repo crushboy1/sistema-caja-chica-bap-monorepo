@@ -16,7 +16,13 @@ const ROLES = {
   SUPER_ADMIN: 'super_admin',
   COLABORADOR: 'colaborador'
 };
-
+// Lógica para determinar si se debe mostrar el enlace de "Fondos"
+const showFondosLink = computed(() => {
+  if (!user.value || !user.value.role) return false;
+  // El enlace es visible para Jefe de Área y roles superiores
+  const rolesPermitidos = [ROLES.JEFE_AREA, ROLES.JEFE_ADM, ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN];
+  return rolesPermitidos.includes(user.value.role.name);
+});
 // --- Propiedades Computadas para el Usuario ---
 const rolUsuario = computed(() => {
   const roleName = user.value?.role?.name || null;
@@ -51,7 +57,7 @@ const fetchAuthenticatedUser = async () => {
     console.log('DEBUG: Solo user de /user:', response.data.user);
     console.log('DEBUG: Role desde /user:', response.data.user?.role);
     console.log('DEBUG: Permissions desde /user:', response.data.user?.role?.permissions);
-    
+
     user.value = response.data.user;
   } catch (error) {
     console.error('Error:', error);
@@ -78,7 +84,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-verde-bap-light flex flex-col"> 
+  <div class="min-h-screen bg-verde-bap-light flex flex-col">
     <nav class="glass shadow-soft p-6 flex justify-between items-center backdrop-blur-sm">
       <div class="flex items-center">
         <img src="/src/assets/images/logo-wt.svg" alt="Logo BAP" class="h-10 mr-4" />
@@ -86,28 +92,27 @@ onMounted(() => {
       </div>
 
       <div class="flex space-x-6 ">
-        <router-link to="/dashboard" class="text-gray-600 font-medium nav-link-item" active-class="router-link-exact-active">
+        <router-link to="/dashboard" class="text-gray-600 font-medium nav-link-item"
+          active-class="router-link-exact-active">
           Dashboard
         </router-link>
-        <router-link to="/dashboard/solicitudes" 
-        class="text-gray-600 font-medium nav-link-item"
-        style="--underline-color: var(--color-rojo-bap);"
-        >
+        <router-link to="/dashboard/solicitudes" class="text-gray-600 font-medium nav-link-item"
+          style="--underline-color: var(--color-rojo-bap);">
           Solicitudes
         </router-link>
-        <router-link
-          to="/dashboard/declaraciones"
-          class="text-gray-600 font-medium nav-link-item"
-          style="--underline-color: var(--color-amarillo-bap);"
-        >
+        <router-link to="/dashboard/declaraciones" class="text-gray-600 font-medium nav-link-item"
+          style="--underline-color: var(--color-amarillo-bap);">
           Declaraciones
         </router-link>
-        <router-link to="/dashboard/gestion-usuarios" 
-        class="text-gray-600 font-medium nav-link-item"
-        >
+        <router-link v-if="showFondosLink" to="/dashboard/fondos" class="text-gray-600 font-medium nav-link-item"
+          style="--underline-color: var(--color-verde-bap);">
+          Fondos
+        </router-link>
+        <router-link to="/dashboard/gestion-usuarios" class="text-gray-600 font-medium nav-link-item"
+        style="--underline-color: var(--color-rojo-bap);">
           Gestión de Usuarios
         </router-link>
-        </div>
+      </div>
 
       <div class="flex items-center space-x-4">
         <div v-if="isLoadingUser" class="text-gray-500">Cargando...</div>
@@ -115,10 +120,8 @@ onMounted(() => {
           <h2>Bienvenido!</h2>{{ user ? user.name : 'Invitado' }}
         </div>
 
-        <button
-          @click="handleLogout"
-          class="bg-rojo-bap hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-full transition-colors"
-        >
+        <button @click="handleLogout"
+          class="bg-rojo-bap hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-full transition-colors">
           Cerrar Sesión
         </button>
       </div>
@@ -126,7 +129,7 @@ onMounted(() => {
 
     <main class="bg-verde-bap-light flex-grow p-8">
       <div class="max-w-7xl mx-auto glass rounded-2xl shadow-soft p-8 animate-fade-in-up">
-        <router-view></router-view> 
+        <router-view></router-view>
       </div>
     </main>
 
