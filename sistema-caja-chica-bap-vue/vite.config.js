@@ -22,6 +22,18 @@ export default defineConfig({
     },
     // Configuración del proxy para la API
     proxy: {
+      '/storage': {
+        target: 'http://caja-chica-app:80', // Apunta al mismo backend que la API
+        changeOrigin: true,
+        secure: false,
+        // No necesita rewrite, la ruta /storage/... se pasa tal cual.
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying storage request:', req.method, req.url);
+          });
+        },
+      },
+
       // Regla específica para sanctum/csrf-cookie: ¡reescribe el /api/!
       '/api/sanctum/csrf-cookie': {
         target: 'http://caja-chica-app:80', // Apunta al puerto interno de Apache en el contenedor Laravel

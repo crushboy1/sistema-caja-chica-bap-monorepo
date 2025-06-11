@@ -37,6 +37,13 @@
                             class="mt-1 block w-full p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                             disabled />
                     </div>
+                    <div>
+                        <label for="fecha_registro" class="block text-sm font-medium text-gray-700 mb-1">Fecha de
+                            Registro</label>
+                        <input type="text" id="fecha_registro" :value="fechaRegistroActual"
+                            class="mt-1 block w-full p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                            disabled />
+                    </div>
                 </div>
             </div>
 
@@ -54,8 +61,8 @@
                             required>
                             <option disabled value="">Selecciona un fondo</option>
                             <option v-for="fondo in fondosActivos" :key="fondo.id_fondo" :value="fondo.id_fondo">
-                                {{ fondo.codigo_fondo }} (Saldo: S/. {{ parseFloat(fondo.monto_disponible ||
-                                0).toFixed(2) }})
+                                {{ fondo.codigo_fondo }} (Saldo: S/. {{ fondo.monto_disponible != null ?
+                                    parseFloat(fondo.monto_disponible).toFixed(2) : '0.00' }})
                             </option>
                         </select>
                     </div>
@@ -86,10 +93,10 @@
                     </div>
 
                     <div class="md:col-span-3">
-                        <label for="glosa" class="block text-sm font-medium text-gray-700 mb-1">Glosa / Descripción del
+                        <label for="glosa" class="block text-sm font-medium text-gray-700 mb-1 ">Glosa / Descripción del
                             Gasto <span class="text-rojo-bap">*</span></label>
                         <textarea id="glosa" v-model="form.glosa" rows="3"
-                            class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
+                            class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap resize-none"
                             placeholder="Ej: Movilidad para reunión con cliente en Miraflores" required></textarea>
                     </div>
 
@@ -113,28 +120,31 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                         <label for="tipo_documento" class="block text-sm font-medium text-gray-700 mb-1">Tipo de
-                            Documento <span class="text-rojo-bap">*</span></label>
-                        <select id="tipo_documento" v-model="form.tipo_documento"
-                            class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-                            required>
+                            Documento</label>
+                        <select id="tipo_documento" v-model="form.tipo_documento" :disabled="form.es_declaracion_jurada"
+                            :class="{ 'bg-gray-200 cursor-not-allowed': form.es_declaracion_jurada }"
+                            class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
                             <option>Boleta de Venta</option>
                             <option>Factura</option>
                             <option>Recibo por Honorarios</option>
+                            <option>Declaración Jurada</option>
                             <option>Otro</option>
                         </select>
                     </div>
-
                     <div>
                         <label for="serie_documento" class="block text-sm font-medium text-gray-700 mb-1">Serie</label>
                         <input type="text" id="serie_documento" v-model="form.serie_documento"
+                            :disabled="form.es_declaracion_jurada"
+                            :class="{ 'bg-gray-200 cursor-not-allowed': form.es_declaracion_jurada }"
                             class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                             placeholder="Ej: F001" />
                     </div>
-
                     <div>
                         <label for="correlativo_documento"
                             class="block text-sm font-medium text-gray-700 mb-1">Correlativo</label>
                         <input type="text" id="correlativo_documento" v-model="form.correlativo_documento"
+                            :disabled="form.es_declaracion_jurada"
+                            :class="{ 'bg-gray-200 cursor-not-allowed': form.es_declaracion_jurada }"
                             class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                             placeholder="Ej: 0012345" />
                     </div>
@@ -144,7 +154,7 @@
             <!-- Sección de Contabilidad y Evidencia -->
             <div class="p-6 border border-gray-200 rounded-lg bg-gray-50">
                 <h3 class="text-xl font-semibold text-gray-800 mb-4">Clasificación y Evidencia</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                     <div>
                         <label for="id_cuenta_contable" class="block text-sm font-medium text-gray-700 mb-1">Cuenta
                             Contable <span class="text-rojo-bap">*</span></label>
@@ -157,10 +167,12 @@
                             </option>
                         </select>
                     </div>
-
                     <div>
-                        <label for="evidencia" class="block text-sm font-medium text-gray-700 mb-1">Archivo de Evidencia
-                            <span class="text-rojo-bap">*</span></label>
+                        <label for="evidencia" class="block text-sm font-medium text-gray-700 mb-1">
+                            <span v-if="!form.es_declaracion_jurada">Archivo de Evidencia (Boleta/Factura)</span>
+                            <span v-else>Archivo de Evidencia (DJ Firmada)</span>
+                            <span class="text-rojo-bap">*</span>
+                        </label>
                         <input type="file" id="evidencia" @change="handleFileChange"
                             class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-verde-bap-light file:text-verde-bap-dark hover:file:bg-verde-bap-light/80"
                             required>
@@ -168,20 +180,28 @@
                             form.evidencia.name }}</p>
                     </div>
                 </div>
-                <div class="mt-4">
+                <div class="mt-6 flex items-center justify-between">
                     <label class="flex items-center">
                         <input type="checkbox" v-model="form.es_declaracion_jurada"
                             class="h-4 w-4 text-verde-bap rounded border-gray-300 focus:ring-verde-bap-dark">
-                        <span class="ml-2 text-sm text-gray-600">Marcar si este gasto se sustenta con Declaración
-                            Jurada</span>
+                        <span class="ml-3 text-sm text-gray-600">Este gasto se sustenta con Declaración Jurada</span>
                     </label>
+                    <!-- Botón para generar y descargar la DJ -->
+                    <button v-if="form.es_declaracion_jurada" type="button" @click="generarYDescargarDJ"
+                        :disabled="!form.monto_total || !form.glosa"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors shadow-md flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Generar Plantilla DJ
+                    </button>
                 </div>
-
                 <div class="md:col-span-2">
                     <label for="comentario" class="block text-sm font-medium text-gray-700 mb-1">Comentario
                         (Opcional)</label>
                     <textarea id="comentario" v-model="form.comentario" rows="2"
-                        class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
+                        class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap resize-none"
                         placeholder="Añade cualquier nota adicional aquí..."></textarea>
                 </div>
             </div>
@@ -210,7 +230,7 @@
 <script setup>
 
 
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 
@@ -237,6 +257,50 @@ const fondosActivos = ref([]);
 const cuentasContables = ref([]);
 const cargandoInicial = ref(true);
 const enviando = ref(false);
+const fechaRegistroActual = ref(new Date().toLocaleDateString('es-ES'));
+// --- Lógica de la Declaración Jurada ---
+watch(() => form.value.es_declaracion_jurada, (isDJ) => {
+    if (isDJ) {
+        // Si se marca como DJ, se establecen valores por defecto y se limpian los campos irrelevantes.
+        form.value.tipo_documento = 'Declaración Jurada';
+        form.value.serie_documento = '';
+        form.value.correlativo_documento = '';
+    } else {
+        // Al desmarcar, se vuelve a un valor por defecto para comprobantes normales.
+        form.value.tipo_documento = 'Boleta de Venta';
+    }
+});
+
+const generarYDescargarDJ = async () => {
+    if (!form.value.monto_total || !form.value.glosa) {
+        Swal.fire('Datos incompletos', 'Por favor, ingrese el Monto Total y la Glosa del gasto antes de generar la DJ.', 'warning');
+        return;
+    }
+
+    try {
+        const response = await api.post('/documentos/generar-dj', {
+            monto: form.value.monto_total,
+            glosa: form.value.glosa,
+        }, {
+            responseType: 'blob' // ¡MUY IMPORTANTE para recibir archivos!
+        });
+
+        // Crear un enlace temporal para iniciar la descarga del archivo
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = `DJ-${usuarioActual.value.name}-${Date.now()}.pdf`;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error("Error al generar la Declaración Jurada:", error);
+        Swal.fire('Error', 'No se pudo generar el documento PDF. Por favor, contacta a soporte.', 'error');
+    }
+};
 
 onMounted(async () => {
     cargandoInicial.value = true;
@@ -301,9 +365,9 @@ const enviarFormulario = async () => {
 
     const formData = new FormData();
     for (const key in form.value) {
-        if (key === 'es_declaracion_jurada') {
+        if (key === 'es_declaracion_jurada' || key === 'pertenece_proyecto') {
             formData.append(key, form.value[key] ? 1 : 0);
-        } else {
+        } else if (form.value[key] !== null) {
             formData.append(key, form.value[key]);
         }
     }
@@ -343,3 +407,8 @@ const enviarFormulario = async () => {
 </script>
 
 <!-- No se necesita la etiqueta <style scoped> -->
+<style scoped>
+.resize-none {
+    resize: none;
+}
+</style>

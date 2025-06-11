@@ -71,7 +71,7 @@ const cerrarModal = () => {
                             <!-- NUEVA SECCIÓN: Código de Fondo Asignado para solicitudes de Apertura Aprobadas -->
                             <p v-if="solicitud?.tipo_solicitud === 'Apertura' && solicitud?.estado === 'Aprobada' && solicitud?.fondo_efectivo?.codigo_fondo"
                                 class="text-sm text-gray-600" >
-                                <strong>Código de Fondo Asignado:</strong> <span class="text-lg text-sm">{{ solicitud.fondo_efectivo.codigo_fondo }}</span>
+                                <strong>Código de Fondo Asignado:</strong> <span class="text-sm">{{ solicitud.fondo_efectivo.codigo_fondo }}</span>
                             </p>
                             <p class="text-sm text-gray-600"><strong>Fecha de Creación:</strong> {{
                                 formatearFecha(solicitud?.created_at) }}</p>

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log; // Importar para logging
 use Illuminate\Validation\ValidationException; // Para lanzar excepciones de validación si es necesario
+use App\Models\SolicitudFondo;
 
 class FondoEfectivo extends Model
 {
@@ -73,8 +74,8 @@ class FondoEfectivo extends Model
         $prefix = 'FNRO';
         // Buscar el último fondo que comience con el prefijo 'FNRO-'
         $latestFondo = self::where('codigo_fondo', 'like', $prefix . '-%')
-                                ->latest('id_fondo') // Asumiendo que 'id_fondo' es autoincremental
-                                ->first();
+            ->latest('id_fondo') // Asumiendo que 'id_fondo' es autoincremental
+            ->first();
 
         $nextNumber = 1;
         if ($latestFondo) {
@@ -126,8 +127,10 @@ class FondoEfectivo extends Model
             'id_responsable' => $solicitud->id_solicitante, // El solicitante de la apertura es el responsable inicial
             'id_area' => $solicitud->id_area,
             'monto_aprobado' => $solicitud->monto_solicitado, // El monto solicitado es el monto aprobado inicial
+            'monto_disponible' => $solicitud->monto_solicitado,
             'fecha_apertura' => now()->toDateString(),
             'estado' => 'Activo', // Se crea como activo por defecto
+            'id_solicitud_apertura' => $solicitud->id,
         ]);
 
         try {
@@ -161,14 +164,19 @@ class FondoEfectivo extends Model
 
         try {
             if ($solicitud->tipo_solicitud === 'Incremento' || $solicitud->tipo_solicitud === 'Decremento') {
-                // El monto_solicitado de la solicitud de modificación es el NUEVO MONTO TOTAL deseado para el fondo.
+                // Calcula la diferencia entre el nuevo monto y el antiguo
+                $diferencia = $solicitud->monto_solicitado - $fondoOriginal->monto_aprobado;
+                // Actualiza el monto aprobado al nuevo valor
                 $fondoOriginal->monto_aprobado = $solicitud->monto_solicitado;
+                // Ajusta el saldo disponible actual sumando o restando la diferencia
+                $fondoOriginal->monto_disponible += $diferencia;
                 Log::info('FondoEfectivo actualizado por solicitud de ' . $solicitud->tipo_solicitud, ['fondo_id' => $fondoOriginal->id_fondo, 'nuevo_monto' => $fondoOriginal->monto_aprobado]);
             } elseif ($solicitud->tipo_solicitud === 'Cierre') {
                 $fondoOriginal->estado = 'Cerrado';
                 $fondoOriginal->fecha_cierre = now()->toDateString();
                 $fondoOriginal->motivo_cierre = $solicitud->motivo_detalle; // Usar el motivo de la solicitud de cierre
                 $fondoOriginal->monto_aprobado = 0.00; // Cuando un fondo se cierra, su monto aprobado debe ser 0.
+                $fondoOriginal->monto_disponible = 0.00;
                 Log::info('FondoEfectivo cerrado por solicitud.', ['fondo_id' => $fondoOriginal->id_fondo, 'motivo_cierre' => $fondoOriginal->motivo_cierre]);
             }
 

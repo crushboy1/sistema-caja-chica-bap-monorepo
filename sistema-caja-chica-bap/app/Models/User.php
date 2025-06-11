@@ -128,6 +128,21 @@ class User extends Authenticatable // Implementa MustVerifyEmail si usas verific
     {
         return $this->role?->name === $roleName;
     }
+    /**
+     * Verifica si el usuario tiene alguno de los roles en una lista.
+     * @param array $roles Los nombres de los roles a verificar.
+     * @return bool
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        // Si el usuario no tiene un rol asignado, devuelve false.
+        if (!$this->role) {
+            return false;
+        }
+
+        // Comprueba si el nombre del rol del usuario está en el array de roles proporcionado.
+        return in_array($this->role->name, $roles);
+    }
 
     /**
      * Verifica si el usuario es un jefe de área.

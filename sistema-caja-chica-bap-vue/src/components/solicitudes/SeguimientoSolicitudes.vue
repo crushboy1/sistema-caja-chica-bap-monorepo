@@ -11,7 +11,7 @@ const usuarioActual = ref(null);
 const cargandoUsuario = ref(true);
 const solicitudes = ref([]);
 const cargandoSolicitudes = ref(true);
-const buscandoSolicitudes = ref(false); // Indica si hay una búsqueda pendiente por debounce
+const buscandoSolicitudes = ref(false); 
 // Variables para el modal de detalles
 const mostrarDetalleModal = ref(false);
 const solicitudSeleccionada = ref(null);
@@ -76,11 +76,11 @@ const estadosVisiblesEnTabla = computed(() => {
     return [
         'Todas',
         'Pendiente Aprobación ADM',
-        'Observada ADM', // La solicitud puede estar en este estado principal
-        'Descargo Enviado ADM', // También visible en la tabla principal
+        'Observada ADM',
+        'Descargo Enviado ADM', 
         'Pendiente Aprobación GRTE',
-        'Observada GRTE', // La solicitud puede estar en este estado principal
-        'Descargo Enviado GRTE', // También visible en la tabla principal
+        'Observada GRTE', 
+        'Descargo Enviado GRTE', 
         'Aprobada',
         'Rechazada Final'
     ];

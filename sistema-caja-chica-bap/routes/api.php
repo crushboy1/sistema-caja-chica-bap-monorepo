@@ -8,6 +8,7 @@ use App\Http\Controllers\API\GastoController;
 use App\Http\Controllers\API\FondoEfectivoController;
 use App\Http\Controllers\API\AreaController;
 use App\Http\Controllers\API\CuentaContableController;
+use App\Http\Controllers\API\DocumentoController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -72,4 +73,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cuentas-contables', [CuentaContableController::class, 'index']);
     // Obtiene la lista de todas las áreas.
     Route::get('/areas', [AreaController::class, 'index']);
+    Route::post('/documentos/generar-dj', [DocumentoController::class, 'generarDJ']);
 });

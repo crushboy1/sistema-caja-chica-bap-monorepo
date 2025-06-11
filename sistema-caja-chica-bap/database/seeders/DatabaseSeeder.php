@@ -20,7 +20,8 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,                   // Necesario antes de UserSeeder y PermissionRoleSeeder
             PermissionSeeder::class,             // Necesario antes de PermissionRoleSeeder
             PermissionRoleSeeder::class,         // Necesario después de RoleSeeder y PermissionSeeder
-            UserSeeder::class,                   // Necesario después de los anteriores
+            UserSeeder::class,  
+                             // Necesario después de los anteriores
         ]);
 
         // Seeders para el módulo de Fondos (dependen de Users y Areas)
@@ -30,5 +31,7 @@ class DatabaseSeeder extends Seeder
             HistorialEstadoSolicitudSeeder::class, // Historial de estados para solicitudes (depende de SolicitudFondo, Users)
             FondoEfectivoSeeder::class,          // Fondos activos (depende de SolicitudFondo, Users, Areas)
         ]);
+
+        $this->call(CuentaContableSeeder::class);
     }
 }

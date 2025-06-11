@@ -5,7 +5,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB; // Para la generación de código único
+use Illuminate\Support\Facades\DB; 
+use Illuminate\Support\Facades\Storage; 
 
 class Gasto extends Model
 {
@@ -43,7 +44,7 @@ class Gasto extends Model
         'pertenece_proyecto',
         'comentario',
     ];
-    
+
     /**
      * El "boot" method del modelo.
      * Se ejecuta cuando el modelo es inicializado.
@@ -77,50 +78,56 @@ class Gasto extends Model
 
     // --- RELACIONES ---
 
-    /**
-     * Un gasto pertenece a un único Fondo de Efectivo.
-     * Relación con la tabla 'fondo_efectivo' (ya existente).
-     */
     public function fondoEfectivo()
     {
-        // El segundo argumento es la clave foránea en la tabla 'gastos',
-        // el tercer argumento es la clave primaria en la tabla 'fondo_efectivo'.
         return $this->belongsTo(FondoEfectivo::class, 'id_fondo_efectivo', 'id_fondo');
     }
 
-    /**
-     * Un gasto es registrado por un único Usuario.
-     * Relación con la tabla 'users' (ya existente).
-     */
     public function registrador()
     {
         return $this->belongsTo(User::class, 'id_registrador');
     }
 
-    /**
-     * Un gasto es aprobado por un único Jefe de Área.
-     * Relación con la tabla 'users' (ya existente).
-     */
     public function jefeAprobador()
     {
         return $this->belongsTo(User::class, 'id_jefe_aprobador');
     }
 
-    /**
-     * Un gasto pertenece a una única Cuenta Contable.
-     * Relación con la nueva tabla 'cuentas_contables'.
-     */
     public function cuentaContable()
     {
         return $this->belongsTo(CuentaContable::class, 'id_cuenta_contable');
     }
 
-    /**
-     * Un gasto puede tener múltiples entradas en su historial.
-     * Relación con la nueva tabla 'historial_aprobaciones_gastos'.
-     */
     public function historial()
     {
         return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
+    }
+
+
+    // --- ACCESORS & MUTATORS ---
+
+    /**
+     * Los "accessors" para añadir al array del modelo.
+     * Esto hará que 'evidencia_url' se añada automáticamente al JSON de respuesta.
+     *
+     * @var array
+     */
+    protected $appends = ['evidencia_url'];
+
+    /**
+     * Obtiene la URL completa del archivo de evidencia.
+     *
+     * @return string|null
+     */
+    public function getEvidenciaUrlAttribute()
+    {
+        // Verifica si el campo 'ruta_evidencia' existe y no está vacío.
+        if ($this->ruta_evidencia) {
+            // Usa el Facade de Storage para generar la URL pública correcta.
+            // Esto funciona tanto para el disco local como para S3, etc.
+            return Storage::url($this->ruta_evidencia);
+        }
+        // Si no hay ruta, devuelve null.
+        return null;
     }
 }
