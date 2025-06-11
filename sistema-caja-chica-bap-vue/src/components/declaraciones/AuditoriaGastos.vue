@@ -3,8 +3,8 @@ import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
-// Asumimos que existirá un modal para gestionar la observación/validación final
-// import GestionAuditoriaModal from './modals/GestionAuditoriaModal.vue'; 
+import GestionAuditoriaModal from './modals/GestionAuditoriaModal.vue'; 
+
 
 // --- ESTADO DEL COMPONENTE ---
 const props = defineProps({
@@ -327,6 +327,9 @@ onMounted(() => {
         <!-- Modales -->
         <GastoDetalleModal :mostrar="mostrarDetalleModal" :gasto="gastoSeleccionado"
             @close="mostrarDetalleModal = false" />
+        <GestionAuditoriaModal :mostrar="mostrarAuditoriaModal" :gasto="gastoParaAuditar"
+            :usuarioActual="props.usuarioActual" @close="cerrarAuditoriaModal"
+            @accionRealizada="handleAccionRealizada" />
 
     </div>
 </template>

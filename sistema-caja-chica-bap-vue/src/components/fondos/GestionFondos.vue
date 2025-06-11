@@ -338,7 +338,7 @@ const obtenerUsuarioAutenticado = async () => {
   cargandoUsuario.value = true;
   try {
     const response = await api.get('/user');
-    usuarioActual.value = response.data.user;
+    usuarioActual.value = response.data;
     console.log('✅ Usuario y Rol asignados correctamente:', usuarioActual.value?.name, rolUsuario.value);
   } catch (error) {
     console.error('❌ Error al obtener datos del usuario autenticado:', error);

@@ -314,7 +314,7 @@ onMounted(async () => {
 const obtenerUsuarioLogueado = async () => {
     try {
         const response = await api.get('/user');
-        usuarioActual.value = response.data.user;
+        usuarioActual.value = response.data;
     } catch (error) {
         console.error("Error al obtener datos del usuario:", error);
     }

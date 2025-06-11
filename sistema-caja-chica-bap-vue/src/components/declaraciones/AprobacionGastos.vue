@@ -81,7 +81,7 @@
       <div class="mb-4 text-sm text-gray-600 text-center">
         Mostrando <strong>{{ (paginaActual - 1) * registrosPorPagina + 1 }} - {{ Math.min(paginaActual *
           registrosPorPagina,
-          gastosPendientes.length) }}</strong> de <strong>{{ gastosPendientes.length }}</strong> registros
+          gastos.length) }}</strong> de <strong>{{ gastos.length }}</strong> registros
       </div>
       <div class="overflow-x-auto shadow-lg rounded-lg">
         <table class="min-w-full bg-white border border-gray-200 rounded-lg">
@@ -124,7 +124,7 @@
                     </svg>
                   </button>
 
-                  <button @click="abrirGestionModal(gasto)"
+                  <button v-if="gasto.estado === 'Pendiente de Aprobación Jefatura'" @click="abrirGestionModal(gasto)"
                     class="w-9 h-9 rounded-full bg-verde-bap hover:bg-verde-bap-dark text-white flex items-center justify-center transition-all duration-300 hover:scale-110"
                     title="Gestionar Gasto">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,13 +189,12 @@ import GestionGastoModal from './modals/GestionGastoModal.vue';
 
 // --- ESTADO DEL COMPONENTE ---
 const usuarioActual = ref(null);
-const gastosPendientes = ref([]);
+const gastos = ref([]);
 const cargando = ref(true);
 const filtros = ref({
   registrador_name: '',
   fecha_inicio: '',
   fecha_fin: '',
-  estado: 'Pendiente de Aprobación Jefatura',
   codigo_gasto: ''
 });
 
@@ -215,12 +214,12 @@ const hayFiltrosActivos = computed(() => {
 });
 
 const totalPaginas = computed(() => {
-  return Math.ceil(gastosPendientes.value.length / registrosPorPagina.value);
+  return Math.ceil(gastos.value.length / registrosPorPagina.value);
 });
 
 const gastosPaginados = computed(() => {
   const inicio = (paginaActual.value - 1) * registrosPorPagina.value;
-  return gastosPendientes.value.slice(inicio, inicio + registrosPorPagina.value);
+  return gastos.value.slice(inicio, inicio + registrosPorPagina.value);
 });
 
 const paginasVisibles = computed(() => {
@@ -242,7 +241,7 @@ const paginasVisibles = computed(() => {
 const obtenerUsuarioActual = async () => {
   try {
     const response = await api.get('/user');
-    usuarioActual.value = response.data.user;
+    usuarioActual.value = response.data;
   } catch (error) {
     console.error("Error al obtener el usuario actual:", error);
     Swal.fire('Error', 'No se pudo obtener la información del usuario.', 'error');
@@ -250,11 +249,16 @@ const obtenerUsuarioActual = async () => {
 };
 
 let debounceTimeout = null;
-const fetchGastosPendientes = async () => {
+const fetchGastos = async () => {
   cargando.value = true;
   try {
-    const response = await api.get('/gastos', { params: filtros.value });
-    gastosPendientes.value = response.data;
+    const params = {
+        ...filtros.value,
+        scope: 'aprobaciones'
+      };
+    const response = await api.get('/gastos', { params });
+    gastos.value = response.data;
+    
     if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
       paginaActual.value = totalPaginas.value;
     } else if (totalPaginas.value === 0) {
@@ -290,7 +294,7 @@ const cerrarGestionModal = () => {
 // CAMBIO: Nueva función para manejar el refresco de datos tras una acción
 const handleAccionRealizada = () => {
   cerrarGestionModal(); // Primero cierra el modal
-  fetchGastosPendientes(); // Luego refresca la lista
+  fetchGastos(); // Luego refresca la lista
 };
 
 const irAPagina = (pagina) => {
@@ -314,13 +318,13 @@ watch(filtros, () => {
   clearTimeout(debounceTimeout);
   debounceTimeout = setTimeout(() => {
     paginaActual.value = 1;
-    fetchGastosPendientes();
+    fetchGastos();
   }, 500);
 }, { deep: true });
 
 onMounted(() => {
   obtenerUsuarioActual();
-  fetchGastosPendientes();
+  fetchGastos();
 });
 </script>
 

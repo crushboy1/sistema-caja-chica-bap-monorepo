@@ -437,7 +437,7 @@ const obtenerUsuarioAutenticado = async () => {
   cargandoUsuario.value = true;
   try {
     const response = await api.get('/user');
-    usuarioActual.value = response.data.user;
+    usuarioActual.value = response.data;
   } catch (error) {
     console.error('Error al obtener datos del usuario autenticado:', error);
     Swal.fire({

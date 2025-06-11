@@ -56,9 +56,9 @@ const fetchAuthenticatedUser = async () => {
     console.log('DEBUG: Respuesta completa de /user:', response.data);
     console.log('DEBUG: Solo user de /user:', response.data.user);
     console.log('DEBUG: Role desde /user:', response.data.user?.role);
-    console.log('DEBUG: Permissions desde /user:', response.data.user?.role?.permissions);
+    console.log('DEBUG: Permissions desde /user:', response.data?.role?.permissions);
 
-    user.value = response.data.user;
+    user.value = response.data;
   } catch (error) {
     console.error('Error:', error);
   } finally {

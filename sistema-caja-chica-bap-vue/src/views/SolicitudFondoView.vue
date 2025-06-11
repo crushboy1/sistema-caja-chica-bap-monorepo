@@ -388,7 +388,7 @@ const showSuccessNotification = (message) => {
 onMounted(async () => {
   try {
     const response = await api.get('/user')
-    user.value = response.data.user
+    user.value = response.data;
   } catch (error) {
     console.error('Error al obtener datos del usuario:', error)
   }

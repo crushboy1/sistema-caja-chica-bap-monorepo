@@ -25,7 +25,7 @@ const totalGastosProyectados = computed(() => {
 const obtenerUsuarioAutenticado = async () => {
   try {
     const response = await api.get('/user');
-    usuarioActual.value = response.data.user;
+    usuarioActual.value = response.data;
     cargandoUsuario.value = false;
   } catch (error) {
     console.error('Error al obtener datos del usuario autenticado:', error);

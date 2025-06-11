@@ -3,33 +3,38 @@ import { ref, watch, computed } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 
+// --- PROPS Y EMITS ---
+// Se define un emit 'accionRealizada' para notificar al componente padre que debe recargar los datos.
 const props = defineProps({
     mostrar: Boolean,
     gasto: Object,
-    usuarioActual: Object, // <-- NUEVA PROP: Necesaria para la lógica de autoaprobación
+    usuarioActual: Object, 
 });
+const emit = defineEmits(['close', 'accionRealizada']);
 
-const emit = defineEmits(['close']);
 
+// --- ESTADO INTERNO ---
 const isLoading = ref(false);
-const accionActual = ref(null);
+const accionActual = ref(null); // Usado para mostrar/ocultar el textarea de rechazo.
 const motivoRechazo = ref('');
 
-// --- LÓGICA DE AUTOAPROBACIÓN ---
+
+// --- COMPUTED PROPS ---
+// La lógica para evitar la autoaprobación se mantiene, es una regla de negocio correcta.
 const esGastoPropio = computed(() => {
-    if (!props.gasto || !props.usuarioActual) {
-        return false;
-    }
+    if (!props.gasto || !props.usuarioActual) return false;
     return props.gasto.id_registrador === props.usuarioActual.id;
 });
 
 
-const cerrarModal = (refresh = false) => {
-    accionActual.value = null;
-    motivoRechazo.value = '';
-    emit('close', refresh);
-};
+// --- MÉTODOS DE ACCIÓN (REFACTORIZADOS) ---
+// Se elimina la función genérica 'ejecutarAccionAPI' y se crean métodos específicos
+// para cada acción, apuntando a los nuevos endpoints RESTful del backend.
 
+/**
+ * Llama al endpoint específico para APROBAR el gasto.
+ * Corresponde al Paso 2 del flujo.
+ */
 const aprobarGasto = async () => {
     const result = await Swal.fire({
         title: '¿Aprobar Gasto?',
@@ -38,16 +43,70 @@ const aprobarGasto = async () => {
         showCancelButton: true,
         confirmButtonText: 'Sí, Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#76C49D',
+        confirmButtonColor: '#76C49D', // Verde BAP
     });
 
     if (result.isConfirmed) {
-        ejecutarAccionAPI({ accion: 'aprobar_jefe' });
+        isLoading.value = true;
+        try {
+            // Llamada directa al nuevo endpoint POST para aprobar.
+            await api.post(`/gastos/${props.gasto.id}/approve`);
+            
+            await Swal.fire('¡Éxito!', 'Gasto aprobado correctamente.', 'success');
+            emit('accionRealizada'); // Notifica al padre para refrescar y cerrar el modal.
+        } catch (error) {
+            console.error("Error al aprobar el gasto:", error);
+            Swal.fire('Error', error.response?.data?.message || 'No se pudo completar la acción.', 'error');
+        } finally {
+            isLoading.value = false;
+        }
     }
 };
 
+/**
+ * Llama al endpoint específico para RECHAZAR el gasto.
+ * Corresponde a la alternativa del Paso 2.
+ */
+const confirmarRechazo = async () => {
+    if (!motivoRechazo.value.trim()) {
+        Swal.fire('Atención', 'Debes ingresar un motivo para el rechazo.', 'warning');
+        return;
+    }
+
+    const result = await Swal.fire({
+        title: '¿Rechazar este Gasto?',
+        text: "Esta acción marcará el gasto como 'Rechazado' y no podrá ser procesado.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Rechazar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#DB3D47', // Rojo BAP
+    });
+
+    if (result.isConfirmed) {
+        isLoading.value = true;
+        try {
+            // Llamada directa al nuevo endpoint POST para rechazar, enviando el motivo.
+            await api.post(`/gastos/${props.gasto.id}/reject-by-jefe`, {
+                comentario: motivoRechazo.value
+            });
+            
+            await Swal.fire('Rechazado', 'El gasto ha sido rechazado.', 'success');
+            emit('accionRealizada'); // Notifica al padre para refrescar y cerrar.
+        } catch (error) {
+            console.error("Error al rechazar el gasto:", error);
+            Swal.fire('Error', error.response?.data?.message || 'No se pudo completar la acción.', 'error');
+        } finally {
+            isLoading.value = false;
+        }
+    }
+};
+
+
+// --- MÉTODOS DEL MODAL ---
+
 const iniciarAccionRechazo = () => {
-    accionActual.value = 'rechazar_jefe';
+    accionActual.value = 'rechazar';
 };
 
 const cancelarAccion = () => {
@@ -55,28 +114,12 @@ const cancelarAccion = () => {
     motivoRechazo.value = '';
 };
 
-const confirmarRechazo = async () => {
-    if (!motivoRechazo.value) {
-        Swal.fire('Atención', 'Debes ingresar un motivo para el rechazo.', 'warning');
-        return;
-    }
-    ejecutarAccionAPI({ accion: 'rechazar_jefe', comentario: motivoRechazo.value });
+// Se simplifica la función de cierre. El padre se encarga de la lógica de refresco.
+const cerrarModal = () => {
+    emit('close');
 };
 
-const ejecutarAccionAPI = async (payload) => {
-    isLoading.value = true;
-    try {
-        await api.put(`/gastos/${props.gasto.id}`, payload);
-        Swal.fire('¡Éxito!', 'La acción se ha completado correctamente.', 'success');
-        cerrarModal(true);
-    } catch (error) {
-        console.error("Error al gestionar el gasto:", error);
-        Swal.fire('Error', error.response?.data?.message || 'No se pudo completar la acción.', 'error');
-    } finally {
-        isLoading.value = false;
-    }
-};
-
+// Limpia el estado del modal cuando se cierra.
 watch(() => props.mostrar, (newVal) => {
     if (!newVal) {
         cancelarAccion();
@@ -104,7 +147,7 @@ watch(() => props.mostrar, (newVal) => {
 
                 <!-- Cuerpo del Modal -->
                 <div class="p-6 space-y-6">
-                    <!-- Sección de Resumen Mejorada con nuevos campos -->
+                    <!-- Sección de Resumen del Gasto -->
                     <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
                         <h4 class="font-bold text-gray-700 mb-3">Resumen del Gasto</h4>
                         <div class="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
@@ -128,25 +171,31 @@ watch(() => props.mostrar, (newVal) => {
                         </div>
                     </div>
 
-                    <!-- Sección de Acciones de Jefatura con Lógica Anti-Autoaprobación -->
+                    <!-- Sección de Acciones de Jefatura -->
                     <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Jefatura</h4>
 
-                        <!-- CASO 1: El gasto NO es propio, se muestran las acciones -->
-                        <div v-if="!esGastoPropio">
+                        <!-- Mensaje si el gasto es propio -->
+                        <div v-if="esGastoPropio"
+                            class="text-center p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
+                            <p class="font-semibold">Acción no permitida</p>
+                            <p class="text-sm">No puedes aprobar o rechazar tus propios gastos registrados.</p>
+                        </div>
+                        
+                        <!-- Acciones si el gasto NO es propio -->
+                        <div v-else>
+                            <!-- Botones principales: Aprobar y Rechazar -->
                             <div v-if="!accionActual" class="flex flex-wrap gap-3">
-                                <button @click="aprobarGasto"
-                                    class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors flex items-center space-x-2"
-                                    :disabled="isLoading">
+                                <button @click="aprobarGasto" :disabled="isLoading"
+                                    class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors flex items-center space-x-2">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M5 13l4 4L19 7" />
                                     </svg>
                                     <span>Aprobar Gasto</span>
                                 </button>
-                                <button @click="iniciarAccionRechazo"
-                                    class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-dark transition-colors flex items-center space-x-2"
-                                    :disabled="isLoading">
+                                <button @click="iniciarAccionRechazo" :disabled="isLoading"
+                                    class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-dark transition-colors flex items-center space-x-2">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M6 18L18 6M6 6l12 12" />
@@ -155,7 +204,8 @@ watch(() => props.mostrar, (newVal) => {
                                 </button>
                             </div>
 
-                            <div v-if="accionActual === 'rechazar_jefe'" class="animate-fade-in">
+                            <!-- Formulario para ingresar el motivo del rechazo -->
+                            <div v-if="accionActual === 'rechazar'" class="animate-fade-in">
                                 <label for="motivoRechazo" class="block text-sm font-medium text-gray-700 mb-2">Motivo
                                     del Rechazo (requerido):</label>
                                 <textarea id="motivoRechazo" v-model="motivoRechazo" rows="3"
@@ -171,13 +221,6 @@ watch(() => props.mostrar, (newVal) => {
                                     </button>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- CASO 2: El gasto SÍ es propio, se muestra un mensaje -->
-                        <div v-else
-                            class="text-center p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
-                            <p class="font-semibold">Acción no permitida</p>
-                            <p class="text-sm">No puedes aprobar o rechazar tus propios gastos registrados.</p>
                         </div>
                     </div>
                 </div>
