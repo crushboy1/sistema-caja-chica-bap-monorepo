@@ -3,7 +3,6 @@ import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
-import GestionAuditoriaModal from './modals/GestionAuditoriaModal.vue';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
 import ReposicionFondoModal from './modals/ReposicionFondoModal.vue';
 
@@ -26,7 +25,7 @@ const filtros = ref({
     fecha_inicio: '',
     fecha_fin: '',
     estado: 'Todos',
-    area_id: '', // Corregido: El valor inicial debe ser el mismo que en limpiarFiltros
+    area_id: '',
 });
 
 // --- CONSTANTES PARA FILTROS ---
@@ -41,8 +40,6 @@ const registrosPorPagina = ref(10);
 // --- ESTADO DE MODALES ---
 const gastoSeleccionado = ref(null);
 const mostrarDetalleModal = ref(false);
-const gastoParaAuditar = ref(null);
-const mostrarAuditoriaModal = ref(false);
 const mostrarReposicionModal = ref(false);
 
 // --- PROPIEDADES COMPUTADAS ---
@@ -128,24 +125,83 @@ const verDetalles = (gasto) => {
     mostrarDetalleModal.value = true;
 };
 
-const abrirAuditoriaModal = (gasto) => {
-    gastoParaAuditar.value = gasto;
-    mostrarAuditoriaModal.value = true;
-};
+const gestionarAccionAdm = async (gasto, accion) => {
+    let config;
 
-const cerrarAuditoriaModal = () => {
-    mostrarAuditoriaModal.value = false;
-    gastoParaAuditar.value = null;
-};
+    switch (accion) {
+        case 'finalizeAsAccounted':
+            config = {
+                title: 'Contabilizar Gasto',
+                text: `¿Estás seguro de finalizar y contabilizar el gasto ${gasto.codigo_gasto}? Esta acción descontará el monto del fondo y no se puede revertir.`,
+                icon: 'success',
+                confirmButtonText: 'Sí, Contabilizar',
+                endpoint: `/gastos/${gasto.id}/finalize`,
+                method: 'post',
+                needsComment: false,
+            };
+            break;
+        case 'observe':
+            config = {
+                title: 'Observar Gasto',
+                text: `Vas a devolver el gasto ${gasto.codigo_gasto} para su corrección.`,
+                icon: 'warning',
+                confirmButtonText: 'Sí, Observar',
+                endpoint: `/gastos/${gasto.id}/observe`,
+                method: 'post',
+                needsComment: true,
+                commentLabel: 'Motivo de la observación:'
+            };
+            break;
+        case 'rejectFinal':
+            config = {
+                title: 'Rechazar Gasto Definitivamente',
+                text: `Esta acción es final. ¿Estás seguro de rechazar el gasto ${gasto.codigo_gasto}?`,
+                icon: 'error',
+                confirmButtonText: 'Sí, Rechazar',
+                endpoint: `/gastos/${gasto.id}/reject-final`,
+                method: 'post',
+                needsComment: true,
+                commentLabel: 'Motivo del rechazo:'
+            };
+            break;
+        default: return;
+    }
 
-const handleAccionRealizada = () => {
-    cerrarAuditoriaModal();
-    fetchGastos();
-};
+    let comentario = '';
+    if (config.needsComment) {
+        const { value: text } = await Swal.fire({
+            title: config.title,
+            input: 'textarea',
+            inputLabel: config.commentLabel,
+            inputPlaceholder: 'Escribe tu comentario aquí...',
+            showCancelButton: true,
+            confirmButtonText: config.confirmButtonText
+        });
+        if (!text) return; // El usuario canceló o no escribió nada.
+        comentario = text;
+    } else {
+        const result = await Swal.fire({
+            title: config.title,
+            text: config.text,
+            icon: config.icon,
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: config.confirmButtonText,
+            cancelButtonText: 'Cancelar'
+        });
+        if (!result.isConfirmed) return;
+    }
 
-const handleFondoRepuesto = () => {
-    mostrarReposicionModal.value = false;
-    fetchGastos();
+    // Ejecutar la llamada a la API
+    try {
+        await api[config.method](config.endpoint, { comentario });
+        Swal.fire('¡Acción Completada!', 'La operación se realizó con éxito.', 'success');
+        fetchGastos(); // Refrescar la tabla
+    } catch (error) {
+        console.error(`Error al ejecutar la acción ${accion}:`, error);
+        Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error inesperado.', 'error');
+    }
 };
 
 const exportarGastos = async () => {
@@ -227,7 +283,13 @@ watch(() => filtros.value.registrador_name, (newValue) => {
 watch([() => filtros.value.fecha_inicio, () => filtros.value.fecha_fin], () => {
     triggerSearchWithDebounce();
 });
-
+watch(filtros, () => {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+        paginaActual.value = 1;
+        fetchGastos();
+    }, 500);
+}, { deep: true });
 onMounted(() => {
     fetchGastos();
     fetchAreas();
@@ -380,6 +442,7 @@ onMounted(() => {
                     <thead class="bg-gray-100">
                         <tr class="text-gray-700 uppercase text-xs leading-normal">
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Cód. Gasto</th>
+                            <th class="py-3 px-4 text-left font-semibold">Proyección Original</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Monto</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Registrador</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Área</th>
@@ -393,6 +456,8 @@ onMounted(() => {
                         <tr v-for="gasto in gastosPaginados" :key="gasto.id"
                             class="hover:bg-gray-50 transition-colors text-center">
                             <td class="py-4 px-6 font-medium whitespace-nowrap">{{ gasto.codigo_gasto }}</td>
+                            <td class="py-4 px-4 text-left text-gray-500 whitespace-nowrap">{{
+                                gasto.detalle_proyectado?.descripcion_gasto }}</td>
                             <td class="py-4 px-6 font-semibold whitespace-nowrap">S/. {{
                                 parseFloat(gasto.monto_total).toFixed(2) }}</td>
                             <td class="py-4 px-4">{{ gasto.registrador.name }} {{ gasto.registrador.last_name }}</td>
@@ -406,29 +471,57 @@ onMounted(() => {
                             <td class="py-4 px-4 text-gray-500">{{ new
                                 Date(gasto.created_at).toLocaleDateString('es-ES') }}</td>
                             <td class="py-4 px-4">
-                                <div class="flex items-center justify-center space-x-2">
-                                    <button @click="verDetalles(gasto)"
-                                        class="w-9 h-9 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
-                                        title="Ver Detalles y Evidencia">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                    </button>
-                                    <button v-if="gasto.estado === 'Pendiente de Validación Contable'"
-                                        @click="abrirAuditoriaModal(gasto)"
-                                        class="w-8 h-8 rounded-full bg-verde-bap-dark hover:bg-verde-bap flex items-center justify-center text-white transition-colors duration-200"
-                                        title="Gestionar Gasto">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor" class="w-4 h-4">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
+                                <div class="flex flex-col items-center justify-center space-y-2">
+                                    
+                                    <div class="flex items-center space-x-2">
+                                        <button @click="verDetalles(gasto)"
+                                            class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                                            title="Ver Detalles y Evidencia">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                        <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
+                                            <button @click="gestionarAccionAdm(gasto, 'finalizeAsAccounted')"
+                                                title="Contabilizar Gasto"
+                                                class="w-8 h-8 rounded-full bg-verde-bap-light hover:bg-verde-bap text-verde-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </button>
+                                        </template>
+                                    </div>
+
+                                    <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
+                                        <div class="flex items-center space-x-2">
+                                            <button @click="gestionarAccionAdm(gasto, 'observe')" title="Observar Gasto"
+                                                class="w-8 h-8 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                </svg>
+                                            </button>
+                                            <button @click="gestionarAccionAdm(gasto, 'rejectFinal')"
+                                                title="Rechazar Gasto"
+                                                class="w-8 h-8 rounded-full bg-rojo-bap-light hover:bg-rojo-bap text-rojo-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </template>
                                 </div>
                             </td>
+
                         </tr>
                     </tbody>
                 </table>
@@ -470,12 +563,9 @@ onMounted(() => {
 
         <GastoDetalleModal :mostrar="mostrarDetalleModal" :gasto="gastoSeleccionado"
             @close="mostrarDetalleModal = false" />
-        <GestionAuditoriaModal :mostrar="mostrarAuditoriaModal" :gasto="gastoParaAuditar"
-            :usuarioActual="props.usuarioActual" @close="cerrarAuditoriaModal"
-            @accionRealizada="handleAccionRealizada" />
+
         <ReposicionFondoModal :mostrar="mostrarReposicionModal" @close="mostrarReposicionModal = false"
             @fondoRepuesto="handleFondoRepuesto" />
-
     </div>
 </template>
 

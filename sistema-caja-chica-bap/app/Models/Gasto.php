@@ -1,10 +1,10 @@
 <?php
-// Comando para generar: php artisan make:model Gasto
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,20 +13,21 @@ class Gasto extends Model
     use HasFactory;
 
     /**
-     * The table associated with the model.
+     * La tabla asociada con el modelo.
      *
      * @var string
      */
     protected $table = 'gastos';
 
     /**
-     * The attributes that are mass assignable.
+     * Los atributos que son asignables en masa.
      *
      * @var array<int, string>
      */
     protected $fillable = [
         'codigo_gasto',
         'id_fondo_efectivo',
+        'detalle_gasto_proyectado_id', 
         'id_registrador',
         'id_jefe_aprobador',
         'id_validador_adm',
@@ -36,11 +37,8 @@ class Gasto extends Model
         'serie_documento',
         'correlativo_documento',
         'monto_total',
-        'moneda',
-        'tipo_cambio_referencial',
-        'tipo_cambio', // NUEVO: Tipo de cambio para gastos en USD
-        'monto_final_pen', // NUEVO: Monto final en PEN para contabilidad
-        'glosa',
+        'moneda',                 
+        'glosa',                  
         'pertenece_proyecto',
         'comentario',
         'ruta_evidencia',
@@ -51,37 +49,31 @@ class Gasto extends Model
     ];
 
     /**
-     * The attributes that should be cast.
+     * Los atributos que deben ser convertidos a tipos nativos.
      *
      * @var array<string, string>
      */
     protected $casts = [
         'fecha_documento' => 'date',
         'monto_total' => 'decimal:2',
-        'tipo_cambio_referencial' => 'decimal:4',
-        'tipo_cambio' => 'decimal:4',
-        'monto_final_pen' => 'decimal:2',
         'pertenece_proyecto' => 'boolean',
         'es_declaracion_jurada' => 'boolean',
     ];
 
     /**
-     * The accessors to append to the model's array form.
+     * Los "accessors" para añadir al array del modelo.
      *
      * @var array
      */
     protected $appends = ['evidencia_url'];
 
     /**
-     * The "booted" method of the model.
-     *
-     * @return void
+     * El método "booted" del modelo.
      */
     protected static function boot()
     {
         parent::boot();
 
-        // Automatically assign a unique code before creating a new expense.
         static::creating(function ($gasto) {
             if (empty($gasto->codigo_gasto)) {
                 $gasto->codigo_gasto = self::generateUniqueGastoCode();
@@ -90,7 +82,7 @@ class Gasto extends Model
     }
 
     /**
-     * Generate a unique code for the expense (e.g., GTO-00001).
+     * Genera un código único para el gasto (ej. GTO-00001).
      *
      * @return string
      */
@@ -102,28 +94,44 @@ class Gasto extends Model
         return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
     }
 
-    // --- RELATIONSHIPS ---
+    /*
+    |--------------------------------------------------------------------------
+    | RELACIONES DE ELOQUENT
+    |--------------------------------------------------------------------------
+    */
 
-    public function fondoEfectivo()
+    /**
+     * NUEVA RELACIÓN: Un gasto pertenece a un detalle de gasto proyectado.
+     * Esto nos permite acceder al detalle original desde un gasto.
+     * Por ejemplo: $gasto->detalleProyectado->descripcion_gasto
+     */
+    public function detalleProyectado(): BelongsTo
     {
+        return $this->belongsTo(DetalleGastoProyectado::class, 'detalle_gasto_proyectado_id');
+    }
+
+    public function fondoEfectivo(): BelongsTo
+    {
+        // Se asegura que los nombres de las claves sean explícitos para evitar ambigüedades.
         return $this->belongsTo(FondoEfectivo::class, 'id_fondo_efectivo', 'id_fondo');
     }
 
-    public function registrador()
+    public function registrador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_registrador');
     }
 
-    public function jefeAprobador()
+    public function jefeAprobador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_jefe_aprobador');
     }
-    public function validadorAdm()
+
+    public function validadorAdm(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_validador_adm');
     }
 
-    public function cuentaContable()
+    public function cuentaContable(): BelongsTo
     {
         return $this->belongsTo(CuentaContable::class, 'id_cuenta_contable');
     }
@@ -133,11 +141,14 @@ class Gasto extends Model
         return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
     }
 
-
-    // --- ACCESSORS & MUTATORS ---
+    /*
+    |--------------------------------------------------------------------------
+    | ACCESSORS & MUTATORS
+    |--------------------------------------------------------------------------
+    */
 
     /**
-     * Get the full URL for the evidence file.
+     * Obtiene la URL completa del archivo de evidencia.
      *
      * @return string|null
      */

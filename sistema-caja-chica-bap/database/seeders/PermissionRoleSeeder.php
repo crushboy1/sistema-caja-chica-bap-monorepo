@@ -5,135 +5,88 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon; // Importar Carbon para los timestamps
+use Carbon\Carbon;
 
 class PermissionRoleSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Ejecuta los seeds para la tabla pivote permission_role.
+     * Asigna los permisos refactorizados a cada rol del sistema.
      */
     public function run(): void
     {
-        // Obtener los IDs de los roles
-        $superAdminRole = DB::table('roles')->where('name', 'super_admin')->first();
-        $gerenteGeneralRole = DB::table('roles')->where('name', 'gerente_general')->first();
-        $jefeAdministracionRole = DB::table('roles')->where('name', 'jefe_administracion')->first();
-        $jefeAreaRole = DB::table('roles')->where('name', 'jefe_area')->first();
-        $colaboradorRole = DB::table('roles')->where('name', 'colaborador')->first();
+        // Limpiar la tabla pivote antes de insertar para evitar conflictos.
+        DB::table('permission_role')->delete();
 
-        // Obtener los IDs de los permisos y indexarlos por 'name' para fácil acceso
+        // Obtener los IDs de los roles y permisos para un mapeo eficiente.
+        $roles = DB::table('roles')->get()->keyBy('name');
         $permissions = DB::table('permissions')->get()->keyBy('name');
 
-        // Array para almacenar las asociaciones de permisos a roles
-        $rolePermissions = [];
+        // Definir qué permisos tiene cada rol.
+        $assignments = [
+            'super_admin' => array_keys($permissions->toArray()), // El Super Admin tiene todos los permisos.
 
-        // Asignar permisos al rol 'super_admin' (todos los permisos)
-        if ($superAdminRole) {
-            foreach ($permissions as $permission) {
-                $rolePermissions[] = [
-                    'role_id' => $superAdminRole->id,
-                    'permission_id' => $permission->id,
-                    'created_at' => Carbon::now(), // Añadir timestamps
-                    'updated_at' => Carbon::now(), // Añadir timestamps
-                ];
-            }
-        }
-
-        // Asignar permisos al rol 'gerente_general'
-        if ($gerenteGeneralRole) {
-            $gerenteGeneralPermissions = [
+            'gerente_general' => [
                 'view_dashboard',
-                'view_solicitudes', // Puede ver el seguimiento de solicitudes
-                'approve_solicitud_grte', // Aprobar solicitudes de fondo
-                'observe_solicitud_grte', // Observar solicitudes de fondo
-                'reject_final_solicitud_grte', // Rechazar definitivamente solicitudes de modificación
-                'supervise_fund', // Supervisar fondos de efectivo
-            ];
-            foreach ($gerenteGeneralPermissions as $permName) {
-                if (isset($permissions[$permName])) {
-                    $rolePermissions[] = [
-                        'role_id' => $gerenteGeneralRole->id,
-                        'permission_id' => $permissions[$permName]->id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ];
+                'solicitud_view_all',
+                'solicitud_approve_grte', // Aprueba/Observa solicitudes de fondo.
+            ],
+
+            'jefe_administracion' => [
+                'view_dashboard',
+                'manage_accounting_codes', // NUEVO: Puede gestionar el catálogo de cuentas/glosas.
+                'solicitud_view_all',
+                'solicitud_approve_adm', // Aprueba/Observa solicitudes hacia Gerencia.
+                'gasto_view_all',
+                'gasto_finalize_by_adm', // Contabiliza el gasto (acción final).
+                'gasto_observe_by_adm',  // Observa cualquier gasto.
+                'gasto_reject_by_adm',   // Rechaza cualquier gasto.
+                'fund_reposition',       // Ejecuta la reposición.
+            ],
+
+            'jefe_area' => [
+                'view_dashboard',
+                'solicitud_view_own_area',
+                'solicitud_create',
+                'solicitud_submit_descargo',
+                'gasto_view_own_area',
+                'gasto_create',
+                'gasto_approve_by_jefe',      // Aprueba gastos de su equipo.
+                'gasto_observe_by_jefe',      // NUEVO: Puede observar gastos de su equipo.
+                'gasto_reject_by_jefe',       // Rechaza gastos de su equipo.
+                'gasto_resubmit_observed',    // Puede corregir sus propios gastos observados.
+            ],
+
+            'colaborador' => [
+                'view_dashboard',
+                'gasto_view_own',
+                'gasto_create',
+                'gasto_resubmit_observed', // Puede corregir sus propios gastos observados.
+            ],
+        ];
+
+        // Preparar el array para la inserción masiva.
+        $permissionRoleData = [];
+        $now = Carbon::now();
+
+        // Iterar sobre las asignaciones para construir los datos de inserción.
+        foreach ($assignments as $roleName => $permissionNames) {
+            if (isset($roles[$roleName])) {
+                $roleId = $roles[$roleName]->id;
+                foreach ($permissionNames as $permName) {
+                    if (isset($permissions[$permName])) {
+                        $permissionRoleData[] = [
+                            'role_id' => $roleId,
+                            'permission_id' => $permissions[$permName]->id,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
                 }
             }
         }
 
-        // Asignar permisos al rol 'jefe_administracion'
-        if ($jefeAdministracionRole) {
-            $jefeAdministracionPermissions = [
-                'view_dashboard',
-                'view_solicitudes', // Puede ver el seguimiento de solicitudes
-                'review_initial_solicitud_adm', //revision inicial de la solicitud
-                'approve_solicitud_adm', // Aprobar solicitudes a Gerencia
-                'observe_solicitud_adm', // Observar solicitudes (requiere descargo)
-                'reject_final_solicitud_adm', // Rechazar definitivamente solicitudes de modificación
-                'review_expense_liquidation', // Revisar liquidaciones de Jefes de Área
-                'approve_expense_liquidation', // Aprobar liquidaciones de Jefes de Área
-                'notify_liquidation_observations', // Notificar observaciones en liquidaciones
-                'apply_sanction', // Aplicar sanciones
-                'declare_expenses_in_system', // Declarar gastos en SAP
-                'supervise_fund', // Supervisar fondos de efectivo
-            ];
-            foreach ($jefeAdministracionPermissions as $permName) {
-                if (isset($permissions[$permName])) {
-                    $rolePermissions[] = [
-                        'role_id' => $jefeAdministracionRole->id,
-                        'permission_id' => $permissions[$permName]->id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ];
-                }
-            }
-        }
-
-        // Asignar permisos al rol 'jefe_area'
-        if ($jefeAreaRole) {
-            $jefeAreaPermissions = [
-                'view_dashboard',
-                'view_solicitudes', // Puede ver el seguimiento de sus propias solicitudes
-                'create_solicitud_fondo', // Crear Apertura, Incremento, Decremento, Cierre
-                'submit_descargo_solicitud', // Enviar descargo a solicitudes observadas
-                'create_expense_declaration', // Crear sus propias declaraciones de gastos
-                'validate_collaborator_expense', // Validar gastos de sus colaboradores
-                'resolve_liquidation_observations', // Resolver observaciones de sus liquidaciones
-            ];
-            foreach ($jefeAreaPermissions as $permName) {
-                if (isset($permissions[$permName])) {
-                    $rolePermissions[] = [
-                        'role_id' => $jefeAreaRole->id,
-                        'permission_id' => $permissions[$permName]->id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ];
-                }
-            }
-        }
-
-        // Asignar permisos al rol 'colaborador'
-        if ($colaboradorRole) {
-            $colaboradorPermissions = [
-                'view_dashboard',
-                // 'view_solicitudes', // Si los colaboradores pueden ver el seguimiento de sus propias solicitudes (no de fondos, sino de gastos)
-                'create_expense_declaration', // Crear sus propias declaraciones de gastos
-                'resolve_liquidation_observations', // Resolver observaciones de sus propias declaraciones
-            ];
-            foreach ($colaboradorPermissions as $permName) {
-                if (isset($permissions[$permName])) {
-                    $rolePermissions[] = [
-                        'role_id' => $colaboradorRole->id,
-                        'permission_id' => $permissions[$permName]->id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ];
-                }
-            }
-        }
-
-        // Inserta las asociaciones en la tabla pivote 'permission_role'
-        // Usar insertOrIgnore para evitar duplicados si se ejecuta múltiples veces sin fresh
-        DB::table('permission_role')->insertOrIgnore($rolePermissions);
+        // Insertar todas las asignaciones en la base de datos.
+        DB::table('permission_role')->insert($permissionRoleData);
     }
 }

@@ -10,51 +10,55 @@ use Carbon\Carbon;
 class PermissionSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Ejecuta los seeds para los permisos del sistema.
+     * Se han renombrado y añadido permisos para que coincidan con las acciones de los controladores.
      */
     public function run(): void
     {
-        // Define los permisos a insertar
+        // Limpiar la tabla antes de insertar para evitar duplicados en re-seeding.
+        DB::table('permissions')->delete();
+
         $permissions = [
-            // Permisos generales del sistema
+            // === PERMISOS GENERALES Y DE USUARIOS ===
             ['name' => 'manage_users', 'display_name' => 'Gestionar Usuarios', 'description' => 'Permite crear, editar y eliminar usuarios.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'manage_roles', 'display_name' => 'Gestionar Roles', 'description' => 'Permite crear, editar y eliminar roles.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'manage_permissions', 'display_name' => 'Gestionar Permisos', 'description' => 'Permite asignar y revocar permisos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'manage_roles', 'display_name' => 'Gestionar Roles y Permisos', 'description' => 'Permite gestionar roles y asignar permisos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'view_dashboard', 'display_name' => 'Ver Dashboard', 'description' => 'Acceso al panel principal del sistema.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Permisos relacionados con Solicitudes de Fondo (Apertura, Incremento, Decremento, Cierre)
-            ['name' => 'create_solicitud_fondo', 'display_name' => 'Crear Solicitud de Fondo', 'description' => 'Permite al Jefe de Área crear solicitudes de Apertura, Incremento, Decremento o Cierre de fondos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'view_solicitudes', 'display_name' => 'Ver Solicitudes de Fondo', 'description' => 'Permite ver el seguimiento y detalles de las solicitudes de fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // === NUEVO: PERMISOS DE CONFIGURACIÓN ===
+            ['name' => 'manage_accounting_codes', 'display_name' => 'Gestionar Cuentas Contables', 'description' => 'Permite crear, editar y desactivar cuentas contables (glosas).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Acciones del Jefe de Administración sobre Solicitudes
-            ['name' => 'review_initial_solicitud_adm', 'display_name' => 'Revisar Solicitud Creada (ADM)', 'description' => 'Permite al Jefe de Administración revisar y tomar la primera acción sobre solicitudes en estado "Creada".', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'approve_solicitud_adm', 'display_name' => 'Aprobar Solicitud ADM', 'description' => 'Permite al Jefe de Administración aprobar una solicitud y enviarla a Gerencia.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'observe_solicitud_adm', 'display_name' => 'Observar Solicitud ADM', 'description' => 'Permite al Jefe de Administración observar una solicitud, requiriendo un descargo del solicitante.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'reject_final_solicitud_adm', 'display_name' => 'Rechazar Solicitud ADM (Final)', 'description' => 'Permite al Jefe de Administración rechazar definitivamente una solicitud de modificación (sin opción a descargo).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // === PERMISOS: MÓDULO DE SOLICITUDES DE FONDOS ===
+            ['name' => 'solicitud_view_all', 'display_name' => 'Ver Todas las Solicitudes', 'description' => 'Permite ver todas las solicitudes de todos los usuarios.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitud_view_own_area', 'display_name' => 'Ver Solicitudes del Área', 'description' => 'Permite ver las solicitudes de su propia área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitud_create', 'display_name' => 'Crear Solicitud de Fondo', 'description' => 'Permite crear solicitudes de Apertura, Incremento, etc.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitud_approve_adm', 'display_name' => 'Aprobar/Observar Solicitud (ADM)', 'description' => 'Permite al Jefe de ADM aprobar u observar solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitud_approve_grte', 'display_name' => 'Aprobar/Observar Solicitud (GRTE)', 'description' => 'Permite al Gerente General la aprobación final de solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitud_submit_descargo', 'display_name' => 'Enviar Descargo de Solicitud', 'description' => 'Permite responder a una observación en una solicitud.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Acciones del Gerente General sobre Solicitudes
-            ['name' => 'approve_solicitud_grte', 'display_name' => 'Aprobar Solicitud GRTE', 'description' => 'Permite al Gerente General aprobar una solicitud de fondo, finalizando el proceso de aprobación.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'observe_solicitud_grte', 'display_name' => 'Observar Solicitud GRTE', 'description' => 'Permite al Gerente General observar una solicitud, requiriendo un descargo del solicitante.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'reject_final_solicitud_grte', 'display_name' => 'Rechazar Solicitud GRTE (Final)', 'description' => 'Permite al Gerente General rechazar definitivamente una solicitud de modificación (sin opción a descargo).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // === PERMISOS: MÓDULO DE DECLARACIÓN DE GASTOS ===
+            // -- Permisos de Creación y Visualización --
+            ['name' => 'gasto_view_all', 'display_name' => 'Ver Todos los Gastos', 'description' => 'Permite ver todos los gastos de todas las áreas.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_view_own_area', 'display_name' => 'Ver Gastos del Área', 'description' => 'Permite ver todos los gastos registrados por su área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_view_own', 'display_name' => 'Ver Propios Gastos', 'description' => 'Permite ver únicamente los gastos que uno mismo ha registrado.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_create', 'display_name' => 'Crear Declaración de Gasto', 'description' => 'Permite registrar un nuevo gasto.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Acciones del Solicitante sobre Solicitudes
-            ['name' => 'submit_descargo_solicitud', 'display_name' => 'Enviar Descargo de Solicitud', 'description' => 'Permite al Jefe de Área/Colaborador enviar un descargo a una solicitud observada.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // -- Acciones del Jefe de Área --
+            ['name' => 'gasto_approve_by_jefe', 'display_name' => 'Aprobar Gasto (Jefe Área)', 'description' => 'Permite aprobar un gasto de un colaborador.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_observe_by_jefe', 'display_name' => 'Observar Gasto (Jefe Área)', 'description' => 'Permite devolver un gasto a un colaborador para su corrección.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_reject_by_jefe', 'display_name' => 'Rechazar Gasto (Jefe Área)', 'description' => 'Permite rechazar un gasto de un colaborador de forma definitiva.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Permisos relacionados con la Liquidación de Gastos (básicos para roles)
-            ['name' => 'create_expense_declaration', 'display_name' => 'Crear Declaración de Gastos', 'description' => 'Permite al Colaborador/Jefe de Área crear declaraciones de gastos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'validate_collaborator_expense', 'display_name' => 'Validar Gasto de Colaborador', 'description' => 'Permite al Jefe de Área validar gastos de su personal.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'review_expense_liquidation', 'display_name' => 'Revisar Liquidación de Gastos', 'description' => 'Permite al Jefe de Administración revisar liquidaciones de Jefes de Área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'approve_expense_liquidation', 'display_name' => 'Aprobar Liquidación de Gastos', 'description' => 'Permite al Jefe de Administración aprobar liquidaciones de Jefes de Área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'notify_liquidation_observations', 'display_name' => 'Notificar Observaciones de Liquidación', 'description' => 'Permite al Jefe de Administración notificar observaciones en liquidaciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'resolve_liquidation_observations', 'display_name' => 'Resolver Observaciones de Liquidación', 'description' => 'Permite al Jefe de Área/Colaborador levantar observaciones en liquidaciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'apply_sanction', 'display_name' => 'Aplicar Sanción', 'description' => 'Permite al Jefe de Administración aplicar sanciones por liquidaciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'declare_expenses_in_system', 'display_name' => 'Declarar Gastos en Sistema (SAP)', 'description' => 'Permite al Jefe de Administración declarar gastos en SAP.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // -- Acciones de Administración --
+            ['name' => 'gasto_finalize_by_adm', 'display_name' => 'Contabilizar Gasto (ADM)', 'description' => 'Permite a ADM dar la validación final y descontar el fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_observe_by_adm', 'display_name' => 'Observar Gasto (ADM)', 'description' => 'Permite a ADM devolver un gasto para corrección.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'gasto_reject_by_adm', 'display_name' => 'Rechazar Gasto (ADM)', 'description' => 'Permite a ADM rechazar un gasto de forma definitiva.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
-            // Permisos relacionados con Control y Supervisión de Fondos Activos
-            ['name' => 'supervise_fund', 'display_name' => 'Supervisar Fondos de Efectivo', 'description' => 'Permite al Jefe de Administración y Gerente General supervisar el estado y movimientos de los fondos activos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            // -- Acciones del Colaborador --
+            ['name' => 'gasto_resubmit_observed', 'display_name' => 'Reenviar Gasto Observado', 'description' => 'Permite a un colaborador corregir y reenviar un gasto observado.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+
+            // -- Permisos de Reposición --
+            ['name' => 'fund_reposition', 'display_name' => 'Reponer Fondos', 'description' => 'Permite a ADM ejecutar la reposición de un fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
         ];
 
-        // Inserta los datos en la tabla 'permissions'
         DB::table('permissions')->insert($permissions);
     }
 }
