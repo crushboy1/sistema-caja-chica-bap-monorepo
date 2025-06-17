@@ -5,13 +5,13 @@ import Swal from 'sweetalert2';
 import SolicitudDetalleModal from './SolicitudDetalleModal.vue';
 import HistorialEstadosModal from './HistorialEstadosModal.vue';
 import GestionSolicitudModal from './GestionSolicitudModal.vue';
-
+import { getClassesForBadge } from '@/utils/statusStyles.js';
 // --- Variables de Estado ---
 const usuarioActual = ref(null);
 const cargandoUsuario = ref(true);
 const solicitudes = ref([]);
 const cargandoSolicitudes = ref(true);
-const buscandoSolicitudes = ref(false); 
+const buscandoSolicitudes = ref(false);
 // Variables para el modal de detalles
 const mostrarDetalleModal = ref(false);
 const solicitudSeleccionada = ref(null);
@@ -77,10 +77,10 @@ const estadosVisiblesEnTabla = computed(() => {
         'Todas',
         'Pendiente Aprobación ADM',
         'Observada ADM',
-        'Descargo Enviado ADM', 
+        'Descargo Enviado ADM',
         'Pendiente Aprobación GRTE',
-        'Observada GRTE', 
-        'Descargo Enviado GRTE', 
+        'Observada GRTE',
+        'Descargo Enviado GRTE',
         'Aprobada',
         'Rechazada Final'
     ];
@@ -138,7 +138,7 @@ const puedeGestionarSolicitud = (solicitud) => {
     const rol = rolUsuario.value;
     const estado = solicitud.estado;
     const usuarioEsSolicitante = usuarioActual.value?.id === solicitud.id_solicitante;
-    
+
     // Es crucial que solicitud.solicitante.role.name esté cargado.
     // El backend ya lo carga en el index y show, así que debería estar disponible.
     const solicitanteRol = solicitud.solicitante?.role?.name;
@@ -171,7 +171,7 @@ const puedeGestionarSolicitud = (solicitud) => {
         // Similar a Jefe ADM, si el propio Gerente es el solicitante de un Decremento/Cierre, solo puede
         // enviar descargo si fue Observada GRTE.
         if (usuarioEsSolicitante && solicitanteRol === ROLES.GERENTE_GENERAL && esDecrementoCierre) {
-             return estado === 'Observada GRTE'; // Solo si es observada por GRTE, puede enviar descargo
+            return estado === 'Observada GRTE'; // Solo si es observada por GRTE, puede enviar descargo
         }
         return ['Pendiente Aprobación GRTE', 'Descargo Enviado GRTE'].includes(estado);
     }
@@ -407,8 +407,8 @@ onMounted(() => {
 
         <div v-if="cargandoUsuario || cargandoSolicitudes" class="text-center text-gray-500 py-8">
             <div class="inline-flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none"
-                    viewBox="0 0 24 24">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
@@ -455,7 +455,8 @@ onMounted(() => {
                         <button v-if="hayFiltrosActivos" @click="limpiarFiltros"
                             class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
                             <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                             Limpiar Filtros
                         </button>
@@ -474,8 +475,10 @@ onMounted(() => {
                         <!-- Indicador de búsqueda -->
                         <div v-if="buscandoSolicitudes && busquedaNumeroSolicitud.length > 0 && busquedaNumeroSolicitud.length < MIN_SEARCH_LENGTH"
                             class="absolute right-3 top-8 text-gray-400">
-                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor"
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                 </path>
@@ -499,8 +502,10 @@ onMounted(() => {
                         <!-- Indicador de búsqueda -->
                         <div v-if="buscandoSolicitudes && busquedaSolicitante.length > 0 && busquedaSolicitante.length < MIN_SEARCH_LENGTH"
                             class="absolute right-3 top-8 text-gray-400">
-                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor"
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                 </path>
@@ -533,10 +538,12 @@ onMounted(() => {
                 </div>
 
                 <!-- Indicador de estado de búsqueda -->
-                <div v-if="buscandoSolicitudes && (busquedaNumeroSolicitud.length >= MIN_SEARCH_LENGTH || busquedaSolicitante.length >= MIN_SEARCH_LENGTH || filtroFechaInicio || filtroFechaFin)" class="mt-3 text-sm text-verde-bap flex items-center">
-                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-verde-bap" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <div v-if="buscandoSolicitudes && (busquedaNumeroSolicitud.length >= MIN_SEARCH_LENGTH || busquedaSolicitante.length >= MIN_SEARCH_LENGTH || filtroFechaInicio || filtroFechaFin)"
+                    class="mt-3 text-sm text-verde-bap flex items-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-verde-bap" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
                         <path class="opacity-75" fill="currentColor"
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                         </path>
@@ -546,14 +553,16 @@ onMounted(() => {
             </div>
 
             <!-- Mensaje cuando no hay resultados -->
-            <div v-if="solicitudesFiltradas.length === 0 && !cargandoSolicitudes" class="text-center text-gray-500 py-8">
+            <div v-if="solicitudesFiltradas.length === 0 && !cargandoSolicitudes"
+                class="text-center text-gray-500 py-8">
                 <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <p class="text-lg font-medium">No se encontraron solicitudes</p>
                 <p class="text-sm text-gray-400 mt-1">
-                    {{ hayFiltrosActivos ? 'Intenta ajustar los filtros de búsqueda' : 'No hay solicitudes registradas' }}
+                    {{ hayFiltrosActivos ? 'Intenta ajustar los filtros de búsqueda' : 'No hay solicitudes registradas'
+                    }}
                 </p>
                 <button v-if="hayFiltrosActivos" @click="limpiarFiltros"
                     class="mt-3 px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors duration-200 text-sm">
@@ -575,31 +584,26 @@ onMounted(() => {
                                 <th class="py-4 px-4 text-center font-semibold">Tipo</th>
                                 <th class="py-4 px-4 text-center font-semibold">Monto</th>
                                 <th class="py-4 px-4 text-center font-semibold">Prioridad</th>
-                                <th class="py-4 px-4 text-center font-semibold">Estado</th>
+                                <th class="py-4 px-4 text-center font-semibold w-48">Estado</th>
                                 <th class="py-4 px-4 text-center font-semibold">Solicitante</th>
                                 <th class="py-4 px-4 text-center font-semibold">Fecha Creación</th>
-                                <th class="py-4 px-4 text-center font-semibold w-4">Acciones</th>
+                                <th class="py-4 px-4 text-center font-semibold w-32">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="text-gray-600 text-sm">
                             <tr v-for="solicitud in solicitudesMostradas" :key="solicitud.id"
                                 class="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
-                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">{{ solicitud.codigo_solicitud ||
+                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">{{
+                                    solicitud.codigo_solicitud ||
                                     solicitud.id }}</td>
                                 <td class="py-4 px-4 text-center">{{ solicitud.tipo_solicitud || 'N/A' }}</td>
-                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">S/. {{ solicitud.monto_solicitado ?
-                                    parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</td>
+                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">S/. {{
+                                    solicitud.monto_solicitado ?
+                                        parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</td>
                                 <td class="py-4 px-4 text-center">{{ solicitud.prioridad || 'N/A' }}</td>
-                                <td class="py-4 px-4 text-center">
-                                    <span :class="{
-                                        'bg-estado-creada text-estado-creada-text': solicitud.estado === 'Creada',
-                                        'bg-estado-pendiente text-estado-pendiente-text': solicitud.estado === 'Pendiente Aprobación ADM' || solicitud.estado === 'Pendiente Aprobación GRTE',
-                                        'bg-estado-observada text-estado-observada-text': solicitud.estado.includes('Observada'),
-                                        'bg-estado-descargo text-estado-descargo-text': solicitud.estado.includes('Descargo Enviado'),
-                                        'bg-estado-aprobada-adm text-estado-aprobada-adm-text': solicitud.estado === 'Aprobada ADM',
-                                        'bg-estado-aprobada-final text-estado-aprobada-final-text': solicitud.estado === 'Aprobada',
-                                        'bg-estado-rechazada text-estado-rechazada-text': solicitud.estado === 'Rechazada Final',
-                                    }" class="py-2 px-3 rounded-full text-xs font-semibold inline-block text-center w-40">
+
+                                <td class="py-4 px-4 flex justify-center items-center">
+                                    <span :class="getClassesForBadge(solicitud.estado)">
                                         {{ solicitud.estado }}
                                     </span>
                                 </td>
@@ -613,8 +617,8 @@ onMounted(() => {
                                         <button @click="verDetalles(solicitud)"
                                             class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-700 transition-colors duration-200"
                                             title="Ver Detalles">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                                class="w-4 h-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -625,18 +629,19 @@ onMounted(() => {
                                         <button @click="verHistorial(solicitud)"
                                             class="w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center text-blue-700 transition-colors duration-200"
                                             title="Ver Historial de Estados">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                                class="w-4 h-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                         </button>
 
-                                        <button v-if="puedeGestionarSolicitud(solicitud)" @click="abrirGestionModal(solicitud)"
+                                        <button v-if="puedeGestionarSolicitud(solicitud)"
+                                            @click="abrirGestionModal(solicitud)"
                                             class="w-8 h-8 rounded-full bg-verde-bap-dark hover:bg-verde-bap flex items-center justify-center text-white transition-colors duration-200"
                                             title="Gestionar Solicitud">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                                class="w-4 h-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
@@ -659,12 +664,13 @@ onMounted(() => {
                     </button>
 
                     <div class="flex space-x-1">
-                        <button v-for="pagina in Math.min(totalPaginas, 5)" :key="pagina" @click="irAPagina(pagina)" :class="[
-                            'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
-                            paginaActual === pagina
-                                ? 'bg-verde-bap text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        ]">
+                        <button v-for="pagina in Math.min(totalPaginas, 5)" :key="pagina" @click="irAPagina(pagina)"
+                            :class="[
+                                'w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200',
+                                paginaActual === pagina
+                                    ? 'bg-verde-bap text-white'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            ]">
                             {{ pagina }}
                         </button>
 

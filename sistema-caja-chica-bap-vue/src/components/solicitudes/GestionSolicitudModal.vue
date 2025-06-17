@@ -1,12 +1,15 @@
 <template>
     <Transition name="modal-fade">
         <div v-if="mostrar" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden transform transition-all sm:max-w-lg md:max-w-xl">
+            <div
+                class="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto overflow-hidden transform transition-all sm:max-w-lg md:max-w-xl">
                 <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-xl font-semibold text-gray-800">Gestionar Solicitud: {{ solicitud?.codigo_solicitud || 'N/A' }}</h3>
+                    <h3 class="text-xl font-semibold text-gray-800">Gestionar Solicitud: {{ solicitud?.codigo_solicitud
+                        || 'N/A' }}</h3>
                     <button @click="cerrarModal()" class="text-gray-500 hover:text-gray-700">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
@@ -14,32 +17,50 @@
                 <div class="p-6 max-h-[70vh] overflow-y-auto">
                     <div class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-100">
                         <h4 class="text-lg font-bold text-gray-700 mb-2">Resumen de Solicitud</h4>
-                        <p class="text-sm text-gray-600"><strong>Tipo:</strong> {{ solicitud?.tipo_solicitud || 'N/A' }}</p>
-                        <p class="text-sm text-gray-600"><strong>Monto:</strong> S/. {{ solicitud?.monto_solicitado ? parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</p>
-                        <p class="text-sm text-gray-600"><strong>Motivo:</strong> {{ solicitud?.motivo_detalle || 'N/A' }}</p>
-                        <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ solicitud?.estado || 'N/A' }}</p>
-                        <p class="text-sm text-gray-600"><strong>Solicitante:</strong> {{ solicitud?.solicitante?.name || 'N/A' }} {{ solicitud?.solicitante?.last_name || '' }}</p>
+                        <p class="text-sm text-gray-600"><strong>Tipo:</strong> {{ solicitud.tipo_solicitud || 'N/A' }}
+                        </p>
+                        <p class="text-sm text-gray-600"><strong>Monto:</strong> S/. {{
+                            parseFloat(solicitud.monto_solicitado || 0).toFixed(2) }}</p>
+                        <p class="text-sm text-gray-600"><strong>Motivo:</strong> {{ solicitud.motivo_detalle || 'N/A'
+                            }}</p>
+                        <p class="text-sm text-gray-600"><strong>Solicitante:</strong> {{ solicitud.solicitante?.name ||
+                            'N/A' }} {{ solicitud.solicitante?.last_name || '' }}</p>
+                        <p class="text-sm text-gray-600 flex items-center">
+                            <strong class="mr-2">Estado Actual:</strong>
+                            <span class="font-semibold" :class="getTextClassForState(solicitud.estado)">
+                                {{ solicitud.estado || 'N/A' }}
+                            </span>
+                        </p>
                     </div>
 
                     <div v-if="showJefeAdmActions" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Administración</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarADM')"
-                                class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('exito')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
                                 <span>Aprobar ADM</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('observarADM')"
-                                class="px-4 py-2 bg-estado-observada-text text-white rounded-md hover:bg-observar-bap-hover transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('advertencia')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
                                 <span>Observar ADM</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('rechazarFinal')"
-                                class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-hover transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('error')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                                 <span>Rechazar</span>
                             </button>
                         </div>
@@ -49,48 +70,64 @@
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Gerencia General</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarGRTE')"
-                                class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('exito')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 13l4 4L19 7" />
+                                </svg>
                                 <span>Aprobar GRTE</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('observarGRTE')"
-                                class="px-4 py-2 bg-estado-observada-text text-white rounded-md hover:bg-observar-bap-hover transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('advertencia')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
                                 <span>Observar GRTE</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('rechazarFinal')"
-                                class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-hover transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('error')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                                 <span>Rechazar</span>
                             </button>
                         </div>
                     </div>
 
-                    <div v-if="showSolicitanteDescargoAction" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+                    <div v-if="showSolicitanteDescargoAction"
+                        class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Solicitante</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="iniciarAccionConMotivo('presentarDescargo')"
-                                class="px-4 py-2 bg-descargo-bap-hover text-white rounded-md hover:bg-estado-pendiente-text transition-colors flex items-center space-x-2"
+                                :class="getClassesForActionButton('info')"
                                 :disabled="isLoadingAction">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
                                 <span>Presentar Descargo</span>
                             </button>
                         </div>
                     </div>
 
-                    <div v-if="showMotivoInput" class="mt-6 p-4 border border-gray-200 rounded-md bg-white shadow-inner">
-                        <label for="motivoAccion" class="block text-sm font-medium text-gray-700 mb-2">{{ motivoLabel }}:</label>
+                    <div v-if="showMotivoInput"
+                        class="mt-6 p-4 border border-gray-200 rounded-md bg-white shadow-inner">
+                        <label for="motivoAccion" class="block text-sm font-medium text-gray-700 mb-2">{{ motivoLabel
+                            }}:</label>
                         <textarea id="motivoAccion" v-model="motivoAccion" :placeholder="motivoPlaceholder" rows="4"
                             class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap resize-none"></textarea>
                         <div class="mt-4 flex justify-end space-x-3">
-                            <button @click="cancelarAccion" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">
+                            <button @click="cancelarAccion"
+                                class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">
                                 Cancelar
                             </button>
                             <button @click="ejecutarAccion"
-                                class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors"
+                                :class="getClassesForActionButton(accionActual === 'rechazarFinal' ? 'error' : 'exito')"
                                 :disabled="isLoadingAction || (showMotivoInput && !motivoAccion)">
                                 <span v-if="isLoadingAction">Enviando...</span>
                                 <span v-else>Confirmar</span>
@@ -98,13 +135,15 @@
                         </div>
                     </div>
 
-                    <div v-if="!showJefeAdmActions && !showGerenteGeneralActions && !showSolicitanteDescargoAction && !showMotivoInput" class="text-center text-gray-500 py-4">
+                    <div v-if="!showJefeAdmActions && !showGerenteGeneralActions && !showSolicitanteDescargoAction && !showMotivoInput"
+                        class="text-center text-gray-500 py-4">
                         No hay acciones disponibles para esta solicitud o su rol actual.
                     </div>
                 </div>
 
                 <div class="p-4 border-t border-gray-200 flex justify-end bg-gray-50">
-                    <button @click="cerrarModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">
+                    <button @click="cerrarModal()"
+                        class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">
                         Cerrar
                     </button>
                 </div>
@@ -117,7 +156,7 @@
 import { defineProps, defineEmits, ref, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
-
+import { getTextClassForState, getClassesForActionButton } from '@/utils/statusStyles.js';
 const props = defineProps({
     mostrar: {
         type: Boolean,
@@ -159,12 +198,12 @@ const showJefeAdmActions = computed(() => {
     const estado = props.solicitud.estado;
     const rolActual = props.usuarioActual.role.name;
     const isSolicitanteAdminOrSuperAdmin = props.usuarioActual.id === props.solicitud.id_solicitante &&
-                                            [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(rolActual);
+        [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(rolActual);
     const isDecrementoCierre = ['Decremento', 'Cierre'].includes(props.solicitud.tipo_solicitud);
 
     // Si el usuario actual es Jefe ADM o Super Admin Y la solicitud está en un estado gestionable por ADM
     const canActAsAdm = (rolActual === ROLES.JEFE_ADM || rolActual === ROLES.SUPER_ADMIN) &&
-                               (estado === 'Pendiente Aprobación ADM' || estado === 'Descargo Enviado ADM');
+        (estado === 'Pendiente Aprobación ADM' || estado === 'Descargo Enviado ADM');
 
     // Restricción: Si el solicitante es un ADM/SuperAdmin y es una solicitud de Decremento/Cierre,
     // el ADM no puede "gestionar" su propia solicitud de esta forma (aprobar/observar/rechazar).
@@ -184,12 +223,12 @@ const showGerenteGeneralActions = computed(() => {
     const estado = props.solicitud.estado;
     const rolActual = props.usuarioActual.role.name;
     const isSolicitanteGrteOrSuperAdmin = props.usuarioActual.id === props.solicitud.id_solicitante &&
-                                           [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolActual);
+        [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolActual);
     const isDecrementoCierre = ['Decremento', 'Cierre'].includes(props.solicitud.tipo_solicitud);
 
     // Si el usuario actual es Gerente General o Super Admin Y la solicitud está en un estado gestionable por GRTE
     const canActAsGrte = (rolActual === ROLES.GERENTE_GENERAL || rolActual === ROLES.SUPER_ADMIN) &&
-                               (estado === 'Pendiente Aprobación GRTE' || estado === 'Descargo Enviado GRTE');
+        (estado === 'Pendiente Aprobación GRTE' || estado === 'Descargo Enviado GRTE');
 
     // Restricción: Si el solicitante es un GRTE/SuperAdmin y es una solicitud de Decremento/Cierre,
     // el GRTE no puede "gestionar" su propia solicitud de esta forma (aprobar/observar/rechazar).
@@ -197,7 +236,7 @@ const showGerenteGeneralActions = computed(() => {
     if (canActAsGrte && isSolicitanteGrteOrSuperAdmin && isDecrementoCierre) {
         return false;
     }
-    
+
     return canActAsGrte;
 });
 
@@ -216,9 +255,9 @@ const showSolicitanteDescargoAction = computed(() => {
 // Determina si el campo de texto para el motivo debe ser visible
 const showMotivoInput = computed(() => {
     return accionActual.value === 'observarADM' ||
-           accionActual.value === 'observarGRTE' ||
-           accionActual.value === 'rechazarFinal' ||
-           accionActual.value === 'presentarDescargo';
+        accionActual.value === 'observarGRTE' ||
+        accionActual.value === 'rechazarFinal' ||
+        accionActual.value === 'presentarDescargo';
 });
 
 // Texto del placeholder para el campo de motivo
@@ -284,7 +323,7 @@ const ejecutarAccion = async () => {
     let confirmationTitle = '';
     let confirmationText = '';
     let confirmButtonText = '';
-    
+
     isLoadingAction.value = true;
 
     try {
@@ -409,7 +448,7 @@ const ejecutarAccion = async () => {
 
         // Realizar la llamada a la API y CAPTURAR LA RESPUESTA
         const response = await api.patch(endpoint, payload);
-        
+
         // El mensaje de éxito ahora se tomará directamente de la respuesta de la API
         // que ya contiene el código del fondo cuando sea relevante.
         successMessageFromAPI = response.data.message;
@@ -468,5 +507,6 @@ watch(() => props.mostrar, (newVal) => {
 .modal-fade-leave-to {
     opacity: 0;
 }
+
 /* La clase resize-none es de Tailwind CSS, no necesita definición aquí si Tailwind está configurado */
 </style>

@@ -9,86 +9,101 @@ use App\Http\Controllers\API\FondoEfectivoController;
 use App\Http\Controllers\API\AreaController;
 use App\Http\Controllers\API\CuentaContableController;
 use App\Http\Controllers\API\DocumentoController;
+
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| Rutas de la API
 |--------------------------------------------------------------------------
 |
 | Aquí se registran todas las rutas de la API de la aplicación.
+| Estas rutas son 'stateless' y todas las protegidas usan autenticación
+| vía Sanctum.
 |
 */
 
-//==========================================================================
-// RUTAS PÚBLICAS
-//==========================================================================
+// =========================================================================
+// == RUTAS PÚBLICAS
+// =========================================================================
 
 // --- Autenticación ---
-// Endpoints para que los usuarios inicien sesión y se registren.
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/register', [AuthController::class, 'register']);
 });
 
 // --- Estado de la API ---
-// Endpoint para verificar que la API está funcionando correctamente.
-Route::get('/health', function () {
-    return response()->json(['status' => 'OK', 'timestamp' => now()]);
-});
+Route::get('/health', fn() => response()->json(['status' => 'OK']));
 
 
-//==========================================================================
-// RUTAS PROTEGIDAS (Requieren autenticación vía Sanctum)
-//==========================================================================
+// =========================================================================
+// == RUTAS PROTEGIDAS
+// =========================================================================
 Route::middleware('auth:sanctum')->group(function () {
 
     // --- Gestión de Usuario y Sesión ---
-    Route::get('/user', [AuthController::class, 'user']); // Obtiene la información del usuario autenticado.
-    Route::post('/auth/logout', [AuthController::class, 'logout']); // Cierra la sesión del usuario.
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    // Obtiene la información del usuario autenticado junto con su rol, permisos y área.
+    Route::get('/user', fn(Request $request) => $request->user()->load('role.permissions', 'area'));
 
-    Route::get('/user', function (Request $request) {
-        return $request->user()->load('role.permissions', 'area');
-    });
-    // --- RECURSOS PRINCIPALES (RESTful) ---
-    // Proporcionan las operaciones CRUD estándar (index, show, store, update, destroy).
 
-    // Gestión de todas las solicitudes (Apertura, Modificación, etc.).
+    // -------------------------------------------------------------------------
+    // -- GESTIÓN DE FONDOS Y SOLICITUDES
+    // -------------------------------------------------------------------------
+
+    // --- Recursos Principales (CRUD) ---
     Route::apiResource('solicitudes-fondo', SolicitudFondoController::class);
-    Route::put('/solicitudes-fondos/{solicitud}/actualizar-estado', [SolicitudFondoController::class, 'actualizarEstado']);
-    // Gestión de los fondos de caja chica.
     Route::apiResource('fondos-efectivo', FondoEfectivoController::class)->parameters([
-        'fondos-efectivo' => 'id_fondo' // Asegura que el parámetro en la URL sea {id_fondo}
+        'fondos-efectivo' => 'fondo' // Laravel usará la variable $fondo en el controlador
     ]);
-    // Endpoints que devuelven listas de datos para selectores, etc.
-    //Obtiene lista de cuentas contables.
-    Route::get('/cuentas-contables', [CuentaContableController::class, 'index']);
-    // Obtiene la lista de todas las áreas.
+    // Esta ruta obtiene solo los fondos activos de los que el usuario es responsable.
+    // Esencial para el formulario de registro de gastos.
+    Route::get('/fondos-activos-usuario', [FondoEfectivoController::class, 'getFondosActivosParaUsuario'])->name('fondos.activos-para-usuario');
+    // --- Acciones y Flujos de Trabajo para Fondos ---
+    Route::prefix('fondos-efectivo/{fondo}')->name('fondos.')->group(function () {
+        // Obtiene el historial completo y unificado de un fondo (Aperturas, Reposiciones, etc.)
+        Route::get('/timeline', [FondoEfectivoController::class, 'getTimeline'])->name('timeline');
+        // Obtiene el resumen para la reposición (montos, etc.)
+        Route::get('/reposicion-summary', [FondoEfectivoController::class, 'getReposicionSummary'])->name('reposicion-summary');
+        // Ejecuta la reposición de un fondo
+        Route::post('/reponer', [FondoEfectivoController::class, 'reponer'])->name('reponer');
+    });
+
+    // Ruta para actualizar el estado de una solicitud de fondo.
+    Route::put('/solicitudes-fondos/{solicitud}/actualizar-estado', [SolicitudFondoController::class, 'actualizarEstado']);
+
+
+    // -------------------------------------------------------------------------
+    // -- GESTIÓN DE GASTOS Y FLUJO DE APROBACIÓN (v6)
+    // -------------------------------------------------------------------------
+
+    // --- Recurso Principal (CRUD) ---
+    Route::apiResource('gastos', GastoController::class);
+
+    // --- Máquina de Estados y Flujo de Trabajo para Gastos ---
+    Route::prefix('gastos/{gasto}')->name('gastos.')->group(function () {
+        // Acciones de Jefatura
+        Route::post('/approve', [GastoController::class, 'approve'])->name('approve');
+        Route::post('/reject-by-jefe', [GastoController::class, 'rejectByJefe'])->name('reject-by-jefe');
+
+        // Acciones de Administración
+        Route::post('/finalize', [GastoController::class, 'finalizeAsAccounted'])->name('finalize');
+        Route::post('/observe', [GastoController::class, 'observe'])->name('observe');
+        Route::post('/reject-final', [GastoController::class, 'rejectFinal'])->name('reject-final');
+
+        // Flujo de Corrección
+        Route::post('/return-to-collaborator', [GastoController::class, 'returnToCollaborator'])->name('return');
+        Route::put('/resubmit', [GastoController::class, 'resubmit'])->name('resubmit');
+    });
+
+
+    // -------------------------------------------------------------------------
+    // -- RECURSOS DE SOPORTE Y UTILIDADES
+    // -------------------------------------------------------------------------
+
+    // --- Listas para Selectores (Dropdowns) ---
     Route::get('/areas', [AreaController::class, 'index']);
+    Route::get('/cuentas-contables', [CuentaContableController::class, 'index']);
 
-    // CRUD Básico para Gastos
-    Route::apiResource('gastos', GastoController::class)->except(['update']);
-
-    // --- Máquina de Estados para Gastos ---
-    // Cada ruta representa una acción clara dentro del flujo de negocio.
-    // Paso 2: Aprobación por Jefe de Área
-    Route::post('/gastos/{gasto}/approve', [GastoController::class, 'approve'])->name('gastos.approve');
-    //Rechazo por Jefe de Área
-    Route::post('/gastos/{gasto}/reject-by-jefe', [GastoController::class, 'rejectByJefe'])->name('gastos.reject-by-jefe');
-    // Paso 3: Observación por Administración
-    Route::post('/gastos/{gasto}/observe', [GastoController::class, 'observe'])->name('gastos.observe');
-
-    // Paso 4 (Parte 1): Jefe devuelve a Colaborador
-    Route::post('/gastos/{gasto}/return', [GastoController::class, 'returnToCollaborator'])->name('gastos.return');
-
-    // Paso 4 (Parte 2): Colaborador corrige y reenvía
-    // Se usa PUT aquí porque actualiza datos del gasto (monto, glosa, etc.) y la evidencia.
-    Route::put('/gastos/{gasto}/resubmit', [GastoController::class, 'resubmit'])->name('gastos.resubmit');
-
-    // Acciones Finales de Administración
-    Route::post('/gastos/{gasto}/finalize', [GastoController::class, 'finalizeAsAccounted'])->name('gastos.finalize');
-    Route::post('/gastos/{gasto}/reject-final', [GastoController::class, 'rejectFinal'])->name('gastos.reject-final');
-
-    // Generación de Documentos
+    // --- Generación de Documentos ---
     Route::post('/documentos/generar-dj', [DocumentoController::class, 'generarDJ']);
-    // Obtiene el historial de vida completo de un fondo específico (Apertura, Incrementos, etc.).
-    Route::get('/fondos-efectivo/{id_fondo}/historial', [FondoEfectivoController::class, 'getFondoHistory']);
 });

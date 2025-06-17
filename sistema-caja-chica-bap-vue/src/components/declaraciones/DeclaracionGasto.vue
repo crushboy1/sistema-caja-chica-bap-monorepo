@@ -85,8 +85,11 @@
                         </select>
                     </div>
                     <div>
-                        <label for="monto_total" class="block text-sm font-medium text-gray-700 mb-1">Monto Total (S/.)
-                            <span class="text-rojo-bap">*</span></label>
+                        
+                        <label for="monto_total" class="block text-sm font-medium text-gray-700 mb-1">
+                            Monto Total ({{ form.moneda === 'PEN' ? 'S/.' : 'USD' }}) <span
+                                class="text-rojo-bap">*</span>
+                        </label>
                         <input type="number" id="monto_total" v-model.number="form.monto_total" step="0.01" min="0.01"
                             class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                             placeholder="Ej: 25.50" required />
@@ -321,8 +324,12 @@ const obtenerUsuarioLogueado = async () => {
 };
 const obtenerFondosActivos = async () => {
     try {
-        const response = await api.get('/fondos-efectivo', { params: { estado: 'Activo' } });
-        fondosActivos.value = response.data.fondos;
+        // Se apunta al nuevo endpoint '/fondos-activos-usuario' que está diseñado
+        // para devolver solo los fondos activos del usuario logueado.
+        // Esto soluciona el problema de que el "Colaborador" no podía acceder.
+        const response = await api.get('/fondos-activos-usuario');
+        // La respuesta de este endpoint es directamente el array de fondos.
+        fondosActivos.value = response.data;
     } catch (error) {
         console.error("Error al obtener fondos activos:", error);
         Swal.fire('Error', 'No se pudieron cargar tus fondos activos.', 'error');

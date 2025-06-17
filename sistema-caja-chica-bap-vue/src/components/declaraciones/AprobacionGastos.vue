@@ -99,11 +99,11 @@
           <tbody class="text-gray-600 text-sm">
             <tr v-for="gasto in gastosPaginados" :key="gasto.id" class="hover:bg-gray-50 transition-colors text-center">
               <td class="py-4 px-6 text-center font-medium whitespace-nowrap">{{ gasto.codigo_gasto }}</td>
-              <td class="py-4 px-6 text-center font-medium whitespace-nowrap">S/. {{
-                parseFloat(gasto.monto_total).toFixed(2) }}</td>
+              <td class="py-4 px-6 text-center font-medium whitespace-nowrap">
+                {{ gasto.moneda === 'PEN' ? 'S/.' : 'USD' }} {{ parseFloat(gasto.monto_total).toFixed(2) }}
+              </td>
               <td class="py-4 px-6 whitespace-normal">
-                <span class="py-2 px-3 rounded-full text-xs font-semibold inline-block"
-                  :class="getEstadoClass(gasto.estado)">
+                <span :class="getClassesForAuditoriaBadge(gasto.estado)">
                   {{ gasto.estado }}
                 </span>
               </td>
@@ -112,6 +112,7 @@
               <td class="py-4 px-4 text-center text-gray-500">{{ new
                 Date(gasto.created_at).toLocaleDateString('es-ES') }}</td>
               <td class="py-4 px-4 text-center">
+
                 <div class="flex items-center justify-center space-x-2">
                   <button @click="verDetalles(gasto)"
                     class="w-9 h-9 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
@@ -124,14 +125,20 @@
                     </svg>
                   </button>
 
-                  <button v-if="gasto.estado === 'Pendiente de Aprobación Jefatura'" @click="abrirGestionModal(gasto)"
-                    class="w-9 h-9 rounded-full bg-verde-bap hover:bg-verde-bap-dark text-white flex items-center justify-center transition-all duration-300 hover:scale-110"
-                    title="Gestionar Gasto">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
+                  <div v-if="esJefeDeArea">
+                                        <button v-if="gasto.estado === 'Pendiente de Aprobación'" @click="abrirGestionModal(gasto)" title="Aprobar / Rechazar Gasto" class="w-9 h-9 rounded-full bg-verde-bap-dark hover:bg-verde-bap text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                        </button>
+                                        <button v-if="gasto.estado === 'Observado'" @click="abrirObservacionModal(gasto)" title="Gestionar Observación" class="w-9 h-9 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                        </button>
+                                    </div>
+
+                  <div v-if="esColaborador">
+                                        <button v-if="gasto.estado === 'Observado'" @click="abrirObservacionModal(gasto)" title="Corregir Gasto" class="w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                                        </button>
+                                    </div>
                 </div>
               </td>
             </tr>
@@ -177,6 +184,9 @@
     <!-- CAMBIO: Se pasa la prop `usuarioActual` y se escucha el evento `accionRealizada` -->
     <GestionGastoModal :mostrar="mostrarGestionModal" :gasto="gastoParaGestionar" :usuarioActual="usuarioActual"
       @close="cerrarGestionModal" @accionRealizada="handleAccionRealizada" />
+
+    <GestionObservacionModal :mostrar="mostrarObservacionModal" :gasto="gastoParaObservacion"
+      :usuarioActual="usuarioActual" @close="cerrarObservacionModal" @accionRealizada="handleAccionRealizada" />
   </div>
 </template>
 
@@ -186,7 +196,8 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import GestionGastoModal from './modals/GestionGastoModal.vue';
-
+import GestionObservacionModal from './modals/GestionObservacionModal.vue';
+import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
 // --- ESTADO DEL COMPONENTE ---
 const usuarioActual = ref(null);
 const gastos = ref([]);
@@ -207,8 +218,18 @@ const gastoSeleccionado = ref(null);
 const mostrarDetalleModal = ref(false);
 const gastoParaGestionar = ref(null);
 const mostrarGestionModal = ref(false);
-
+const gastoParaObservacion = ref(null);
+const mostrarObservacionModal = ref(false);
 // --- PROPIEDADES COMPUTADAS ---
+
+const esJefeDeArea = computed(() => {
+    return usuarioActual.value?.role?.name === 'jefe_area';
+});
+
+// Se crea una propiedad computada para verificar si el usuario es Colaborador.
+const esColaborador = computed(() => {
+    return usuarioActual.value?.role?.name === 'colaborador';
+});
 const hayFiltrosActivos = computed(() => {
   return filtros.value.registrador_name || filtros.value.fecha_inicio || filtros.value.fecha_fin || filtros.value.codigo_gasto;
 });
@@ -253,12 +274,12 @@ const fetchGastos = async () => {
   cargando.value = true;
   try {
     const params = {
-        ...filtros.value,
-        scope: 'aprobaciones'
-      };
+      ...filtros.value,
+      scope: 'aprobaciones'
+    };
     const response = await api.get('/gastos', { params });
     gastos.value = response.data;
-    
+
     if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
       paginaActual.value = totalPaginas.value;
     } else if (totalPaginas.value === 0) {
@@ -291,10 +312,21 @@ const cerrarGestionModal = () => {
   gastoParaGestionar.value = null;
 };
 
+
+const abrirObservacionModal = (gasto) => {
+  gastoParaObservacion.value = gasto;
+  mostrarObservacionModal.value = true;
+}
+const cerrarObservacionModal = () => {
+  mostrarObservacionModal.value = false;
+  gastoParaObservacion.value = null;
+}
 // CAMBIO: Nueva función para manejar el refresco de datos tras una acción
 const handleAccionRealizada = () => {
-  cerrarGestionModal(); // Primero cierra el modal
-  fetchGastos(); // Luego refresca la lista
+  // Esta función ahora cierra ambos modales de gestión y refresca la tabla.
+  cerrarGestionModal();
+  cerrarObservacionModal();
+  fetchGastos();
 };
 
 const irAPagina = (pagina) => {
@@ -305,13 +337,7 @@ const irAPagina = (pagina) => {
 const paginaAnterior = () => { if (paginaActual.value > 1) paginaActual.value--; };
 const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) paginaActual.value++; };
 
-const getEstadoClass = (estado) => {
-  const clases = {
-    'Pendiente de Aprobación Jefatura': 'bg-estado-pendiente text-estado-pendiente-text',
-    'Devuelto para Corrección': 'bg-estado-observada text-estado-observada-text',
-  };
-  return clases[estado] || 'bg-gray-200 text-gray-800';
-};
+
 
 // --- WATCHERS Y LIFECYCLE ---
 watch(filtros, () => {

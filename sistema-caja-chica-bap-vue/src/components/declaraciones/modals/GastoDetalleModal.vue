@@ -86,7 +86,7 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Monto Total:</strong> S/. {{ gasto?.monto_total ?
                                 parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</p>
                             <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ gasto?.estado || 'N/A'
-                            }}</p>
+                                }}</p>
                             <p class="text-sm text-gray-600"><strong>Fecha de Registro:</strong> {{
                                 formatearFecha(gasto?.created_at) }}</p>
                             <p class="text-sm text-gray-600"><strong>Glosa:</strong> {{ gasto?.glosa || 'No especificada' }}</p>
@@ -127,6 +127,7 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Área:</strong> {{ gasto?.registrador?.area?.name ||
                                 'N/A' }}</p>
                         </div>
+
                         <!-- Tarjeta de Detalles Contables y de Fondo -->
                         <div
                             class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
@@ -142,31 +143,16 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Fondo Afectado:</strong> {{
                                 gasto?.fondo_efectivo?.codigo_fondo || 'N/A' }}
                             </p>
+                            <!-- CAMBIO: Campo añadido para mostrar el monto original del fondo -->
+                            <p class="text-sm text-gray-600"><strong>Monto Original del Fondo:</strong> S/. {{
+                                gasto?.fondo_efectivo?.monto_aprobado ?
+                                    parseFloat(gasto.fondo_efectivo.monto_aprobado).toFixed(2) : '0.00' }}
+                            </p>
                             <p class="text-sm text-gray-600"><strong>Cuenta Contable:</strong>
                                 <span v-if="gasto?.cuenta_contable">{{ gasto.cuenta_contable.codigo_cuenta }} - {{
                                     gasto.cuenta_contable.descripcion }}</span>
                                 <span v-else>N/A</span>
                             </p>
-                        </div>
-                        <!-- Tarjeta de Evidencia con botón de descarga -->
-                        <div
-                            class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
-                            <h4 class="text-lg font-bold text-gray-700 mb-2 flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-verde-bap-dark" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                Registrador del Gasto
-                            </h4>
-                            <p class="text-sm text-gray-600">
-                                <strong>Nombre:</strong>
-                                {{ gasto?.registrador?.name || 'N/A' }} {{ gasto?.registrador?.last_name || '' }}
-                            </p>
-                            <p class="text-sm text-gray-600"><strong>Rol:</strong> {{
-                                gasto?.registrador?.role?.display_name || 'N/A' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Área:</strong> {{ gasto?.registrador?.area?.name ||
-                                'N/A' }}</p>
                         </div>
 
                         <!-- Tarjeta de Evidencia -->

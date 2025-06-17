@@ -20,7 +20,7 @@ class AreaController extends Controller
         try {
             // No se necesitan filtros de rol aquí, ya que las áreas son datos generales
             // que cualquier usuario autenticado que acceda a este módulo debería ver.
-            $areas = Area::all(); // Obtener todas las áreas
+            $areas = Area::orderBy('name', 'asc')->get(); // Obtener todas las áreas
 
             return response()->json([
                 'message' => 'Áreas obtenidas exitosamente.',

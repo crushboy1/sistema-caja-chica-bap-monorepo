@@ -31,21 +31,29 @@ export default {
         'observar-bap-hover': '#C2410C', // orange-600 (para observación)
         'descargo-bap-hover': '#2563EB', // blue-600 (para descargo)
 
-        // Colores para estados de solicitud
-        'estado-creada': '#DBEAFE',
-        'estado-creada-text': '#1E40AF',
-        'estado-pendiente': '#BFDBFE',
-        'estado-pendiente-text': '#1D4ED8',
-        'estado-observada': '#FFEDD5',
-        'estado-observada-text': '#EA580C',
-        'estado-descargo': '#FEF3C7',
-        'estado-descargo-text': '#D97706',
-        'estado-aprobada-adm': '#D1FAE5',
-        'estado-aprobada-adm-text': '#059669',
-        'estado-aprobada-final': '#D1FAE5',
-        'estado-aprobada-final-text': '#059669',
-        'estado-rechazada': '#FEE2E2',
-        'estado-rechazada-text': '#DC2626',
+        // Amarillo/Ámbar para estados que requieren atención o acción del usuario
+        'estado-alerta-bg': '#FEF3C7', // bg-yellow-100 / amber-100
+        'estado-alerta-text': '#B45309', // text-amber-700
+
+        // Azul para estados informativos o en proceso
+        'estado-info-bg': '#DBEAFE', // bg-blue-100
+        'estado-info-text': '#1E40AF', // text-blue-800
+
+        // Verde para estados de éxito o finalizados positivamente
+        'estado-exito-bg': '#D1FAE5', // bg-green-100
+        'estado-exito-text': '#065F46', // text-green-800
+
+        // Naranja para estados de advertencia o que necesitan corrección
+        'estado-advertencia-bg': '#FFEDD5', // bg-orange-100
+        'estado-advertencia-text': '#C2410C', // text-orange-800
+
+        // Rojo para estados de error o rechazo
+        'estado-error-bg': '#FEE2E2', // bg-red-100
+        'estado-error-text': '#991B1B', // text-red-800
+
+        // Gris para estados neutrales, cerrados o completados
+        'estado-neutro-bg': '#E5E7EB', // bg-gray-200
+        'estado-neutro-text': '#374151', // text-gray-700
         // Colores adicionales para glassmorphism y efectos modernos
         'glass-white': 'rgba(255, 255, 255, 0.85)',
         'glass-border': 'rgba(255, 255, 255, 0.2)',

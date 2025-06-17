@@ -2,61 +2,87 @@
 import { ref, watch, computed } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
-
+import { getClassesForActionButton , getTextClassForState } from '@/utils/statusStyles.js';
 // --- PROPS Y EMITS ---
-// Se define un emit 'accionRealizada' para notificar al componente padre que debe recargar los datos.
 const props = defineProps({
     mostrar: Boolean,
     gasto: Object,
-    usuarioActual: Object, 
+    usuarioActual: Object,
 });
 const emit = defineEmits(['close', 'accionRealizada']);
 
-
 // --- ESTADO INTERNO ---
 const isLoading = ref(false);
-const accionActual = ref(null); // Usado para mostrar/ocultar el textarea de rechazo.
+const accionActual = ref(null);
 const motivoRechazo = ref('');
-
+// NUEVO: Estado para el tipo de cambio
+const tipoCambio = ref(null);
 
 // --- COMPUTED PROPS ---
-// La lógica para evitar la autoaprobación se mantiene, es una regla de negocio correcta.
 const esGastoPropio = computed(() => {
     if (!props.gasto || !props.usuarioActual) return false;
     return props.gasto.id_registrador === props.usuarioActual.id;
 });
 
+// NUEVO: Calcula el monto convertido para mostrarlo en la UI
+const montoConvertido = computed(() => {
+    if (props.gasto?.moneda === 'USD' && tipoCambio.value > 0) {
+        return (props.gasto.monto_total * tipoCambio.value).toFixed(2);
+    }
+    return '0.00';
+});
 
-// --- MÉTODOS DE ACCIÓN (REFACTORIZADOS) ---
-// Se elimina la función genérica 'ejecutarAccionAPI' y se crean métodos específicos
-// para cada acción, apuntando a los nuevos endpoints RESTful del backend.
+// NUEVO: Deshabilita el botón de aprobar si es USD y no hay tipo de cambio
+const isAprobarDisabled = computed(() => {
+    if (isLoading.value) return true;
+    if (props.gasto?.moneda === 'USD' && (!tipoCambio.value || tipoCambio.value <= 0)) {
+        return true;
+    }
+    return false;
+});
+
+
+// --- MÉTODOS DE ACCIÓN ---
 
 /**
  * Llama al endpoint específico para APROBAR el gasto.
- * Corresponde al Paso 2 del flujo.
  */
 const aprobarGasto = async () => {
+    let confirmText = `El gasto de ${props.gasto.moneda === 'PEN' ? 'S/.' : 'USD'} ${parseFloat(props.gasto.monto_total).toFixed(2)} será aprobado.`;
+    if (props.gasto.moneda === 'USD') {
+        confirmText += ` Con un tipo de cambio de ${tipoCambio.value}, se descontarán S/. ${montoConvertido.value} del fondo.`
+    }
+
     const result = await Swal.fire({
         title: '¿Aprobar Gasto?',
-        text: `El gasto de S/. ${parseFloat(props.gasto.monto_total).toFixed(2)} será aprobado y descontado del fondo.`,
+        text: confirmText,
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#76C49D', // Verde BAP
+        confirmButtonColor: '#76C49D',
     });
 
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            // Llamada directa al nuevo endpoint POST para aprobar.
-            await api.post(`/gastos/${props.gasto.id}/approve`);
-            
+            // Construir el payload que se enviará a la API
+            const payload = {
+                comentario: 'Gasto aprobado por Jefe de Área.'
+            };
+            if (props.gasto.moneda === 'USD') {
+                payload.tipo_cambio = tipoCambio.value;
+            }
+
+            // Llamada al endpoint con el payload
+            await api.post(`/gastos/${props.gasto.id}/approve`, payload);
+
             await Swal.fire('¡Éxito!', 'Gasto aprobado correctamente.', 'success');
-            emit('accionRealizada'); // Notifica al padre para refrescar y cerrar el modal.
+            emit('accionRealizada');
         } catch (error) {
             console.error("Error al aprobar el gasto:", error);
-            Swal.fire('Error', error.response?.data?.message || 'No se pudo completar la acción.', 'error');
+            const errorMessage = error.response?.data?.errors?.monto_total || error.response?.data?.message || 'No se pudo completar la acción.';
+            Swal.fire('Error', errorMessage, 'error');
         } finally {
             isLoading.value = false;
         }
@@ -65,7 +91,6 @@ const aprobarGasto = async () => {
 
 /**
  * Llama al endpoint específico para RECHAZAR el gasto.
- * Corresponde a la alternativa del Paso 2.
  */
 const confirmarRechazo = async () => {
     if (!motivoRechazo.value.trim()) {
@@ -80,19 +105,18 @@ const confirmarRechazo = async () => {
         showCancelButton: true,
         confirmButtonText: 'Sí, Rechazar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#DB3D47', // Rojo BAP
+        confirmButtonColor: '#DB3D47',
     });
 
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            // Llamada directa al nuevo endpoint POST para rechazar, enviando el motivo.
             await api.post(`/gastos/${props.gasto.id}/reject-by-jefe`, {
                 comentario: motivoRechazo.value
             });
-            
+
             await Swal.fire('Rechazado', 'El gasto ha sido rechazado.', 'success');
-            emit('accionRealizada'); // Notifica al padre para refrescar y cerrar.
+            emit('accionRealizada');
         } catch (error) {
             console.error("Error al rechazar el gasto:", error);
             Swal.fire('Error', error.response?.data?.message || 'No se pudo completar la acción.', 'error');
@@ -104,7 +128,6 @@ const confirmarRechazo = async () => {
 
 
 // --- MÉTODOS DEL MODAL ---
-
 const iniciarAccionRechazo = () => {
     accionActual.value = 'rechazar';
 };
@@ -114,7 +137,6 @@ const cancelarAccion = () => {
     motivoRechazo.value = '';
 };
 
-// Se simplifica la función de cierre. El padre se encarga de la lógica de refresco.
 const cerrarModal = () => {
     emit('close');
 };
@@ -123,6 +145,7 @@ const cerrarModal = () => {
 watch(() => props.mostrar, (newVal) => {
     if (!newVal) {
         cancelarAccion();
+        tipoCambio.value = null; // Limpiar tipo de cambio al cerrar
     }
 });
 </script>
@@ -156,8 +179,15 @@ watch(() => props.mostrar, (newVal) => {
                                 gasto.registrador?.last_name }}</span>
 
                             <span class="text-gray-500 font-medium col-span-1">Monto:</span>
-                            <span class="font-bold text-verde-bap col-span-2">S/. {{
-                                parseFloat(gasto.monto_total).toFixed(2) }}</span>
+                            <span class="font-bold text-verde-bap col-span-2">
+                                {{ gasto.moneda === 'PEN' ? 'S/.' : 'USD' }} {{ parseFloat(gasto.monto_total).toFixed(2)
+                                }}
+                            </span>
+                            
+                            <span class="text-gray-500 font-medium col-span-1">Estado Actual:</span>
+                            <span class="font-semibold col-span-2" :class="getTextClassForState(gasto.estado)">
+                                {{ gasto.estado }}
+                            </span>
 
                             <span class="text-gray-500 font-medium col-span-1">Fondo Afectado:</span>
                             <span class="font-medium text-gray-800 col-span-2">{{ gasto.fondo_efectivo?.codigo_fondo ||
@@ -171,23 +201,46 @@ watch(() => props.mostrar, (newVal) => {
                         </div>
                     </div>
 
+                    <!-- NUEVO: Sección de Tipo de Cambio (solo para USD) -->
+                    <div v-if="gasto.moneda === 'USD'"
+                        class="p-4 bg-blue-50 border border-blue-200 rounded-lg animate-fade-in">
+                        <h4 class="text-lg font-bold text-gray-700 mb-4">Conversión de Moneda</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="tipo_cambio" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Tipo de Cambio <span class="text-rojo-bap">*</span>
+                                </label>
+                                <input type="number" id="tipo_cambio" v-model.number="tipoCambio" step="0.0001"
+                                    min="0.0001"
+                                    class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
+                                    placeholder="Ej: 3.75" />
+                                <p class="text-xs text-gray-500 mt-1">Ingresa el tipo de cambio del día para la
+                                    aprobación.</p>
+                            </div>
+                            <div>
+                                <label for="monto_convertido" class="block text-sm font-medium text-gray-700 mb-1">Monto
+                                    Convertido (S/.)</label>
+                                <input type="text" id="monto_convertido" :value="montoConvertido"
+                                    class="w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                                    disabled />
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Sección de Acciones de Jefatura -->
                     <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Jefatura</h4>
 
-                        <!-- Mensaje si el gasto es propio -->
                         <div v-if="esGastoPropio"
                             class="text-center p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
                             <p class="font-semibold">Acción no permitida</p>
-                            <p class="text-sm">No puedes aprobar o rechazar tus propios gastos registrados.</p>
+                            <p class="text-sm">No puedes aprobar o rechazar tus propios gastos.</p>
                         </div>
-                        
-                        <!-- Acciones si el gasto NO es propio -->
+
                         <div v-else>
-                            <!-- Botones principales: Aprobar y Rechazar -->
                             <div v-if="!accionActual" class="flex flex-wrap gap-3">
-                                <button @click="aprobarGasto" :disabled="isLoading"
-                                    class="px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors flex items-center space-x-2">
+                                <button @click="aprobarGasto" :disabled="isAprobarDisabled"
+                                    :class="getClassesForActionButton('exito')">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M5 13l4 4L19 7" />
@@ -195,7 +248,7 @@ watch(() => props.mostrar, (newVal) => {
                                     <span>Aprobar Gasto</span>
                                 </button>
                                 <button @click="iniciarAccionRechazo" :disabled="isLoading"
-                                    class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-dark transition-colors flex items-center space-x-2">
+                                    :class="getClassesForActionButton('error')">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M6 18L18 6M6 6l12 12" />
@@ -203,8 +256,6 @@ watch(() => props.mostrar, (newVal) => {
                                     <span>Rechazar</span>
                                 </button>
                             </div>
-
-                            <!-- Formulario para ingresar el motivo del rechazo -->
                             <div v-if="accionActual === 'rechazar'" class="animate-fade-in">
                                 <label for="motivoRechazo" class="block text-sm font-medium text-gray-700 mb-2">Motivo
                                     del Rechazo (requerido):</label>
@@ -213,9 +264,8 @@ watch(() => props.mostrar, (newVal) => {
                                 <div class="mt-4 flex justify-end space-x-3">
                                     <button @click="cancelarAccion"
                                         class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400">Cancelar</button>
-                                    <button @click="confirmarRechazo"
-                                        class="px-4 py-2 bg-rojo-bap text-white rounded-md hover:bg-rojo-bap-dark"
-                                        :disabled="isLoading || !motivoRechazo">
+                                    <button @click="confirmarRechazo" :disabled="isLoading || !motivoRechazo"
+                                        :class="getClassesForActionButton('error')">
                                         <span v-if="isLoading">Enviando...</span>
                                         <span v-else>Confirmar Rechazo</span>
                                     </button>

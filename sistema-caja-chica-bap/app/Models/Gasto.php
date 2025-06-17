@@ -5,22 +5,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB; 
-use Illuminate\Support\Facades\Storage; 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class Gasto extends Model
 {
     use HasFactory;
 
     /**
-     * El nombre de la tabla asociada con el modelo.
+     * The table associated with the model.
      *
      * @var string
      */
     protected $table = 'gastos';
 
     /**
-     * Los atributos que se pueden asignar masivamente.
+     * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
@@ -29,25 +29,51 @@ class Gasto extends Model
         'id_fondo_efectivo',
         'id_registrador',
         'id_jefe_aprobador',
+        'id_validador_adm',
+        'id_cuenta_contable',
         'fecha_documento',
         'tipo_documento',
         'serie_documento',
         'correlativo_documento',
         'monto_total',
         'moneda',
-        'id_cuenta_contable',
+        'tipo_cambio_referencial',
+        'tipo_cambio', // NUEVO: Tipo de cambio para gastos en USD
+        'monto_final_pen', // NUEVO: Monto final en PEN para contabilidad
         'glosa',
+        'pertenece_proyecto',
+        'comentario',
         'ruta_evidencia',
         'es_declaracion_jurada',
         'estado',
         'motivo_observacion_adm',
-        'pertenece_proyecto',
-        'comentario',
+        'motivo_rechazo',
     ];
 
     /**
-     * El "boot" method del modelo.
-     * Se ejecuta cuando el modelo es inicializado.
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'fecha_documento' => 'date',
+        'monto_total' => 'decimal:2',
+        'tipo_cambio_referencial' => 'decimal:4',
+        'tipo_cambio' => 'decimal:4',
+        'monto_final_pen' => 'decimal:2',
+        'pertenece_proyecto' => 'boolean',
+        'es_declaracion_jurada' => 'boolean',
+    ];
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['evidencia_url'];
+
+    /**
+     * The "booted" method of the model.
      *
      * @return void
      */
@@ -55,7 +81,7 @@ class Gasto extends Model
     {
         parent::boot();
 
-        // Se asigna un código único automáticamente antes de crear un nuevo gasto.
+        // Automatically assign a unique code before creating a new expense.
         static::creating(function ($gasto) {
             if (empty($gasto->codigo_gasto)) {
                 $gasto->codigo_gasto = self::generateUniqueGastoCode();
@@ -64,7 +90,7 @@ class Gasto extends Model
     }
 
     /**
-     * Genera un código único para el gasto (ej. GTO-00001).
+     * Generate a unique code for the expense (e.g., GTO-00001).
      *
      * @return string
      */
@@ -76,7 +102,7 @@ class Gasto extends Model
         return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
     }
 
-    // --- RELACIONES ---
+    // --- RELATIONSHIPS ---
 
     public function fondoEfectivo()
     {
@@ -92,6 +118,10 @@ class Gasto extends Model
     {
         return $this->belongsTo(User::class, 'id_jefe_aprobador');
     }
+    public function validadorAdm()
+    {
+        return $this->belongsTo(User::class, 'id_validador_adm');
+    }
 
     public function cuentaContable()
     {
@@ -104,30 +134,18 @@ class Gasto extends Model
     }
 
 
-    // --- ACCESORS & MUTATORS ---
+    // --- ACCESSORS & MUTATORS ---
 
     /**
-     * Los "accessors" para añadir al array del modelo.
-     * Esto hará que 'evidencia_url' se añada automáticamente al JSON de respuesta.
-     *
-     * @var array
-     */
-    protected $appends = ['evidencia_url'];
-
-    /**
-     * Obtiene la URL completa del archivo de evidencia.
+     * Get the full URL for the evidence file.
      *
      * @return string|null
      */
     public function getEvidenciaUrlAttribute()
     {
-        // Verifica si el campo 'ruta_evidencia' existe y no está vacío.
         if ($this->ruta_evidencia) {
-            // Usa el Facade de Storage para generar la URL pública correcta.
-            // Esto funciona tanto para el disco local como para S3, etc.
             return Storage::url($this->ruta_evidencia);
         }
-        // Si no hay ruta, devuelve null.
         return null;
     }
 }

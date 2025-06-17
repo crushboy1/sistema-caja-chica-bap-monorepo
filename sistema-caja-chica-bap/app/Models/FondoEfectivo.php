@@ -61,6 +61,16 @@ class FondoEfectivo extends Model
         return $this->belongsTo(Area::class, 'id_area');
     }
 
+    public function gastos()
+    {
+        // El primer argumento es el modelo relacionado (Gasto).
+        // El segundo es la clave foránea en la tabla 'gastos' que apunta a este fondo.
+        return $this->hasMany(Gasto::class, 'id_fondo_efectivo', 'id_fondo');
+    }
+    public function historialReposiciones()
+    {
+        return $this->hasMany(HistorialReposicion::class, 'id_fondo_efectivo', 'id_fondo');
+    }
     /**
      * Genera un código único secuencial para los fondos de efectivo.
      * El formato es 'FNRO-NNNNN'.

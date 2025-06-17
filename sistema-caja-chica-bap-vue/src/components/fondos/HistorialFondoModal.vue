@@ -1,17 +1,17 @@
 <template>
     <Transition name="modal-fade">
-        <div v-if="mostrar" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4"
+        <div v-if="mostrar" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
             @click.self="closeModal">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-transform duration-300"
                 :class="{ 'scale-100': mostrar, 'scale-95': !mostrar }">
                 <header
-                    class="flex items-center justify-between p-5 border-b border-gray-200 bg-indigo-600 text-white rounded-t-2xl">
+                    class="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-800 text-white rounded-t-2xl">
                     <div>
-                        <h3 class="text-xl font-bold">Historial del Fondo</h3>
-                        <p class="text-sm text-indigo-200">{{ fondo?.codigo_fondo }}</p>
+                        <h3 class="text-xl font-bold">Línea de Tiempo del Fondo</h3>
+                        <p class="text-sm text-gray-300">{{ fondo?.codigo_fondo }}</p>
                     </div>
                     <button @click="closeModal"
-                        class="p-2 rounded-full text-indigo-200 hover:bg-black/20 transition-colors">
+                        class="p-2 rounded-full text-gray-300 hover:bg-black/20 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M6 18L18 6M6 6l12 12"></path>
@@ -38,11 +38,11 @@
                         {{ error }}
                     </div>
 
-                    <div v-else-if="historial.length === 0" class="text-center text-gray-500 py-10">
+                    <div v-else-if="timeline.length === 0" class="text-center text-gray-500 py-10">
                         Este fondo no tiene historial de modificaciones.
                     </div>
                     <div v-else class="relative pl-6 border-l-2 border-gray-200">
-                        <div v-for="item in historial" :key="item.id" class="mb-8 relative">
+                        <div v-for="item in timeline" :key="item.id" class="mb-8 relative">
                             <!-- Círculo del Timeline con color e icono dinámico -->
                             <span
                                 class="absolute -left-[18px] top-0 flex items-center justify-center w-8 h-8 rounded-full ring-4 ring-white"
@@ -56,28 +56,31 @@
                                     <div class="flex justify-between items-center mb-1">
                                         <h4 class="font-bold text-lg" :class="getTimelineClass(item.tipo).text">{{
                                             getTipoLabel(item.tipo) }}</h4>
-                                        <p class="text-xs text-gray-500">{{ item.fecha_aprobacion }}</p>
+                                        <p class="text-xs text-gray-500">{{ formatarFecha(item.fecha) }}</p>
                                     </div>
                                     <div class="text-sm space-y-2 mt-2">
-                                        <div v-if="item.tipo !== 'Cierre'">
-                                            <strong>Monto Final del Fondo:</strong>
+                                        <!-- Lógica de visualización de montos -->
+                                        <div v-if="item.tipo === 'Reposición'">
+                                            <strong>Monto Repuesto:</strong>
                                             <span class="font-semibold" :class="getTimelineClass(item.tipo).text">S/. {{
-                                                parseFloat(item.monto_final).toFixed(2) }}</span>
+                                                parseFloat(item.monto).toFixed(2) }}</span>
                                         </div>
-                                        <div>
-                                            <strong>Solicitado por:</strong>
-                                            <span>{{ item.solicitado_por }}</span>
+                                        <div v-else-if="item.tipo !== 'Cierre'">
+                                            <strong>Monto del Fondo:</strong>
+                                            <span class="font-semibold" :class="getTimelineClass(item.tipo).text">S/. {{
+                                                parseFloat(item.monto).toFixed(2) }}</span>
                                         </div>
+
                                         <div>
-                                            <strong>Aprobado por:</strong>
-                                            <span>{{ item.aprobado_por }}</span>
+                                            <strong>Realizado por:</strong>
+                                            <span>{{ item.usuario }}</span>
                                         </div>
                                         <div>
                                             <strong>Motivo/Justificación:</strong>
                                             <p class="italic text-gray-600 mt-1 pl-2 border-l-2 border-gray-300">{{
                                                 item.motivo }}</p>
                                         </div>
-                                        <div class="text-xs text-gray-400 pt-2 text-right">
+                                        <div v-if="item.codigo_solicitud" class="text-xs text-gray-400 pt-2 text-right">
                                             Ref. Solicitud: {{ item.codigo_solicitud }}
                                         </div>
                                     </div>
@@ -101,6 +104,9 @@ const IconApertura = { template: `<svg fill="none" stroke="currentColor" viewBox
 const IconIncremento = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>` };
 const IconDecremento = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>` };
 const IconCierre = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>` };
+// NUEVO: Ícono para el evento de reposición
+const IconReposicion = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M5 5a7 7 0 0012.544 5.372M19 20v-5h-5m0 0l-3.544-3.544M14 15a7 7 0 00-12.544-5.372" /></svg>` };
+
 
 const props = defineProps({
     mostrar: Boolean,
@@ -109,21 +115,22 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-const historial = ref([]);
+const timeline = ref([]);
 const cargando = ref(false);
 const error = ref(null);
 
-const fetchHistorialFondo = async () => {
+const fetchTimeline = async () => {
     if (!props.fondo) return;
     cargando.value = true;
     error.value = null;
-    historial.value = [];
+    timeline.value = [];
 
     try {
-        const response = await api.get(`/fondos-efectivo/${props.fondo.id_fondo}/historial`);
-        historial.value = response.data.historial;
+        // CAMBIO: Se llama al nuevo endpoint unificado
+        const response = await api.get(`/fondos-efectivo/${props.fondo.id_fondo}/timeline`);
+        timeline.value = response.data.timeline;
     } catch (err) {
-        console.error("Error al cargar el historial del fondo:", err);
+        console.error("Error al cargar la línea de tiempo del fondo:", err);
         error.value = "No se pudo cargar el historial. Por favor, intente de nuevo.";
     } finally {
         cargando.value = false;
@@ -132,7 +139,7 @@ const fetchHistorialFondo = async () => {
 
 watch(() => props.mostrar, (newVal) => {
     if (newVal) {
-        fetchHistorialFondo();
+        fetchTimeline();
     }
 });
 
@@ -140,25 +147,29 @@ const closeModal = () => {
     emit('close');
 };
 
+const formatarFecha = (fechaString) => {
+    if (!fechaString) return 'N/A';
+    const opciones = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(fechaString).toLocaleDateString('es-ES', opciones);
+};
+
+
 // --- Funciones de ayuda para la UI ---
 const getTimelineClass = (tipo) => {
     switch (tipo) {
-        case 'Apertura': return { bg: 'bg-verde-bap', text: 'text-verde-bap-dark', card: 'bg-green-50 border-green-200', icon: markRaw(IconApertura) };
+        case 'Apertura': return { bg: 'bg-green-500', text: 'text-green-700', card: 'bg-green-50 border-green-200', icon: markRaw(IconApertura) };
         case 'Incremento': return { bg: 'bg-blue-500', text: 'text-blue-700', card: 'bg-blue-50 border-blue-200', icon: markRaw(IconIncremento) };
-        case 'Decremento': return { bg: 'bg-amarillo-bap', text: 'text-yellow-700', card: 'bg-yellow-50 border-yellow-200', icon: markRaw(IconDecremento) };
-        case 'Cierre': return { bg: 'bg-rojo-bap', text: 'text-rojo-bap-dark', card: 'bg-red-50 border-red-200', icon: markRaw(IconCierre) };
+        case 'Decremento': return { bg: 'bg-yellow-500', text: 'text-yellow-700', card: 'bg-yellow-50 border-yellow-200', icon: markRaw(IconDecremento) };
+        // NUEVO: Estilo para el evento de reposición
+        case 'Reposición': return { bg: 'bg-purple-500', text: 'text-purple-700', card: 'bg-purple-50 border-purple-200', icon: markRaw(IconReposicion) };
+        case 'Cierre': return { bg: 'bg-red-500', text: 'text-red-700', card: 'bg-red-50 border-red-200', icon: markRaw(IconCierre) };
         default: return { bg: 'bg-gray-500', text: 'text-gray-700', card: 'bg-gray-50 border-gray-200', icon: null };
     }
 }
 
 const getTipoLabel = (tipo) => {
-    switch (tipo) {
-        case 'Apertura': return 'Apertura de Fondo';
-        case 'Incremento': return 'Incremento de Monto';
-        case 'Decremento': return 'Decremento de Monto';
-        case 'Cierre': return 'Cierre de Fondo';
-        default: return 'Evento Desconocido';
-    }
+    // No se necesita cambiar, el backend ya envía "Reposición" como tipo.
+    return tipo;
 }
 </script>
 

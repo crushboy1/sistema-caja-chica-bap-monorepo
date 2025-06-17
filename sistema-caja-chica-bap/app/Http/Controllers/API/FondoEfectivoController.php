@@ -4,14 +4,15 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\FondoEfectivo; // Importar el modelo FondoEfectivo
-use App\Models\SolicitudFondo; // Para posibles relaciones o lógica de negocio
-use App\Models\DetalleGastoProyectado; // Asegúrate de importar el modelo DetalleGastoProyectado
-use Illuminate\Support\Facades\Auth; // Para obtener el usuario autenticado
-use Illuminate\Database\Eloquent\ModelNotFoundException; // Para manejar si no se encuentra un recurso
-use Illuminate\Support\Facades\DB; // Para operaciones de base de datos como DB::raw
-use Illuminate\Validation\ValidationException; // Para manejar errores de validación
-use Illuminate\Support\Facades\Log; // Para logging
+use App\Models\FondoEfectivo;
+use App\Models\SolicitudFondo;
+use App\Models\HistorialReposicion;
+use App\Models\DetalleGastoProyectado;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class FondoEfectivoController extends Controller
 {
@@ -83,62 +84,94 @@ class FondoEfectivoController extends Controller
             'fondos' => $fondos,
         ]);
     }
+    public function getFondosActivosParaUsuario()
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'No autenticado.'], 401);
+        }
+
+        // --- CAMBIO CLAVE ---
+        // La lógica ahora busca todos los fondos activos que pertenecen al ÁREA del usuario logueado.
+        // Esto permite que un 'Colaborador' vea y pueda registrar gastos contra los fondos de su 'Jefe de Área'.
+        // Si el usuario no tiene un área asignada, la consulta devolverá una colección vacía.
+        $query = FondoEfectivo::where('estado', 'Activo');
+
+        if ($user->area_id) {
+            $query->where('id_area', $user->area_id);
+        } else {
+            // Si el usuario no tiene área, no puede ver ningún fondo de área.
+            // Para evitar errores, podemos forzar que no devuelva resultados.
+            $query->whereRaw('1 = 0');
+        }
+
+        $fondos = $query->select('id_fondo', 'codigo_fondo', 'monto_disponible')->get();
+
+        return response()->json($fondos);
+    }
 
     /**
      *
      * @param  int  $id_fondo
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getFondoHistory($id_fondo)
+    public function getTimeline($id_fondo)
     {
         $user = Auth::user();
         $fondo = FondoEfectivo::findOrFail($id_fondo);
 
-        // Validar permisos: el usuario debe poder ver el fondo para ver su historial.
-        if (!($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion') || $user->id === $fondo->id_responsable)) {
-            return response()->json(['message' => 'Acceso denegado.'], 403);
+        $puedeVer = false;
+        if ($user->hasAnyRole(['super_admin', 'jefe_administracion', 'gerente_general'])) {
+            $puedeVer = true;
+        } elseif ($user->hasRole('jefe_area') && $user->area_id === $fondo->id_area) {
+            $puedeVer = true;
+        } elseif ($user->id === $fondo->id_responsable) {
+            $puedeVer = true;
         }
 
-        if (!$fondo->id_solicitud_apertura) {
-            return response()->json(['historial' => [], 'message' => 'Este fondo no tiene una solicitud de apertura para rastrear su historial.'], 200);
+        if (!$puedeVer) {
+            return response()->json(['message' => 'No tienes permiso para ver el historial de este fondo.'], 403);
         }
 
-        $openingRequestId = $fondo->id_solicitud_apertura;
-
-        // Buscamos la solicitud de apertura Y todas las solicitudes de modificación
-        // que apuntan a ella y que han sido aprobadas.
-        $historialSolicitudes = SolicitudFondo::where(function ($query) use ($openingRequestId) {
-            $query->where('id', $openingRequestId)
-                ->orWhere('id_solicitud_original', $openingRequestId);
+        // 1. Obtener historial de solicitudes (Apertura, Incremento, etc.)
+        $historialSolicitudes = SolicitudFondo::where(function ($query) use ($fondo) {
+            $query->where('id', $fondo->id_solicitud_apertura)
+                ->orWhere('id_solicitud_original', $fondo->id_solicitud_apertura);
         })
-            ->where('estado', 'Aprobada') // Solo nos interesan las acciones que se concretaron
-            ->with([
-                'revisorAdm:id,name,last_name',
-                'aprobadorGerente:id,name,last_name'
-            ])
-            ->orderBy('updated_at', 'asc') // Ordenamos por fecha de aprobación final
-            ->get();
+            ->where('estado', 'Aprobada')
+            ->with('solicitante:id,name,last_name')
+            ->get()
+            ->map(function ($solicitud) {
+                return [
+                    'id' => 'solicitud-' . $solicitud->id,
+                    'tipo' => $solicitud->tipo_solicitud,
+                    'fecha' => $solicitud->updated_at,
+                    'monto' => $solicitud->monto_solicitado,
+                    'motivo' => $solicitud->motivo_detalle,
+                    'usuario' => $solicitud->solicitante->name . ' ' . $solicitud->solicitante->last_name,
+                ];
+            });
 
-        // Formatear la respuesta para que sea más fácil de usar en el frontend
-        $formattedHistory = $historialSolicitudes->map(function ($solicitud) {
-            // Determinar el aprobador final basado en el tipo de solicitud y los IDs guardados
-            $aprobador = $solicitud->aprobadorGerente ?? $solicitud->revisorAdm;
+        // 2. Obtener historial de reposiciones desde la nueva tabla
+        $historialReposiciones = $fondo->historialReposiciones()
+            ->with('usuarioAccion:id,name,last_name')
+            ->get()
+            ->map(function ($reposicion) {
+                return [
+                    'id' => 'reposicion-' . $reposicion->id,
+                    'tipo' => 'Reposición',
+                    'fecha' => $reposicion->fecha_reposicion,
+                    'monto' => $reposicion->monto_repuesto,
+                    'motivo' => $reposicion->comentario ?? 'Reposición de gastos contabilizados.',
+                    'usuario' => $reposicion->usuarioAccion->name . ' ' . $reposicion->usuarioAccion->last_name,
+                ];
+            });
 
-            return [
-                'id' => $solicitud->id,
-                'codigo_solicitud' => $solicitud->codigo_solicitud,
-                'tipo' => $solicitud->tipo_solicitud,
-                'monto_final' => $solicitud->monto_solicitado,
-                'motivo' => $solicitud->motivo_detalle,
-                'fecha_aprobacion' => $solicitud->updated_at->format('d/m/Y H:i'),
-                'solicitado_por' => $solicitud->solicitante ? "{$solicitud->solicitante->name} {$solicitud->solicitante->last_name}" : 'N/A',
-                'aprobado_por' => $aprobador ? "{$aprobador->name} {$aprobador->last_name}" : 'Sistema',
-            ];
-        });
+        // 3. Unificar y ordenar la línea de tiempo completa
+        $timeline = $historialSolicitudes->concat($historialReposiciones)->sortByDesc('fecha');
 
-        return response()->json([
-            'historial' => $formattedHistory,
-        ]);
+        return response()->json(['timeline' => $timeline->values()->all()]);
     }
 
     /**
@@ -326,6 +359,33 @@ class FondoEfectivoController extends Controller
             return response()->json(['message' => 'Ocurrió un error al actualizar el fondo de efectivo.', 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * NUEVO: Calcula el resumen de reposición de un fondo determinado. 
+     * Esta es la forma más segura de determinar el importe a reponer.
+     *
+     * @param  \App\Models\FondoEfectivo  $fondo
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getReposicionSummary(FondoEfectivo $fondo)
+    {
+        $user = Auth::user();
+
+
+        if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'No tienes permiso para ver el resumen de reposición.'], 403);
+        }
+
+        $montoAReponer = $fondo->gastos()
+            ->where('estado', 'Contabilizado')
+            ->sum('monto_final_pen');
+
+        return response()->json([
+            'monto_asignado' => $fondo->monto_aprobado,
+            'saldo_disponible_actual' => $fondo->monto_disponible,
+            'monto_a_reponer' => $montoAReponer,
+        ]);
+    }
     /**
      * Elimina un fondo de efectivo.
      * Esta acción debe ser muy restringida, idealmente solo para super_admin y si el fondo está "Cerrado".
@@ -334,6 +394,69 @@ class FondoEfectivoController extends Controller
      * @param  int  $id_fondo
      * @return \Illuminate\Http\JsonResponse
      */
+    public function reponer(Request $request, FondoEfectivo $fondo)
+    {
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'No tienes permiso para ejecutar la reposición de este fondo.'], 403);
+        }
+
+        // 1. VALIDACIÓN DE ESTADO DEL FONDO: No se puede reponer un fondo que ya está cerrado.
+        if ($fondo->estado !== 'Activo') {
+            return response()->json(['message' => 'Solo se pueden reponer fondos que se encuentren en estado "Activo".'], 409);
+        }
+
+        // 2. VALIDACIÓN CRÍTICA DE GASTOS PENDIENTES: No se puede reponer si hay gastos en CUALQUIER estado intermedio.
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable'];
+        $gastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
+        if ($gastosPendientes > 0) {
+            return response()->json([
+                'message' => "El fondo no puede ser repuesto. Tiene {$gastosPendientes} gasto(s) en proceso de aprobación o validación."
+            ], 409);
+        }
+
+        // 3. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
+        $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_final_pen');
+        if ($montoAReponer <= 0) {
+            return response()->json(['message' => 'No hay monto para reponer. Asegúrate de que los gastos hayan sido marcados como "Contabilizado".'], 409);
+        }
+
+        // 4. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
+        if ($fondo->monto_disponible < 0) {
+            Log::warning("Intento de reposición sobre fondo con saldo negativo.", ['fondo_id' => $fondo->id_fondo, 'saldo' => $fondo->monto_disponible]);
+            return response()->json([
+                'message' => "Error de Integridad de Datos: El saldo disponible del fondo es negativo. Por favor, contacte a soporte."
+            ], 500);
+        }
+
+        return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request) {
+            $saldoAnterior = $fondo->monto_disponible;
+            //tambien puede ir logica para generar acta de entrega pdf.
+            // 5. RESTAURACIÓN DEL SALDO
+            $fondo->increment('monto_disponible', $montoAReponer);
+
+            // 6. REGISTRO EN HISTORIAL PARA TRAZABILIDAD
+            HistorialReposicion::create([
+                'id_fondo_efectivo' => $fondo->id_fondo,
+                'id_usuario_accion' => $user->id,
+                'monto_repuesto' => $montoAReponer,
+                'saldo_anterior' => $saldoAnterior,
+                'saldo_nuevo' => $fondo->monto_disponible,
+                'comentario' => $request->input('comentario'),
+                'fecha_reposicion' => now(),
+            ]);
+
+            // 7. ACTUALIZACIÓN DE GASTOS: Los gastos usados en esta reposición se marcan como "Repuesto".
+            $fondo->gastos()->where('estado', 'Contabilizado')->update(['estado' => 'Repuesto']);
+
+            Log::info("Reposición de Fondo: El usuario {$user->name} ha repuesto S/. {$montoAReponer} al fondo '{$fondo->codigo_fondo}'.");
+
+            return response()->json([
+                'message' => "El fondo {$fondo->codigo_fondo} ha sido repuesto exitosamente.",
+                'fondo' => $fondo
+            ]);
+        });
+    }
     public function destroy($id_fondo)
     {
         try {
