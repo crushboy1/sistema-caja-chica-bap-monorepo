@@ -17,10 +17,10 @@ return new class extends Migration
 
                 // Nombre del área (ej: 'Administración', 'Contabilidad', 'TI').
                 $table->string('name')->unique();
-
+                //generar códigos de solicitud únicos y legibles.
+                $table->string('acronym', 10)->nullable();
                 // Descripción opcional del área.
                 $table->string('description')->nullable();
-
                 // Timestamps para created_at y updated_at.
                 $table->timestamps();
             });

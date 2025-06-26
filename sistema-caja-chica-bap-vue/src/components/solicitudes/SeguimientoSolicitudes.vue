@@ -4,6 +4,7 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import SolicitudDetalleModal from './SolicitudDetalleModal.vue';
 import HistorialEstadosModal from './HistorialEstadosModal.vue';
+import EditarSolicitudModal from './EditarSolicitudModal.vue';
 import GestionSolicitudModal from './GestionSolicitudModal.vue';
 import { getClassesForBadge } from '@/utils/statusStyles.js';
 // --- Variables de Estado ---
@@ -19,6 +20,11 @@ const solicitudSeleccionada = ref(null);
 // Variables para el modal de historial de estados
 const mostrarHistorialModal = ref(false);
 const solicitudHistorialSeleccionada = ref(null);
+
+// --- ¡NUEVO! Estado para el modal de edición ---
+const mostrarEditarModal = ref(false);
+const solicitudParaEditar = ref(null);
+const modoEdicion = ref('pendiente'); // 'pendiente' o 'observada'
 
 // Variables para el modal de gestión de solicitudes
 const mostrarGestionModal = ref(false);
@@ -48,6 +54,7 @@ const estadosSolicitud = [
     'Pendiente Aprobación ADM',
     'Observada ADM',
     'Descargo Enviado ADM',
+    'Pendiente Re-evaluacion',
     'Aprobada ADM',
     'Pendiente Aprobación GRTE',
     'Observada GRTE',
@@ -78,6 +85,7 @@ const estadosVisiblesEnTabla = computed(() => {
         'Pendiente Aprobación ADM',
         'Observada ADM',
         'Descargo Enviado ADM',
+        'Pendiente Re-evaluacion',
         'Pendiente Aprobación GRTE',
         'Observada GRTE',
         'Descargo Enviado GRTE',
@@ -162,7 +170,7 @@ const puedeGestionarSolicitud = (solicitud) => {
         // Para otras solicitudes (que no sean sus propios Decremento/Cierre)
         // o si es un Decremento/Cierre de OTRA persona,
         // el Jefe ADM puede gestionar si está en Pendiente ADM o si hay un descargo enviado (vuelve a Pendiente ADM).
-        return ['Pendiente Aprobación ADM', 'Descargo Enviado ADM'].includes(estado);
+        return ['Pendiente Aprobación ADM', 'Descargo Enviado ADM', 'Pendiente Re-evaluacion'].includes(estado);
     }
 
     // Reglas para Gerente General
@@ -184,6 +192,12 @@ const puedeGestionarSolicitud = (solicitud) => {
     }
 
     return false; // Por defecto, no se puede gestionar
+};
+
+// --- Función de permiso para edición proactiva ---
+const puedeEditarProactivamente = (solicitud) => {
+    if (!usuarioActual.value) return false;
+    return usuarioActual.value.id === solicitud.id_solicitante && solicitud.estado === 'Pendiente Aprobación ADM';
 };
 
 // --- Funciones de Carga de Datos ---
@@ -252,7 +266,7 @@ const obtenerSolicitudes = async () => {
 
         console.log('📤 Parámetros de búsqueda:', params);
 
-        const response = await api.get('/solicitudes-fondo', { params });
+        const response = await api.get('/solicitudes', { params });
         solicitudes.value = response.data.solicitudes;
 
         console.log(`📥 Solicitudes cargadas: ${solicitudes.value.length}`);
@@ -346,14 +360,43 @@ const abrirGestionModal = (solicitud) => {
     mostrarGestionModal.value = true;
 };
 
-const cerrarGestionModal = (refresh = false) => {
+const cerrarGestionModal = (refresh = false, openEditModal = false, solicitudToEdit = null) => {
     mostrarGestionModal.value = false;
     solicitudGestionSeleccionada.value = null;
     if (refresh) {
-        obtenerSolicitudes(); // Refrescar la tabla si se hizo una gestión
+        obtenerSolicitudes();
+    }
+    if (openEditModal && solicitudToEdit) {
+        abrirModalEdicion(solicitudToEdit, 'observada');
     }
 };
+// --- ¡NUEVAS! Funciones para manejar el modal de edición ---
+const abrirModalEdicion = (solicitud, modo) => {
+    solicitudParaEditar.value = solicitud;
+    modoEdicion.value = modo;
+    mostrarEditarModal.value = true;
+};
 
+const cerrarEditarModal = () => {
+    mostrarEditarModal.value = false;
+    solicitudParaEditar.value = null;
+};
+/**
+ * ¡NUEVO! Esta función actúa como el manejador de eventos.
+ * Cuando GestionSolicitudModal emite el evento, esta función se ejecuta.
+ * @param {object} solicitud - La solicitud que se va a editar.
+ */
+const handleOpenEditModal = (solicitud) => {
+    // 1. Cierra el modal de gestión actual.
+    cerrarGestionModal();
+    // 2. Abre el modal de edición, pasándole la solicitud y el modo 'observada'.
+    abrirModalEdicion(solicitud, 'observada');
+};
+const onSolicitudActualizada = () => {
+    cerrarEditarModal();
+    cerrarGestionModal();
+    obtenerSolicitudes(); // Refrescar la tabla
+};
 // --- Watchers mejorados ---
 
 // Watchers para filtros de selección (disparan búsqueda inmediata)
@@ -579,7 +622,7 @@ onMounted(() => {
                 <div class="overflow-x-auto shadow-lg rounded-lg">
                     <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                         <thead>
-                            <tr class="bg-gray-100 text-gray-700 uppercase text-sm leading-normal">
+                            <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
                                 <th class="py-4 px-4 text-center font-semibold">NRO SOLICITUD</th>
                                 <th class="py-4 px-4 text-center font-semibold">Tipo</th>
                                 <th class="py-4 px-4 text-center font-semibold">Monto</th>
@@ -635,7 +678,16 @@ onMounted(() => {
                                                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                         </button>
-
+                                        <button v-if="puedeEditarProactivamente(solicitud)"
+                                            @click="abrirModalEdicion(solicitud, 'pendiente')"
+                                            title="Editar Solicitud Pendiente"
+                                            class="w-8 h-8 rounded-full bg-gray-500 hover:bg-gray-600 flex items-center justify-center text-white transition-colors duration-200">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />
+                                            </svg>
+                                        </button>
                                         <button v-if="puedeGestionarSolicitud(solicitud)"
                                             @click="abrirGestionModal(solicitud)"
                                             class="w-8 h-8 rounded-full bg-verde-bap-dark hover:bg-verde-bap flex items-center justify-center text-white transition-colors duration-200"
@@ -707,10 +759,12 @@ onMounted(() => {
 
         <HistorialEstadosModal :mostrar="mostrarHistorialModal" :solicitud="solicitudHistorialSeleccionada"
             @close="cerrarHistorialModal" />
+        <EditarSolicitudModal :mostrar="mostrarEditarModal" :solicitud="solicitudParaEditar" :modo="modoEdicion"
+            @close="cerrarEditarModal" @solicitud-actualizada="onSolicitudActualizada" />
 
         <!-- Se pasa el objeto usuarioActual al componente GestionSolicitudModal -->
         <GestionSolicitudModal :mostrar="mostrarGestionModal" :solicitud="solicitudGestionSeleccionada"
-            :usuarioActual="usuarioActual" @close="cerrarGestionModal" />
+            :usuarioActual="usuarioActual" @close="cerrarGestionModal" @open-edit-modal="handleOpenEditModal" />
     </div>
 </template>
 

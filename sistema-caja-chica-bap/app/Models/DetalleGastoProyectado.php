@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
+use Illuminate\Database\Eloquent\Relations\HasOne;
 class DetalleGastoProyectado extends Model
 {
     use HasFactory;
@@ -32,5 +32,16 @@ class DetalleGastoProyectado extends Model
     {
         return $this->belongsTo(SolicitudFondo::class, 'id_solicitud_fondo');
     }
-}
 
+    /**
+     * NUEVA RELACIÓN INVERSA: Un detalle de gasto proyectado puede tener un gasto declarado asociado.
+     * Esto define la relación uno-a-uno (o uno-a-cero) con un Gasto.
+     * Nos será muy útil para filtrar y mostrar al usuario solo las proyecciones
+     * que todavía no han sido declaradas. Por ejemplo: $proyeccion->gastoDeclarado
+     * Si el resultado es null, significa que la proyección está pendiente de declarar.
+     */
+    public function gastoDeclarado(): HasOne
+    {
+        return $this->hasOne(Gasto::class, 'detalle_gasto_proyectado_id');
+    }
+}

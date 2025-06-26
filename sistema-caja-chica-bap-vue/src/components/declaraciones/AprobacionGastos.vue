@@ -114,31 +114,61 @@
               <td class="py-4 px-4 text-center">
 
                 <div class="flex items-center justify-center space-x-2">
+                  <!-- Botón Ver Detalles (siempre visible) -->
                   <button @click="verDetalles(gasto)"
                     class="w-9 h-9 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
                     title="Ver Detalles y Evidencia">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
 
-                  <div v-if="esJefeDeArea">
-                                        <button v-if="gasto.estado === 'Pendiente de Aprobación'" @click="abrirGestionModal(gasto)" title="Aprobar / Rechazar Gasto" class="w-9 h-9 rounded-full bg-verde-bap-dark hover:bg-verde-bap text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                        </button>
-                                        <button v-if="gasto.estado === 'Observado'" @click="abrirObservacionModal(gasto)" title="Gestionar Observación" class="w-9 h-9 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                                        </button>
-                                    </div>
+                  <!-- Acciones para Jefe de Área -->
+                  <div v-if="esJefeDeArea && gasto.estado === 'Pendiente de Aprobación'"
+                    class="flex items-center space-x-2">
+                    <button @click="gestionarAccion(gasto, 'approve')" title="Aprobar Gasto"
+                      class="w-9 h-9 rounded-full bg-verde-bap-light hover:bg-verde-bap text-verde-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button @click="gestionarAccion(gasto, 'observeByJefe')" title="Observar Gasto"
+                      class="w-9 h-9 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </button>
+                    <button @click="gestionarAccion(gasto, 'rejectByJefe')" title="Rechazar Gasto"
+                      class="w-9 h-9 rounded-full bg-rojo-bap-light hover:bg-rojo-bap text-rojo-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-                  <div v-if="esColaborador">
-                                        <button v-if="gasto.estado === 'Observado'" @click="abrirObservacionModal(gasto)" title="Corregir Gasto" class="w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                                        </button>
-                                    </div>
+                  <!-- Acciones para gestionar observaciones (Jefe o Colaborador) -->
+                  <div v-if="gasto.estado === 'Observado'">
+                    <button v-if="esJefeDeArea" @click="gestionarAccion(gasto, 'returnToCollaborator')"
+                      title="Devolver con Directriz"
+                      class="w-9 h-9 rounded-full bg-estado-info-bg hover:bg-blue-500 text-estado-info-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </button>
+                    <button v-if="esColaborador" @click="gestionarAccion(gasto, 'resubmit')"
+                      title="Corregir y Reenviar Gasto"
+                      class="w-9 h-9 rounded-full bg-estado-info-bg hover:bg-blue-500 text-estado-info-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
+
                 </div>
               </td>
             </tr>
@@ -223,12 +253,11 @@ const mostrarObservacionModal = ref(false);
 // --- PROPIEDADES COMPUTADAS ---
 
 const esJefeDeArea = computed(() => {
-    return usuarioActual.value?.role?.name === 'jefe_area';
+  return usuarioActual.value?.role?.name === 'jefe_area';
 });
-
 // Se crea una propiedad computada para verificar si el usuario es Colaborador.
 const esColaborador = computed(() => {
-    return usuarioActual.value?.role?.name === 'colaborador';
+  return usuarioActual.value?.role?.name === 'colaborador';
 });
 const hayFiltrosActivos = computed(() => {
   return filtros.value.registrador_name || filtros.value.fecha_inicio || filtros.value.fecha_fin || filtros.value.codigo_gasto;
@@ -302,31 +331,137 @@ const verDetalles = (gasto) => {
   mostrarDetalleModal.value = true;
 };
 
-const abrirGestionModal = (gasto) => {
-  gastoParaGestionar.value = gasto;
-  mostrarGestionModal.value = true;
-};
+const gestionarAccion = async (gasto, accion) => {
+  let config;
 
-const cerrarGestionModal = () => {
-  mostrarGestionModal.value = false;
-  gastoParaGestionar.value = null;
-};
+  // Configuración para cada tipo de acción
+  switch (accion) {
+    case 'approve':
+      config = {
+        title: 'Aprobar Gasto',
+        text: `¿Estás seguro de que deseas aprobar el gasto con código ${gasto.codigo_gasto}?`,
+        icon: 'success',
+        confirmButtonText: 'Sí, ¡Aprobar!',
+        endpoint: `/gastos/${gasto.id}/approve`,
+        method: 'post',
+        needsComment: false
+      };
+      break;
+    case 'observeByJefe':
+      config = {
+        title: 'Observar Gasto',
+        text: `Vas a devolver el gasto ${gasto.codigo_gasto} para su corrección.`,
+        icon: 'warning',
+        confirmButtonText: 'Sí, ¡Observar!',
+        endpoint: `/gastos/${gasto.id}/observe-by-jefe`,
+        method: 'post',
+        needsComment: true,
+        commentLabel: 'Motivo de la observación:'
+      };
+      break;
+    case 'rejectByJefe':
+      config = {
+        title: 'Rechazar Gasto',
+        text: `Esta acción es definitiva. ¿Estás seguro de que deseas rechazar el gasto ${gasto.codigo_gasto}?`,
+        icon: 'error',
+        confirmButtonText: 'Sí, ¡Rechazar!',
+        endpoint: `/gastos/${gasto.id}/reject-by-jefe`,
+        method: 'post',
+        needsComment: true,
+        commentLabel: 'Motivo del rechazo:'
+      };
+      break;
+    case 'returnToCollaborator':
+      config = {
+        title: 'Añadir Directriz',
+        // AJUSTE: Se añade el motivo de la observación de ADM al texto del modal
+        html: `
+                    <div class="text-left">
+                        <p class="mb-2">Añade una instrucción clara para que el colaborador corrija el gasto <strong>${gasto.codigo_gasto}</strong>.</p>
+                        <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p class="font-semibold text-red-800">Observación de Administración:</p>
+                            <p class="text-red-700 italic">"${gasto.motivo_observacion_adm || 'No se especificó un motivo.'}"</p>
+                        </div>
+                    </div>
+                `,
+        icon: 'info',
+        confirmButtonText: 'Enviar Directriz',
+        endpoint: `/gastos/${gasto.id}/return-to-collaborator`,
+        method: 'post',
+        needsComment: true,
+        commentLabel: 'Tu instrucción para el colaborador:'
+      };
+      break;
+    case 'resubmit':
+      config = {
+        title: 'Corregir y Reenviar Gasto',
+        // AJUSTE: Se añade el motivo de la observación de ADM al texto del modal
+        html: `
+                    <div class="text-left">
+                        <p class="mb-2">El gasto <strong>${gasto.codigo_gasto}</strong> fue observado.</p>
+                        <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p class="font-semibold text-yellow-800">Motivo de la observación:</p>
+                            <p class="text-yellow-700 italic">"${gasto.motivo_observacion_adm || 'No se especificó un motivo.'}"</p>
+                        </div>
+                        <p class="mt-4">Por favor, describe la corrección realizada.</p>
+                    </div>
+                `,
+        icon: 'info',
+        confirmButtonText: 'Reenviar Gasto',
+        endpoint: `/gastos/${gasto.id}/resubmit`,
+        method: 'put',
+        needsComment: true,
+        commentLabel: 'Comentario de corrección:'
+      };
+      break;
+    default:
+      return;
+  }
 
+  let comentario = '';
+  if (config.needsComment) {
+    const { value: text } = await Swal.fire({
+      title: config.title,
+      html: config.html, // Se usa 'html' para mostrar el contenido enriquecido
+      input: 'textarea',
+      inputLabel: config.commentLabel,
+      inputPlaceholder: 'Escribe tu comentario aquí...',
+      showCancelButton: true,
+      confirmButtonText: config.confirmButtonText,
+      confirmButtonColor: '#3085d6',
+      cancelButtonText: 'Cancelar'
+    });
 
-const abrirObservacionModal = (gasto) => {
-  gastoParaObservacion.value = gasto;
-  mostrarObservacionModal.value = true;
-}
-const cerrarObservacionModal = () => {
-  mostrarObservacionModal.value = false;
-  gastoParaObservacion.value = null;
-}
-// CAMBIO: Nueva función para manejar el refresco de datos tras una acción
-const handleAccionRealizada = () => {
-  // Esta función ahora cierra ambos modales de gestión y refresca la tabla.
-  cerrarGestionModal();
-  cerrarObservacionModal();
-  fetchGastos();
+    if (text) {
+      comentario = text;
+    } else {
+      return;
+    }
+  } else {
+    const result = await Swal.fire({
+      title: config.title,
+      text: config.text,
+      icon: config.icon,
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: config.confirmButtonText,
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) {
+      return;
+    }
+  }
+
+  try {
+    await api[config.method](config.endpoint, { comentario });
+    Swal.fire('¡Acción Completada!', 'La operación se realizó con éxito.', 'success');
+    fetchGastos();
+  } catch (error) {
+    console.error(`Error al ejecutar la acción ${accion}:`, error);
+    const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
+    Swal.fire('Error', errorMessage, 'error');
+  }
 };
 
 const irAPagina = (pagina) => {
@@ -349,7 +484,8 @@ watch(filtros, () => {
 }, { deep: true });
 
 onMounted(() => {
-  obtenerUsuarioActual();
+  // Se obtiene el usuario actual para determinar los permisos de visualización.
+  api.get('/user').then(response => usuarioActual.value = response.data);
   fetchGastos();
 });
 </script>

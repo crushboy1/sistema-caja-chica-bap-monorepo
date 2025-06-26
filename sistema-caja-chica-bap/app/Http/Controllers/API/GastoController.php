@@ -33,36 +33,45 @@ class GastoController extends Controller
             'registrador.area:id,name',
             'jefeAprobador:id,name,last_name',
             'validadorAdm:id,name,last_name',
-            'cuentaContable',
-            'fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado'
+            'cuentaContable:id,codigo_cuenta,descripcion',
+            'fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado',
+            'detalleProyectado:id,descripcion_gasto',
         ]);
 
         // --- LÓGICA DE VISUALIZACIÓN POR ROL Y SCOPE ---
 
         // CASO 1: Es un Jefe de Área en su panel de "Aprobaciones"
         if ($request->input('scope') === 'aprobaciones') {
-
-            // --- CAMBIO CLAVE ---
-            // Se ha añadido la lógica para el rol 'colaborador' en esta misma vista.
-
             if ($user->hasRole('jefe_area')) {
-                // El JEFE DE ÁREA ve los gastos de su equipo que están 'Pendiente de Aprobación' o que han sido 'Observado' por ADM.
-                $query->whereIn('estado', ['Pendiente de Aprobación', 'Observado'])
-                    ->where('id_registrador', '!=', $user->id)
-                    ->whereHas('registrador', function ($subQ) use ($user) {
-                        $subQ->where('area_id', $user->area_id);
-                    });
+                // --- LÓGICA CORREGIDA PARA JEFE DE ÁREA ---
+                // Ahora la consulta es más directa y robusta.
+                // Un Jefe de Área en su bandeja de aprobaciones debe ver:
+                $query->where(function ($q) use ($user) {
+                    // 1. CUALQUIER gasto de su área que esté 'Pendiente de Aprobación'.
+                    // Esto incluye los gastos recién creados por colaboradores y los que han sido reenviados.
+                    $q->where('estado', 'Pendiente de Aprobación')
+                        ->whereHas('registrador', function ($subQ) use ($user) {
+                            $subQ->where('area_id', $user->area_id);
+                        });
+                })->orWhere(function ($q) use ($user) {
+                    // 2. O CUALQUIER gasto de su área que esté 'Observado' por ADM.
+                    // (La lógica para ocultarlo después de enviar directriz se puede manejar en el frontend si es necesario,
+                    // pero es mejor que el jefe vea todo lo que está en su cancha).
+                    $q->where('estado', 'Observado')
+                        ->whereHas('registrador', function ($subQ) use ($user) {
+                            $subQ->where('area_id', $user->area_id);
+                        });
+                });
             } elseif ($user->hasRole('colaborador')) {
-                // El COLABORADOR ve únicamente sus propios gastos que han sido marcados como 'Observado'.
+                // El COLABORADOR solo ve sus propios gastos que han sido 'Observado'.
                 $query->where('estado', 'Observado')
                     ->where('id_registrador', $user->id);
             } else {
-                // Si otro rol entra a esta vista (ej. ADM), no verá nada por defecto en el scope de "aprobaciones".
-                $query->whereRaw('1 = 0'); // Devuelve una consulta vacía.
+                $query->whereRaw('1 = 0');
             }
-        }
-        // CASO 2: Es cualquier otro rol o vista (Trazabilidad, Auditoría, etc.)
-        else {
+
+            // CASO 2: Es cualquier otro rol o vista (Trazabilidad, Auditoría, etc.)
+        } else {
             if ($user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
                 // Admin ve todo
             } elseif ($user->hasRole('jefe_area')) {
@@ -110,74 +119,78 @@ class GastoController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. VALIDACIÓN
+        // Se actualiza la validación para esperar un array 'gastos'.
+        // El asterisco (*) aplica las reglas a cada elemento del array.
         $validatedData = $request->validate([
-            'id_fondo_efectivo' => 'required|exists:fondo_efectivo,id_fondo',
-            'fecha_documento' => 'required|date',
-            'tipo_documento' => 'required_if:es_declaracion_jurada,false|string|max:100',
-            'serie_documento' => 'nullable|string|max:20',
-            'correlativo_documento' => 'nullable|string|max:50',
-            'monto_total' => 'required|numeric|min:0.01',
-            'moneda' => 'required|string|in:PEN,USD',
-            'pertenece_proyecto' => 'required|boolean',
-            'id_cuenta_contable' => 'required|exists:cuentas_contables,id',
-            'glosa' => 'required|string|max:1000',
-            'evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
-            'es_declaracion_jurada' => 'required|boolean',
-            'comentario' => 'nullable|string|max:2000',
+            'id_fondo_efectivo' => 'required|exists:fondos_efectivo,id_fondo',
+            'gastos' => 'required|array|min:1',
+            'gastos.*.detalle_gasto_proyectado_id' => 'required|exists:detalle_gastos_proyectados,id',
+            'gastos.*.fecha_documento' => 'required|date',
+            'gastos.*.monto_total' => 'required|numeric|min:0.01',
+            'gastos.*.id_cuenta_contable' => 'required|exists:cuentas_contables,id',
+            'gastos.*.glosa' => 'required|string|max:1000',
+            'gastos.*.evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240', // 10MB Max
+            'gastos.*.es_declaracion_jurada' => 'required|boolean',
+            'gastos.*.tipo_documento' => 'required_if:gastos.*.es_declaracion_jurada,false|string|max:100',
+            'gastos.*.serie_documento' => 'nullable|string|max:20',
+            'gastos.*.correlativo_documento' => 'nullable|string|max:50',
+            'gastos.*.comentario' => 'nullable|string|max:2000',
+            'gastos.*.pertenece_proyecto' => 'required|boolean',
+            'gastos.*.moneda' => 'sometimes|in:PEN,USD',
         ]);
 
         $user = Auth::user();
         $fondo = FondoEfectivo::findOrFail($validatedData['id_fondo_efectivo']);
-        $montoNuevoGasto = $validatedData['monto_total'];
-        // --- LÓGICA DE SALDO OPERATIVO (IMPLEMENTACIÓN COMPLETA) ---
-        // 1. Obtener la colección de gastos que ya están "en proceso".
-        $gastosEnProcesoCollection = $fondo->gastos()
-            ->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])
-            ->get();
-        // 2. Calcular el monto comprometido, convirtiendo los gastos en USD a PEN.
-        $montoComprometido = $gastosEnProcesoCollection->reduce(function ($carry, $gasto) {
-            if ($gasto->moneda === 'PEN') {
-                return $carry + $gasto->monto_total;
-            } else { // El gasto es en USD
-                // Usar el tipo de cambio referencial si existe, si no, un valor por defecto seguro.
-                $tipoCambio = $gasto->tipo_cambio_referencial ?? 3.8; // Valor conservador por defecto
-                return $carry + ($gasto->monto_total * $tipoCambio);
-            }
-        }, 0);
-        // 3. Calcular el saldo operativo real.
-        $saldoOperativo = $fondo->monto_disponible - $montoComprometido;
-        // 4. Convertir el monto del nuevo gasto a PEN si es necesario para la validación.
-        $montoNuevoGastoEnPen = $validatedData['moneda'] === 'PEN'
-            ? $montoNuevoGasto
-            : ($montoNuevoGasto * ($validatedData['tipo_cambio_referencial'] ?? 3.8));
-        // 5. Validar el nuevo gasto contra el saldo operativo.
-        if ($saldoOperativo < $montoNuevoGastoEnPen) {
+        $gastosParaCrear = $validatedData['gastos'];
+
+        // 2. LÓGICA DE SALDO
+        // Se mantiene tu lógica, pero ahora se calcula la suma de todos los gastos que se están enviando.
+        $montoTotalDeclarado = collect($gastosParaCrear)->sum('monto_total');
+
+        $gastosEnProceso = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])->sum('monto_total');
+        $saldoOperativo = $fondo->monto_disponible - $gastosEnProceso;
+
+        if ($saldoOperativo < $montoTotalDeclarado) {
             throw ValidationException::withMessages([
-                'monto_total' => 'El monto del gasto excede el saldo operativo real del fondo (Aprox. S/. ' . number_format($saldoOperativo, 2) . ').'
+                'monto_total' => 'El monto total de los gastos (S/ ' . number_format($montoTotalDeclarado, 2) . ') excede el saldo operativo real del fondo (Aprox. S/. ' . number_format($saldoOperativo, 2) . ').'
             ]);
         }
 
-        return DB::transaction(function () use ($request, $validatedData, $user) {
-            $path = $request->file('evidencia')->store('evidencias_gastos', 'public');
+        // 3. TRANSACCIÓN
+        // Se envuelve toda la lógica en una transacción para garantizar la integridad de los datos.
+        return DB::transaction(function () use ($request, $gastosParaCrear, $user, $fondo) {
 
-            // LÓGICA DE ESTADOS 
-            $estadoInicial = $user->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
+            $gastosCreados = [];
 
-            // Unir los datos validados con los datos generados por el servidor
-            $dataToCreate = array_merge($validatedData, [
-                'id_registrador' => $user->id,
-                'ruta_evidencia' => $path,
-                'estado' => $estadoInicial,
-                'tipo_documento' => $validatedData['es_declaracion_jurada'] ? 'Declaración Jurada' : $validatedData['tipo_documento'],
-                'serie_documento' => $validatedData['es_declaracion_jurada'] ? null : $validatedData['serie_documento'],
-                'correlativo_documento' => $validatedData['es_declaracion_jurada'] ? null : $validatedData['correlativo_documento'],
-            ]);
+            // Se itera sobre el array de gastos para crear cada uno.
+            foreach ($gastosParaCrear as $index => $gastoData) {
+                // Se busca el archivo de evidencia correspondiente por su índice.
+                $evidenciaFile = $request->file("gastos.{$index}.evidencia");
+                $path = $evidenciaFile->store('evidencias_gastos', 'public');
 
-            $gasto = Gasto::create($dataToCreate);
+                // Se mantiene tu lógica para determinar el estado inicial.
+                $estadoInicial = $user->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
 
-            $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado.');
+                // Se crea el registro del gasto.
+                $gasto = Gasto::create(array_merge($gastoData, [
+                    'id_fondo_efectivo' => $fondo->id_fondo,
+                    'id_registrador' => $user->id,
+                    'ruta_evidencia' => $path,
+                    'estado' => $estadoInicial,
+                    'moneda' => 'PEN', // Se asume PEN según los requerimientos.
+                    'id_jefe_aprobador' => $user->hasRole('jefe_area') ? $user->id : null,
+                ]));
 
-            return response()->json(['message' => 'Gasto registrado exitosamente.', 'gasto' => $gasto->load('registrador')], 201);
+                // Se registra el evento en el historial de cada gasto individual.
+                $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado.');
+                $gastosCreados[] = $gasto->load('registrador');
+            }
+
+            return response()->json([
+                'message' => count($gastosCreados) . ' gasto(s) ha(n) sido registrado(s) exitosamente.',
+                'gastos' => $gastosCreados
+            ], 201);
         });
     }
 
@@ -188,95 +201,55 @@ class GastoController extends Controller
     {
         $user = Auth::user();
 
-        // 1. Autorización: ¿Quién puede aprobar?
         if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
             return response()->json(['message' => 'No tienes permiso para aprobar este gasto.'], 403);
         }
-
-        // 2. Validación de Estado: ¿Se puede aprobar este gasto?
         if ($gasto->estado !== 'Pendiente de Aprobación') {
-            return response()->json(['message' => 'El gasto no puede ser aprobado porque no está pendiente.'], 409); // 409 Conflict
+            return response()->json(['message' => 'El gasto no puede ser aprobado porque no está pendiente.'], 409);
         }
 
-        //3. Validación de datos para el tipo de cambio si la moneda es USD
-        $validationRules = [];
-        if ($gasto->moneda === 'USD') {
-            $validationRules['tipo_cambio'] = 'required|numeric|min:0.0001';
-        }
-        $request->validate($validationRules);
-        // 4. Ejecución
         return DB::transaction(function () use ($gasto, $user, $request) {
-            $montoADescontar = 0;
-            $tipoCambio = null;
-
-            if ($gasto->moneda === 'PEN') {
-                $montoADescontar = $gasto->monto_total;
-            } else { // Moneda es USD
-                $tipoCambio = $request->input('tipo_cambio');
-                $montoADescontar = $gasto->monto_total * $tipoCambio;
-            }
-
-            // Business validation: Consultar saldo de fondos con el monto final en PEN
-            if ($gasto->fondoEfectivo->monto_disponible < $montoADescontar) {
-                throw ValidationException::withMessages([
-                    'monto_total' => 'El fondo no tiene saldo suficiente (S/. ' . number_format($gasto->fondoEfectivo->monto_disponible, 2) . ') para cubrir el monto convertido de S/. ' . number_format($montoADescontar, 2) . '.'
-                ]);
-            }
-
-            // Ejecución
             $estadoAnterior = $gasto->estado;
+            // Lógica de Saldo: NO se descuenta el dinero aquí.
             $gasto->estado = 'Pendiente de Validación Contable';
             $gasto->id_jefe_aprobador = $user->id;
-            $gasto->tipo_cambio = $tipoCambio;
-            $gasto->monto_final_pen = $montoADescontar;
             $gasto->save();
-
-            $gasto->fondoEfectivo->decrement('monto_disponible', $montoADescontar);
 
             $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto aprobado por Jefe de Área.'));
 
-            return response()->json(['message' => 'Gasto aprobado exitosamente.', 'gasto' => $gasto]);
+            return response()->json(['message' => 'Gasto aprobado exitosamente. Pasa a validación contable.', 'gasto' => $gasto]);
         });
     }
+
     /**
-     *  Valida, contabiliza y descuenta un gasto. (Acción de Administración)
+     * Finaliza un gasto marcándolo como 'Contabilizado'. (Acción de Administración)
      */
-    public function validateAndAccount(Request $request, Gasto $gasto)
+    public function finalizeAsAccounted(Request $request, Gasto $gasto)
     {
         $user = Auth::user();
-        $this->authorize('validate', $gasto);
-
+        if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'No tienes permiso para esta acción.'], 403);
+        }
         if ($gasto->estado !== 'Pendiente de Validación Contable') {
-            return response()->json(['message' => 'Este gasto no está pendiente de validación contable.'], 409);
+            return response()->json(['message' => 'Solo se pueden contabilizar gastos que estén pendientes de validación contable.'], 409);
         }
 
-        $validationRules = [];
-        if ($gasto->moneda === 'USD') {
-            $validationRules['tipo_cambio'] = 'required|numeric|min:0.0001';
-        }
-        $validated = $request->validate($validationRules);
+        return DB::transaction(function () use ($gasto, $user, $request) {
+            $fondo = $gasto->fondoEfectivo;
+            $montoFinal = $gasto->monto_total;
 
-        return DB::transaction(function () use ($gasto, $user, $validated, $request) {
-            $tipoCambioOficial = $gasto->moneda === 'USD' ? $validated['tipo_cambio'] : null;
-            $montoFinalPen = $gasto->moneda === 'PEN' ? $gasto->monto_total : ($gasto->monto_total * $tipoCambioOficial);
-
-            // La validación de saldo y el descuento ocurren AQUI, en el paso final.
-            if ($gasto->fondoEfectivo->monto_disponible < $montoFinalPen) {
-                throw ValidationException::withMessages([
-                    'monto_total' => 'El fondo no tiene saldo suficiente para cubrir el monto final de S/. ' . number_format($montoFinalPen, 2)
-                ]);
+            // Lógica de Saldo: EL DESCUENTO OCURRE AQUÍ.
+            if ($fondo->monto_disponible < $montoFinal) {
+                throw ValidationException::withMessages(['monto_total' => 'El fondo no tiene saldo suficiente (S/. ' . number_format($fondo->monto_disponible, 2) . ') para cubrir este gasto.']);
             }
-
-            $gasto->fondoEfectivo->decrement('monto_disponible', $montoFinalPen);
+            $fondo->decrement('monto_disponible', $montoFinal);
 
             $estadoAnterior = $gasto->estado;
             $gasto->estado = 'Contabilizado';
             $gasto->id_validador_adm = $user->id;
-            $gasto->tipo_cambio = $tipoCambioOficial;
-            $gasto->monto_final_pen = $montoFinalPen;
             $gasto->save();
 
-            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Validado y contabilizado por administración.'));
+            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto validado y contabilizado por administración.'));
 
             return response()->json(['message' => 'Gasto validado y contabilizado exitosamente.', 'gasto' => $gasto]);
         });
@@ -286,26 +259,19 @@ class GastoController extends Controller
     {
         $user = Auth::user();
         $request->validate(['comentario' => 'required|string|max:2000']);
-        $comentario = $request->input('comentario');
 
-        // 1. Autorización
         if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
             return response()->json(['message' => 'No tienes permiso para rechazar este gasto.'], 403);
         }
-
-        // 2. Validación de Estado
         if ($gasto->estado !== 'Pendiente de Aprobación') {
             return response()->json(['message' => 'Solo se pueden rechazar gastos que estén pendientes.'], 409);
         }
 
-        // 3. Ejecución
         $estadoAnterior = $gasto->estado;
         $gasto->estado = 'Rechazado';
-        $gasto->motivo_rechazo = $comentario;
+        $gasto->motivo_rechazo = $request->input('comentario');
         $gasto->save();
-
-        // No se revierte dinero porque nunca se descontó del fondo.
-        $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $comentario);
+        $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Rechazado por Jefe: " . $request->input('comentario'));
 
         return response()->json(['message' => 'Gasto rechazado exitosamente.', 'gasto' => $gasto]);
     }
@@ -319,35 +285,52 @@ class GastoController extends Controller
         if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
             return response()->json(['message' => 'No tienes permiso para observar gastos.'], 403);
         }
-
-        // Se puede observar un gasto que está pendiente de aprobación o de validación.
         if (!in_array($gasto->estado, ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])) {
-            return response()->json(['message' => 'Solo se pueden observar gastos que estén pendientes de procesar.'], 409);
+            return response()->json(['message' => 'Solo se pueden observar gastos que estén pendientes.'], 409);
         }
-        
+
         $request->validate(['comentario' => 'required|string|max:2000']);
 
         return DB::transaction(function () use ($gasto, $user, $request) {
             $estadoAnterior = $gasto->estado;
-            
-            // Si el gasto ya había sido aprobado por un jefe, se anula esa aprobación para reiniciar el flujo.
+            // Lógica de Saldo: No se revierte dinero porque nunca se descontó.
             if ($gasto->id_jefe_aprobador) {
-                // También es importante revertir el monto del fondo si ya se había descontado.
-                if ($gasto->monto_final_pen) {
-                    $gasto->fondoEfectivo()->increment('monto_disponible', $gasto->monto_final_pen);
-                }
                 $gasto->id_jefe_aprobador = null;
-                $gasto->monto_final_pen = null;
-                $gasto->tipo_cambio = null;
             }
 
-            $gasto->estado = 'Observado'; // Estado correcto según la migración.
+            $gasto->estado = 'Observado';
             $gasto->motivo_observacion_adm = $request->comentario;
             $gasto->save();
 
             $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Observado por ADM: " . $request->comentario);
-            
-            return response()->json(['message' => 'Gasto observado. El jefe de área será notificado para gestionar la corrección.', 'gasto' => $gasto]);
+
+            return response()->json(['message' => 'Gasto observado. El jefe de área será notificado.', 'gasto' => $gasto]);
+        });
+    }
+
+    /**
+     *  Observa un gasto para corrección. (Acción del Jefe de Área)
+     */
+    public function observeByJefe(Request $request, Gasto $gasto)
+    {
+        $user = Auth::user();
+        if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
+            return response()->json(['message' => 'No tienes permiso para observar este gasto.'], 403);
+        }
+        if ($gasto->estado !== 'Pendiente de Aprobación') {
+            return response()->json(['message' => 'Solo puedes observar gastos de tu equipo que estén pendientes de tu aprobación.'], 409);
+        }
+        $request->validate(['comentario' => 'required|string|max:2000']);
+
+        return DB::transaction(function () use ($gasto, $user, $request) {
+            $estadoAnterior = $gasto->estado;
+            $gasto->estado = 'Observado';
+            $gasto->motivo_observacion_adm = $request->comentario; // Se reutiliza el campo de observación de ADM.
+            $gasto->save();
+
+            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Observado por Jefe de Área: " . $request->comentario);
+
+            return response()->json(['message' => 'Gasto observado y devuelto al colaborador para corrección.', 'gasto' => $gasto]);
         });
     }
 
@@ -356,30 +339,15 @@ class GastoController extends Controller
      */
     public function returnToCollaborator(Request $request, Gasto $gasto)
     {
-        $user = Auth::user(); // Este es el Jefe de Área
-        
-        // 1. Autorización: Solo el jefe de área puede realizar esta acción.
+        $user = Auth::user();
         if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
             return response()->json(['message' => 'No tienes permiso para gestionar este gasto observado.'], 403);
         }
-
-        // 2. Validación de Estado: La acción solo es válida si el gasto está 'Observado'.
         if ($gasto->estado !== 'Observado') {
             return response()->json(['message' => 'Solo se pueden gestionar gastos que han sido observados.'], 409);
         }
-
         $request->validate(['comentario' => 'required|string|max:2000']);
-        
-        // 3. Ejecución: No se cambia el estado. Solo se añade la directriz del jefe al historial.
-        // El estado 'Observado' permanece, pero ahora el colaborador verá esta nueva directriz.
-        $this->registrarHistorial(
-            $gasto, 
-            $gasto->estado, // El estado no cambia
-            $gasto->estado, 
-            $user->id, 
-            "Directriz del Jefe: " . $request->input('comentario')
-        );
-
+        $this->registrarHistorial($gasto, $gasto->estado, $gasto->estado, $user->id, "Directriz del Jefe: " . $request->input('comentario'));
         return response()->json(['message' => 'Directriz enviada al colaborador para su corrección.', 'gasto' => $gasto]);
     }
 
@@ -388,96 +356,56 @@ class GastoController extends Controller
      */
     public function resubmit(Request $request, Gasto $gasto)
     {
-        $user = Auth::user(); // Este es el Colaborador o Jefe que corrige.
-
-        // 1. Autorización: Solo el registrador original puede corregir su gasto.
+        $user = Auth::user();
         if ($user->id !== $gasto->id_registrador) {
             return response()->json(['message' => 'No tienes permiso para corregir este gasto.'], 403);
         }
-        
-        // 2. Validación de Estado: El gasto debe estar 'Observado' para ser corregido.
         if ($gasto->estado !== 'Observado') {
             return response()->json(['message' => 'Este gasto no se encuentra en estado de corrección.'], 409);
         }
-        
-        // 3. Validación de Datos: El comentario de descargo es obligatorio.
-        $validatedData = $request->validate([
-            'comentario' => 'required|string|max:2000',
-            // Aquí se podrían añadir otros campos que el usuario puede editar si fuera necesario.
-        ]);
+        $validatedData = $request->validate(['comentario' => 'required|string|max:2000']);
 
-        return DB::transaction(function () use ($gasto, $user, $request, $validatedData) {
+        return DB::transaction(function () use ($gasto, $user, $validatedData) {
             $estadoAnterior = $gasto->estado;
-
-            // Al reenviar, el estado vuelve al inicio del ciclo de aprobación.
-            $gasto->estado = 'Pendiente de Aprobación';
-            $gasto->motivo_observacion_adm = null; // Limpiar la observación anterior.
+            // Si el Jefe de Área fue el que registró, pasa directo a validación contable.
+            // Si no, vuelve al inicio del ciclo de aprobación por el jefe.
+            $gasto->estado = $gasto->registrador->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
+            $gasto->motivo_observacion_adm = null;
             $gasto->save();
 
             $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Descargo/Corrección: " . $validatedData['comentario']);
-            
+
             return response()->json(['message' => 'Gasto corregido y reenviado para aprobación.', 'gasto' => $gasto]);
         });
     }
 
     // MÉTODOS ADICIONALES PARA COMPLETAR EL FLUJO
 
-    /**
-     * Finaliza un gasto marcándolo como 'Contabilizado'. (Acción de Administración)
-     */
-    public function finalizeAsAccounted(Request $request, Gasto $gasto)
-    {
-        $user = Auth::user();
-        // Autorización y Validación de Estado
-        if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
-            return response()->json(['message' => 'No tienes permiso para esta acción.'], 403);
-        }
-        if ($gasto->estado !== 'Pendiente de Validación Contable') {
-            return response()->json(['message' => 'Solo se pueden contabilizar gastos aprobados.'], 409);
-        }
-
-        $estadoAnterior = $gasto->estado;
-        $gasto->update(['estado' => 'Contabilizado']);
-        $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto procesado y cerrado para contabilidad.'));
-
-        return response()->json(['message' => 'Gasto marcado como Contabilizado.', 'gasto' => $gasto]);
-    }
-
     //Rechaza un gasto de forma definitiva. (Acción de Administración)
     public function rejectFinal(Request $request, Gasto $gasto)
     {
         $user = Auth::user();
         $request->validate(['comentario' => 'required|string|max:2000']);
-        $comentario = $request->input('comentario');
 
-        // 1. Autorización
         if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
             return response()->json(['message' => 'No tienes permiso para esta acción.'], 403);
         }
-
-        // 2. Validación de Estado (Un admin puede rechazar un gasto aprobado que considere incorrecto)
         if ($gasto->estado !== 'Pendiente de Validación Contable') {
-            return response()->json(['message' => 'Solo se pueden rechazar gastos que han sido aprobados por la jefatura.'], 409);
+            return response()->json(['message' => 'Solo se pueden rechazar gastos que ya están aprobados por jefatura.'], 409);
         }
 
-        // 3. Ejecución
-        DB::transaction(function () use ($gasto, $user, $request) {
+        return DB::transaction(function () use ($gasto, $user, $request) {
             $estadoAnterior = $gasto->estado;
-
-            // Revert the money to the fund, using the final discounted amount.
-            $gasto->fondoEfectivo->increment('monto_disponible', $gasto->monto_final_pen);
-
+            // Lógica de Saldo: No se revierte dinero porque nunca se descontó.
             $gasto->estado = 'Rechazado';
-            $gasto->motivo_observacion_adm = $request->comentario;
+            $gasto->motivo_rechazo = $request->comentario;
             $gasto->id_jefe_aprobador = null;
-            $gasto->tipo_cambio = null;
-            $gasto->monto_final_pen = null;
             $gasto->save();
 
-            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->comentario);
-        });
+            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Rechazado por ADM: " . $request->comentario);
 
-        return response()->json(['message' => 'Gasto rechazado definitivamente.', 'gasto' => $gasto]);
+            return response()->json(['message' => 'Gasto rechazado definitivamente.', 'gasto' => $gasto]);
+        });
     }
     public function misGastos()
     {
@@ -510,7 +438,7 @@ class GastoController extends Controller
      */
     public function show(Gasto $gasto)
     {
-        return response()->json($gasto->load(['registrador.role', 'registrador.area', 'jefeAprobador', 'cuentaContable', 'historial.usuarioAccion']));
+        return response()->json($gasto->load(['registrador.role', 'registrador.area', 'jefeAprobador', 'validadorAdm', 'cuentaContable', 'detalleProyectado', 'historial.usuarioAccion']));
     }
 
     /**

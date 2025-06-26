@@ -47,7 +47,7 @@ class FondoEfectivoController extends Controller
         if ($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) {
             // Acceso total para roles de administración.
         } elseif ($user->hasRole('jefe_area') || $user->hasRole('colaborador')) {
-            $query->where('id_responsable', $user->id);
+            $query->where('id_area', $user->area_id);
         } else {
             return response()->json(['message' => 'Acceso denegado. Rol no reconocido.'], 403);
         }
@@ -84,6 +84,30 @@ class FondoEfectivoController extends Controller
             'fondos' => $fondos,
         ]);
     }
+    public function getProyeccionesPendientes(FondoEfectivo $fondo)
+    {
+        // Se valida que el usuario autenticado pertenezca al área del fondo para poder acceder a sus proyecciones.
+        $user = Auth::user();
+        if ($user->area_id !== $fondo->id_area && !$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'No tienes permiso para acceder a las proyecciones de este fondo.'], 403);
+        }
+
+        // Se utiliza la relación 'solicitudApertura' para acceder a sus 'detallesGastosProyectados'.
+        // La clave está en el uso de 'whereDoesntHave('gastoDeclarado')'.
+        // Esto filtra los detalles y devuelve SOLO aquellos que NO tienen un gasto asociado en la tabla 'gastos'.
+        $proyeccionesPendientes = $fondo->solicitudApertura->detallesGastosProyectados()
+            ->whereDoesntHave('gastoDeclarado') // La magia ocurre aquí.
+            ->select('id', 'descripcion_gasto', 'monto_estimado') // Se seleccionan los campos necesarios para el frontend.
+            ->get();
+
+        // Se retorna la lista de proyecciones pendientes.
+        return response()->json($proyeccionesPendientes);
+    }
+
+    /**
+     * Obtiene los fondos activos para el área del usuario.
+     * Este método sigue siendo útil para que el usuario seleccione su fondo activo.
+     */
     public function getFondosActivosParaUsuario()
     {
         $user = Auth::user();
@@ -92,21 +116,18 @@ class FondoEfectivoController extends Controller
             return response()->json(['message' => 'No autenticado.'], 401);
         }
 
-        // --- CAMBIO CLAVE ---
-        // La lógica ahora busca todos los fondos activos que pertenecen al ÁREA del usuario logueado.
-        // Esto permite que un 'Colaborador' vea y pueda registrar gastos contra los fondos de su 'Jefe de Área'.
-        // Si el usuario no tiene un área asignada, la consulta devolverá una colección vacía.
+        // Se buscan todos los fondos activos que pertenecen al ÁREA del usuario.
         $query = FondoEfectivo::where('estado', 'Activo');
 
         if ($user->area_id) {
             $query->where('id_area', $user->area_id);
         } else {
-            // Si el usuario no tiene área, no puede ver ningún fondo de área.
-            // Para evitar errores, podemos forzar que no devuelva resultados.
+            // Si el usuario no tiene área, no puede ver ningún fondo.
             $query->whereRaw('1 = 0');
         }
 
-        $fondos = $query->select('id_fondo', 'codigo_fondo', 'monto_disponible')->get();
+        // Se seleccionan los campos más relevantes para el desplegable.
+        $fondos = $query->select('id_fondo', 'codigo_fondo', 'monto_disponible', 'monto_aprobado')->get();
 
         return response()->json($fondos);
     }
@@ -480,7 +501,7 @@ class FondoEfectivoController extends Controller
             return response()->json([
                 'message' => 'Ocurrió un error al eliminar el fondo de efectivo.',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(), // Para depuración
+                'trace' => $e->getTraceAsString(), 
             ], 500);
         }
     }

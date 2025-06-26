@@ -18,7 +18,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
         <!-- Card 1: Declaración de Gasto -->
-        <div v-if="showDeclaracionCard" @click="handleCardClick('declaracion')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="esJefeDeArea || esColaborador" @click="cambiarTab('declaracion')" class="group relative overflow-hidden rounded-3xl cursor-pointer
                      bg-gradient-to-br from-verde-bap to-verde-bap-dark
                      transition-all duration-500 ease-out
                      transform hover:scale-105 hover:-translate-y-3
@@ -50,15 +50,15 @@
         </div>
 
         <!-- Card 2: Aprobaciones -->
-        <div v-if="showAprobacionesCard" @click="handleCardClick('aprobaciones')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                     bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
-                     transition-all duration-500 ease-out
-                     transform hover:scale-105 hover:-translate-y-3
-                     shadow-soft hover:shadow-glow-amarillo
-                     focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
-                     animate-fade-in-up border-2 border-transparent
-                     hover:border-amarillo-bap-light/50" :class="getCardClasses('aprobaciones')"
-          style="animation-delay: 0.2s" tabindex="0" @keydown.enter="handleCardClick('aprobaciones')"
+        <div v-if="esJefeDeArea || esColaborador" @click="cambiarTab('aprobaciones')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+                    bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
+                    transition-all duration-500 ease-out
+                    transform hover:scale-105 hover:-translate-y-3
+                    shadow-soft hover:shadow-glow-amarillo
+                    focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
+                    animate-fade-in-up border-2 border-transparent
+                  hover:border-amarillo-bap-light/50" :class="getCardClasses('aprobaciones')"
+           style="animation-delay: 0.2s" tabindex="0" @keydown.enter="handleCardClick('aprobaciones')"
           @keydown.space.prevent="handleCardClick('aprobaciones')">
           <div
             class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out">
@@ -81,7 +81,7 @@
         </div>
 
         <!-- Card 3: Auditoría y Reportes -->
-        <div v-if="showAuditoriaCard" @click="handleCardClick('auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="esAdmin" @click="cambiarTab('auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer
                      bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
                      transition-all duration-500 ease-out
                      transform hover:scale-105 hover:-translate-y-3
@@ -117,20 +117,16 @@
 
       </div>
 
-      <!-- SECCIÓN DE COMPONENTE ACTIVO (AJUSTADA PARA SOLUCIONAR EL ERROR) -->
-      <Transition name="fade-slide" mode="out-in">
-        <div v-if="activeComponent" class="mt-12">
-          <div class="bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-strong">
-            <!-- Se utiliza <component :is> para renderizar el componente activo -->
-            <!-- Se pasa el usuario como prop para que los hijos tengan el contexto necesario -->
-            <component :is="activeComponent" :usuarioActual="user" @close="handleClose" />
-          </div>
+      <!-- Contenedor del Componente Activo -->
+      <div v-if="activeTab" class="mt-12">
+        <div class="bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-8 shadow-strong">
+          <component :is="activeComponent" :usuarioActual="usuarioActual" @close="activeTab = ''" />
         </div>
-      </Transition>
+      </div>
 
       <Transition enter-active-class="transition-all duration-600 ease-out delay-500"
         enter-from-class="opacity-0 transform translate-y-4" enter-to-class="opacity-100 transform translate-y-0">
-        <div v-if="!activeSection"
+        <div v-if="!activeTab"
           class="relative overflow-hidden rounded-2xl bg-verde-bap-extralight border-l-4 border-verde-bap p-6 shadow-soft">
           <div class="relative flex items-start space-x-4">
             <div class="flex-shrink-0">
@@ -157,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, shallowRef } from 'vue';
 import api from '@/plugins/axios';
 
 // Importar los componentes de los submódulos
@@ -165,79 +161,64 @@ import DeclaracionGasto from '@/components/declaraciones/DeclaracionGasto.vue';
 import AprobacionGastos from '@/components/declaraciones/AprobacionGastos.vue';
 import AuditoriaGastos from '@/components/declaraciones/AuditoriaGastos.vue';
 
-const activeSection = ref(null);
-const user = ref(null);
+// --- ESTADO ---
+const usuarioActual = ref(null);
+const cargando = ref(true);
+const activeTab = ref(''); // Pestaña activa, ej: 'declaracion'
+const activeComponent = shallowRef(null); // Contenedor para el componente dinámico
 
-const ROLES = {
-  JEFE_AREA: 'jefe_area',
-  JEFE_ADM: 'jefe_administracion',
-  GERENTE_GENERAL: 'gerente_general',
-  SUPER_ADMIN: 'super_admin',
-  COLABORADOR: 'colaborador'
-};
+// --- PROPIEDADES COMPUTADAS ---
+// Lógica de visibilidad basada en el rol del usuario.
+const esAdmin = computed(() => usuarioActual.value?.role?.name === 'jefe_administracion' || usuarioActual.value?.role?.name === 'super_admin');
+const esJefeDeArea = computed(() => usuarioActual.value?.role?.name === 'jefe_area');
+const esColaborador = computed(() => usuarioActual.value?.role?.name === 'colaborador');
 
-// --- CAMBIO PRINCIPAL: Se usa un computed para determinar qué componente mostrar ---
-const activeComponent = computed(() => {
-  if (!activeSection.value) return null;
-  switch (activeSection.value) {
-    case 'declaracion': return DeclaracionGasto;
-    case 'aprobaciones': return AprobacionGastos;
-    case 'auditoria': return AuditoriaGastos;
-    default: return null;
+// --- MÉTODOS ---
+const obtenerUsuarioActual = async () => {
+  cargando.value = true;
+  try {
+    const { data } = await api.get('/user');
+    usuarioActual.value = data;
+  } catch (error) {
+    console.error("Error al obtener datos del usuario:", error);
+  } finally {
+    cargando.value = false;
   }
-});
-
-
-// Lógica de visibilidad de las tarjetas basada en roles
-const showDeclaracionCard = computed(() => {
-  return user.value;
-});
-
-const showAprobacionesCard = computed(() => {
-  return user.value && [ROLES.JEFE_AREA, ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(user.value.role.name);
-});
-
-const showAuditoriaCard = computed(() => {
-  return user.value && [ROLES.JEFE_ADM, ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(user.value.role.name);
-});
-
-// Métodos para manejar la interacción
-const handleCardClick = (section) => {
-  activeSection.value = activeSection.value === section ? null : section;
 };
 
-const handleClose = () => {
-  activeSection.value = null;
-};
-
-const getCardClasses = (section) => {
-  const classes = [];
-  if (activeSection.value === section) {
-    classes.push('scale-105', '-translate-y-3');
-    switch (section) {
+const cambiarTab = (tab) => {
+  if (activeTab.value === tab) {
+    // Si se hace clic en la misma pestaña, se cierra.
+    activeTab.value = '';
+    activeComponent.value = null;
+  } else {
+    // Se cambia a la nueva pestaña.
+    activeTab.value = tab;
+    switch (tab) {
       case 'declaracion':
-        classes.push('ring-4', 'ring-verde-bap/50', 'shadow-glow-verde');
+        activeComponent.value = DeclaracionGasto;
         break;
       case 'aprobaciones':
-        classes.push('ring-4', 'ring-amarillo-bap/50', 'shadow-glow-amarillo');
+        activeComponent.value = AprobacionGastos;
         break;
       case 'auditoria':
-        classes.push('ring-4', 'ring-rojo-bap/50', 'shadow-glow-rojo');
+        activeComponent.value = AuditoriaGastos;
         break;
+      default:
+        activeComponent.value = null;
     }
   }
-  return classes;
 };
 
-// Obtener datos del usuario al montar el componente
-onMounted(async () => {
-  try {
-    const response = await api.get('/user');
-    user.value = response.data;
-  } catch (error) {
-    console.error('Error al obtener datos del usuario:', error);
-  }
-});
+// Función para aplicar estilos dinámicos a las tarjetas.
+const getCardClasses = (tab) => {
+  return activeTab.value === tab
+    ? 'ring-4 ring-white/50 shadow-glow-verde' // Estilo para la tarjeta activa
+    : 'shadow-soft'; // Estilo para tarjetas inactivas
+};
+
+// --- LIFECYCLE HOOKS ---
+onMounted(obtenerUsuarioActual);
 </script>
 
 <style scoped>

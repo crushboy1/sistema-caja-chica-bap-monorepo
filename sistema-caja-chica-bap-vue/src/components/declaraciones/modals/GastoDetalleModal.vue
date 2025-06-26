@@ -143,7 +143,16 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Fondo Afectado:</strong> {{
                                 gasto?.fondo_efectivo?.codigo_fondo || 'N/A' }}
                             </p>
-                            <!-- CAMBIO: Campo añadido para mostrar el monto original del fondo -->
+                            <p class="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200/80"><strong>Proyección
+                                    Original:</strong> {{
+                                        gasto?.detalle_proyectado?.descripcion_gasto || 'No especificada' }}</p>
+                            <p class="text-sm text-gray-600"><strong>Monto Proyectado:</strong> S/. {{
+                                gasto?.detalle_proyectado?.monto_estimado
+                                    ? parseFloat(gasto.detalle_proyectado.monto_estimado).toFixed(2) : '0.00' }}</p>
+                            <p class="text-sm text-gray-600"><strong>Pertenece a Proyecto:</strong> {{
+                                gasto?.pertenece_proyecto ? 'Sí' : 'No'
+                                }}</p>
+
                             <p class="text-sm text-gray-600"><strong>Monto Original del Fondo:</strong> S/. {{
                                 gasto?.fondo_efectivo?.monto_aprobado ?
                                     parseFloat(gasto.fondo_efectivo.monto_aprobado).toFixed(2) : '0.00' }}

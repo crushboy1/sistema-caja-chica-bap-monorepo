@@ -7,31 +7,54 @@ use Illuminate\Database\Seeder;
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Ejecuta todos los seeders de la aplicación en un orden lógico y seguro.
+     *
+     * El orden es CRÍTICO para respetar las dependencias de claves foráneas.
+     * Se agrupan los seeders por su dominio funcional.
      */
     public function run(): void
     {
-        // Llama a los seeders en el orden correcto para respetar las dependencias de claves foráneas
-
-        // Seeders base (dependencias para usuarios)
+        // =========================================================================
+        // GRUPO 1: AUTENTICACIÓN Y PERMISOS
+        // =========================================================================
+        // Esta es la base del sistema de seguridad. Se debe ejecutar primero.
+        // El orden interno también es importante: Roles -> Permisos -> Asignación.
         $this->call([
-            TipoDocumentoIdentidadSeeder::class, // Necesario antes de UserSeeder
-            AreaSeeder::class,                   // Necesario antes de UserSeeder
-            RoleSeeder::class,                   // Necesario antes de UserSeeder y PermissionRoleSeeder
-            PermissionSeeder::class,             // Necesario antes de PermissionRoleSeeder
-            PermissionRoleSeeder::class,         // Necesario después de RoleSeeder y PermissionSeeder
-            UserSeeder::class,  
-                             // Necesario después de los anteriores
+            RoleSeeder::class,           // 1. Crea los roles (super_admin, jefe_area, etc.).
+            PermissionSeeder::class,       // 2. Crea todos los permisos disponibles.
+            PermissionRoleSeeder::class,   // 3. Asigna los permisos a los roles.
         ]);
 
-        // Seeders para el módulo de Fondos (dependen de Users y Areas)
+        // =========================================================================
+        // GRUPO 2: ESTRUCTURA ORGANIZACIONAL Y CATÁLOGOS (Master Data)
+        // =========================================================================
+        // Estos son los catálogos y estructuras base que la aplicación utiliza.
+        // Deben existir antes de crear usuarios o datos transaccionales.
         $this->call([
-            SolicitudFondoSeeder::class,         // Crea las solicitudes (depende de Users, Areas)
-            DetalleGastoProyectadoSeeder::class, // Detalle de gastos para solicitudes (depende de SolicitudFondo)
-            HistorialEstadoSolicitudSeeder::class, // Historial de estados para solicitudes (depende de SolicitudFondo, Users)
-            FondoEfectivoSeeder::class,          // Fondos activos (depende de SolicitudFondo, Users, Areas)
+            AreaSeeder::class,                     // Crea las áreas de la empresa.
+            TipoDocumentoIdentidadSeeder::class,   // Crea los tipos de documento (DNI, etc.).
+            CuentaContableSeeder::class,           // Crea el catálogo inicial de cuentas contables.
         ]);
 
-        $this->call(CuentaContableSeeder::class);
+        // =========================================================================
+        // GRUPO 3: USUARIOS
+        // =========================================================================
+        // Ahora que existen los roles, áreas y tipos de documento, podemos crear los usuarios.
+        $this->call([
+            UserSeeder::class,
+        ]);
+
+        // =========================================================================
+        // GRUPO 4: DATOS TRANSACCIONALES DE PRUEBA (Opcional)
+        // =========================================================================
+        // Estos seeders crean datos de ejemplo que simulan el uso de la aplicación.
+        // Dependen de que todos los seeders anteriores se hayan ejecutado.
+        $this->call([
+            SolicitudFondoSeeder::class,           // Crea solicitudes de fondo de ejemplo.
+            DetalleGastoProyectadoSeeder::class,   // Añade detalles a esas solicitudes.
+            HistorialEstadoSolicitudSeeder::class, // Genera el historial para las solicitudes.
+            FondoEfectivoSeeder::class,            // Crea fondos de efectivo basados en las solicitudes aprobadas.
+            // NOTA: No tenemos un GastoSeeder por ahora, pero si lo tuviéramos, iría aquí.
+        ]);
     }
 }
