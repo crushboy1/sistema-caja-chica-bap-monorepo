@@ -47,7 +47,7 @@ class FondoEfectivoController extends Controller
         if ($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) {
             // Acceso total para roles de administración.
         } elseif ($user->hasRole('jefe_area') || $user->hasRole('colaborador')) {
-            $query->where('id_area', $user->id);
+            $query->where('id_area', $user->area_id);
         } else {
             return response()->json(['message' => 'Acceso denegado. Rol no reconocido.'], 403);
         }
@@ -501,7 +501,7 @@ class FondoEfectivoController extends Controller
             return response()->json([
                 'message' => 'Ocurrió un error al eliminar el fondo de efectivo.',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(), // Para depuración
+                'trace' => $e->getTraceAsString(), 
             ], 500);
         }
     }

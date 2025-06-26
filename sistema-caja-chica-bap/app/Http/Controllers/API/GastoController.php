@@ -119,57 +119,78 @@ class GastoController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. VALIDACIÓN
+        // Se actualiza la validación para esperar un array 'gastos'.
+        // El asterisco (*) aplica las reglas a cada elemento del array.
         $validatedData = $request->validate([
-            'detalle_gasto_proyectado_id' => 'required|exists:detalle_gastos_proyectados,id',
-            'fecha_documento' => 'required|date',
-            'tipo_documento' => 'required_if:es_declaracion_jurada,false|string|max:100',
-            'serie_documento' => 'nullable|string|max:20',
-            'correlativo_documento' => 'nullable|string|max:50',
-            'monto_total' => 'required|numeric|min:0.01',
-            'moneda' => 'sometimes|in:PEN,USD',
-            'pertenece_proyecto' => 'required|boolean',
-            'id_cuenta_contable' => 'required|exists:cuentas_contables,id',
-            'glosa' => 'required|string|max:1000',
-            'evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
-            'es_declaracion_jurada' => 'required|boolean',
-            'comentario' => 'nullable|string|max:2000',
+            'id_fondo_efectivo' => 'required|exists:fondos_efectivo,id_fondo',
+            'gastos' => 'required|array|min:1',
+            'gastos.*.detalle_gasto_proyectado_id' => 'required|exists:detalle_gastos_proyectados,id',
+            'gastos.*.fecha_documento' => 'required|date',
+            'gastos.*.monto_total' => 'required|numeric|min:0.01',
+            'gastos.*.id_cuenta_contable' => 'required|exists:cuentas_contables,id',
+            'gastos.*.glosa' => 'required|string|max:1000',
+            'gastos.*.evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240', // 10MB Max
+            'gastos.*.es_declaracion_jurada' => 'required|boolean',
+            'gastos.*.tipo_documento' => 'required_if:gastos.*.es_declaracion_jurada,false|string|max:100',
+            'gastos.*.serie_documento' => 'nullable|string|max:20',
+            'gastos.*.correlativo_documento' => 'nullable|string|max:50',
+            'gastos.*.comentario' => 'nullable|string|max:2000',
+            'gastos.*.pertenece_proyecto' => 'required|boolean',
+            'gastos.*.moneda' => 'sometimes|in:PEN,USD',
         ]);
 
         $user = Auth::user();
-        $detalleProyectado = \App\Models\DetalleGastoProyectado::with('solicitudFondo.fondoEfectivo')->findOrFail($validatedData['detalle_gasto_proyectado_id']);
-        $fondo = $detalleProyectado->solicitudFondo->fondoEfectivo;
+        $fondo = FondoEfectivo::findOrFail($validatedData['id_fondo_efectivo']);
+        $gastosParaCrear = $validatedData['gastos'];
 
-        // --- LÓGICA DE SALDO SIMPLIFICADA ---
-        $gastosEnProceso = $fondo->gastos()
-            ->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])
-            ->sum('monto_total');
+        // 2. LÓGICA DE SALDO
+        // Se mantiene tu lógica, pero ahora se calcula la suma de todos los gastos que se están enviando.
+        $montoTotalDeclarado = collect($gastosParaCrear)->sum('monto_total');
 
+        $gastosEnProceso = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])->sum('monto_total');
         $saldoOperativo = $fondo->monto_disponible - $gastosEnProceso;
 
-        if ($saldoOperativo < $validatedData['monto_total']) {
+        if ($saldoOperativo < $montoTotalDeclarado) {
             throw ValidationException::withMessages([
-                'monto_total' => 'El monto del gasto excede el saldo operativo real del fondo (Aprox. S/. ' . number_format($saldoOperativo, 2) . ').'
+                'monto_total' => 'El monto total de los gastos (S/ ' . number_format($montoTotalDeclarado, 2) . ') excede el saldo operativo real del fondo (Aprox. S/. ' . number_format($saldoOperativo, 2) . ').'
             ]);
         }
 
+        // 3. TRANSACCIÓN
+        // Se envuelve toda la lógica en una transacción para garantizar la integridad de los datos.
+        return DB::transaction(function () use ($request, $gastosParaCrear, $user, $fondo) {
 
-        return DB::transaction(function () use ($request, $validatedData, $user, $fondo, $detalleProyectado) {
-            $path = $request->file('evidencia')->store('evidencias_gastos', 'public');
-            $estadoInicial = $user->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
+            $gastosCreados = [];
 
-            // 3. Al crear el gasto, AÑADIMOS MANUALMENTE el 'id_fondo_efectivo' que obtuvimos.
-            $gasto = Gasto::create(array_merge($validatedData, [
-                'id_fondo_efectivo' => $fondo->id_fondo,
-                'id_registrador' => $user->id,
-                'ruta_evidencia' => $path,
-                'estado' => $estadoInicial,
-                'moneda' => 'PEN',
-                'id_jefe_aprobador' => $user->hasRole('jefe_area') ? $user->id : null,
-            ]));
+            // Se itera sobre el array de gastos para crear cada uno.
+            foreach ($gastosParaCrear as $index => $gastoData) {
+                // Se busca el archivo de evidencia correspondiente por su índice.
+                $evidenciaFile = $request->file("gastos.{$index}.evidencia");
+                $path = $evidenciaFile->store('evidencias_gastos', 'public');
 
-            $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado.');
+                // Se mantiene tu lógica para determinar el estado inicial.
+                $estadoInicial = $user->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
 
-            return response()->json(['message' => 'Gasto registrado exitosamente.', 'gasto' => $gasto->load('registrador')], 201);
+                // Se crea el registro del gasto.
+                $gasto = Gasto::create(array_merge($gastoData, [
+                    'id_fondo_efectivo' => $fondo->id_fondo,
+                    'id_registrador' => $user->id,
+                    'ruta_evidencia' => $path,
+                    'estado' => $estadoInicial,
+                    'moneda' => 'PEN', // Se asume PEN según los requerimientos.
+                    'id_jefe_aprobador' => $user->hasRole('jefe_area') ? $user->id : null,
+                ]));
+
+                // Se registra el evento en el historial de cada gasto individual.
+                $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado.');
+                $gastosCreados[] = $gasto->load('registrador');
+            }
+
+            return response()->json([
+                'message' => count($gastosCreados) . ' gasto(s) ha(n) sido registrado(s) exitosamente.',
+                'gastos' => $gastosCreados
+            ], 201);
         });
     }
 

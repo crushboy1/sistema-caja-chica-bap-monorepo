@@ -37,8 +37,7 @@
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Administración</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarADM')"
-                                :class="getClassesForActionButton('exito')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('exito')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M5 13l4 4L19 7" />
@@ -46,8 +45,7 @@
                                 <span>Aprobar ADM</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('observarADM')"
-                                :class="getClassesForActionButton('advertencia')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('advertencia')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" />
@@ -55,8 +53,7 @@
                                 <span>Observar ADM</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('rechazarFinal')"
-                                :class="getClassesForActionButton('error')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('error')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M6 18L18 6M6 6l12 12" />
@@ -70,8 +67,7 @@
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Gerencia General</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarGRTE')"
-                                :class="getClassesForActionButton('exito')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('exito')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M5 13l4 4L19 7" />
@@ -79,8 +75,7 @@
                                 <span>Aprobar GRTE</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('observarGRTE')"
-                                :class="getClassesForActionButton('advertencia')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('advertencia')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" />
@@ -88,8 +83,7 @@
                                 <span>Observar GRTE</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('rechazarFinal')"
-                                :class="getClassesForActionButton('error')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('error')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M6 18L18 6M6 6l12 12" />
@@ -102,15 +96,25 @@
                     <div v-if="showSolicitanteDescargoAction"
                         class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Solicitante</h4>
+                        <p class="text-sm text-gray-600 mb-4">La solicitud ha sido observada. Puedes presentar un
+                            descargo simple o editar la solicitud completa.</p>
                         <div class="flex flex-wrap gap-3">
                             <button @click="iniciarAccionConMotivo('presentarDescargo')"
-                                :class="getClassesForActionButton('info')"
-                                :disabled="isLoadingAction">
+                                :class="getClassesForActionButton('info')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                                 <span>Presentar Descargo</span>
+                            </button>
+                            <button @click="iniciarModoEdicion" :class="getClassesForActionButton('advertencia')"
+                                :disabled="isLoadingAction">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" />
+                                </svg>
+                                <span>Editar Solicitud</span>
                             </button>
                         </div>
                     </div>
@@ -172,7 +176,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'open-edit-modal']);
 
 // --- Variables de Estado Internas ---
 const motivoAccion = ref('');
@@ -203,7 +207,7 @@ const showJefeAdmActions = computed(() => {
 
     // Si el usuario actual es Jefe ADM o Super Admin Y la solicitud está en un estado gestionable por ADM
     const canActAsAdm = (rolActual === ROLES.JEFE_ADM || rolActual === ROLES.SUPER_ADMIN) &&
-        (estado === 'Pendiente Aprobación ADM' || estado === 'Descargo Enviado ADM');
+        (estado === 'Pendiente Aprobación ADM' || estado === 'Descargo Enviado ADM' || estado === 'Pendiente Re-evaluacion');
 
     // Restricción: Si el solicitante es un ADM/SuperAdmin y es una solicitud de Decremento/Cierre,
     // el ADM no puede "gestionar" su propia solicitud de esta forma (aprobar/observar/rechazar).
@@ -311,12 +315,16 @@ const cerrarModal = (refresh = false) => {
     motivoAccion.value = '';
     emit('close', refresh);
 };
+const iniciarModoEdicion = () => {
+    // En lugar de manejar la lógica aquí, le decimos al componente padre que lo haga.
+    emit('open-edit-modal', props.solicitud);
+};
 
 // Función para ejecutar la acción de la API
 const ejecutarAccion = async () => {
     if (!props.solicitud) return;
 
-    let endpoint = `/solicitudes-fondo/${props.solicitud.id}`;
+    let endpoint = `/solicitudes/${props.solicitud.id}/gestionar-aprobacion`;
     let payload = {};
     let successMessageFromAPI = ''; // Variable para el mensaje de éxito de la API
     let errorMessage = '';
@@ -441,13 +449,13 @@ const ejecutarAccion = async () => {
             }
         }
 
-        console.log('--- Enviando PATCH a la API ---');
+        console.log('--- Enviando PUT a la API ---');
         console.log('Endpoint:', endpoint);
         console.log('Payload:', payload);
         console.log('-----------------------------');
 
         // Realizar la llamada a la API y CAPTURAR LA RESPUESTA
-        const response = await api.patch(endpoint, payload);
+        const response = await api.put(endpoint, payload);
 
         // El mensaje de éxito ahora se tomará directamente de la respuesta de la API
         // que ya contiene el código del fondo cuando sea relevante.

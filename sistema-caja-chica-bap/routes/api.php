@@ -56,11 +56,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- CRUD Básico para Solicitudes ---
     // Proporciona los endpoints estándar: index, store, show, update, destroy.
-    Route::apiResource('solicitudes-fondo', SolicitudFondoController::class);
-
+    Route::apiResource('solicitudes', SolicitudFondoController::class);
+    // --- Acciones Específicas del Solicitante  ---
+    // Endpoint para que el solicitante edite una solicitud que está PENDIENTE.
+    Route::put('/solicitudes/{solicitud}/editar-pendiente', [SolicitudFondoController::class, 'editarSolicitudPendiente'])
+        ->name('solicitudes.editar-pendiente');
+    // Endpoint para que el solicitante edite una solicitud que fue OBSERVADA.
+    Route::put('/solicitudes/{solicitud}/editar-observada', [SolicitudFondoController::class, 'editarSolicitudObservada'])
+        ->name('solicitudes.editar-observada');
     // --- Acciones Específicas para Solicitudes ---
-    // Ruta para que los aprobadores (ADM, GRTE) cambien el estado de una solicitud (aprobar, observar, etc.).
-    Route::put('/solicitudes-fondos/{solicitud}/actualizar-estado', [SolicitudFondoController::class, 'actualizarEstado']);
+    Route::put('/solicitudes/{solicitud}/gestionar-aprobacion', [SolicitudFondoController::class, 'update'])
+        ->name('solicitudes.gestionar-aprobacion');
 
 
     // =========================================================================
