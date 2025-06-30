@@ -205,7 +205,7 @@ const obtenerUsuarioAutenticado = async () => {
     cargandoUsuario.value = true;
     try {
         console.log('🔍 Haciendo petición a /user...');
-        const response = await api.get('/user');
+        const response = await api.get('/auth/user');
 
         usuarioActual.value = response.data;
 
@@ -266,7 +266,7 @@ const obtenerSolicitudes = async () => {
 
         console.log('📤 Parámetros de búsqueda:', params);
 
-        const response = await api.get('/solicitudes', { params });
+        const response = await api.get('/v1/solicitudes', { params });
         solicitudes.value = response.data.solicitudes;
 
         console.log(`📥 Solicitudes cargadas: ${solicitudes.value.length}`);

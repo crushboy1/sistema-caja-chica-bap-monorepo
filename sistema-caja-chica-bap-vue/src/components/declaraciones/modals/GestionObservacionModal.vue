@@ -47,18 +47,21 @@ const handleConfirmarAccion = async () => {
     }
 
     let endpoint = '';
+    let method = 'post';
     let payload = { comentario: comentario.value };
     let confirmationTitle = '';
     let successMessage = '';
-
+    const endpointPrefix = '/v1';
     if (esJefeDeArea.value) {
-        endpoint = `/gastos/${props.gasto.id}/return-to-collaborator`;
+        endpoint = `${endpointPrefix}/gastos/${props.gasto.id}/return-to-collaborator`;
         confirmationTitle = '¿Enviar Directriz?';
         successMessage = 'La directriz ha sido enviada al colaborador.';
+        method = 'post';
     } else if (esColaborador.value) {
-        endpoint = `/gastos/${props.gasto.id}/resubmit`;
+        endpoint = `${endpointPrefix}/gastos/${props.gasto.id}/resubmit`;
         confirmationTitle = '¿Reenviar Gasto?';
         successMessage = 'El gasto ha sido corregido y reenviado para su aprobación.';
+        method = 'put';
     } else {
         return; // No hacer nada si el rol no es el esperado
     }
@@ -75,7 +78,7 @@ const handleConfirmarAccion = async () => {
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            await api.post(endpoint, payload);
+            await api[method](endpoint, payload);
             await Swal.fire('¡Éxito!', successMessage, 'success');
             emit('accionRealizada');
         } catch (error) {

@@ -177,7 +177,7 @@ const esColaborador = computed(() => usuarioActual.value?.role?.name === 'colabo
 const obtenerUsuarioActual = async () => {
   cargando.value = true;
   try {
-    const { data } = await api.get('/user');
+    const { data } = await api.get('/auth/user');
     usuarioActual.value = data;
   } catch (error) {
     console.error("Error al obtener datos del usuario:", error);

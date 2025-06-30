@@ -52,7 +52,7 @@ const hasPermission = (permissionName) => {
 // Función para obtener los datos del usuario autenticado
 const fetchAuthenticatedUser = async () => {
   try {
-    const response = await api.get('/user');
+    const response = await api.get('/auth/user');
     console.log('DEBUG: Respuesta completa de /user:', response.data);
     console.log('DEBUG: Solo user de /user:', response.data.user);
     console.log('DEBUG: Role desde /user:', response.data.user?.role);

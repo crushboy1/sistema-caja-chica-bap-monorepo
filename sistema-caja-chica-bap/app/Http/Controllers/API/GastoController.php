@@ -123,7 +123,7 @@ class GastoController extends Controller
         // Se actualiza la validación para esperar un array 'gastos'.
         // El asterisco (*) aplica las reglas a cada elemento del array.
         $validatedData = $request->validate([
-            'id_fondo_efectivo' => 'required|exists:fondos_efectivo,id_fondo',
+            'id_fondo_efectivo' => ['required', 'integer', 'exists:fondo_efectivo,id_fondo'],
             'gastos' => 'required|array|min:1',
             'gastos.*.detalle_gasto_proyectado_id' => 'required|exists:detalle_gastos_proyectados,id',
             'gastos.*.fecha_documento' => 'required|date',

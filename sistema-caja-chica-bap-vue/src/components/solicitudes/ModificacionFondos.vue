@@ -436,7 +436,7 @@ const removerGastoDetallado = (index) => {
 const obtenerUsuarioAutenticado = async () => {
   cargandoUsuario.value = true;
   try {
-    const response = await api.get('/user');
+    const response = await api.get('/auth/user');
     usuarioActual.value = response.data;
   } catch (error) {
     console.error('Error al obtener datos del usuario autenticado:', error);
@@ -474,7 +474,7 @@ const obtenerFondosExistentes = async () => {
       }
     }
 
-    const response = await api.get('/fondos-efectivo', { params });
+    const response = await api.get('/v1/fondos-efectivo', { params });
     fondosExistentes.value = response.data.fondos.map(fondo => ({
       ...fondo,
       monto_aprobado: parseFloat(fondo.monto_aprobado)
@@ -496,7 +496,7 @@ const obtenerFondosExistentes = async () => {
 // Función para obtener las áreas
 const obtenerAreas = async () => {
   try {
-    const response = await api.get('/areas');
+    const response = await api.get('/v1/areas');
     areasDisponibles.value = response.data.areas;
   } catch (error) {
     console.error('Error al obtener áreas:', error);
@@ -700,7 +700,7 @@ const manejarEnvio = async () => {
         // lo que es el comportamiento deseado para que el backend no lo valide.
 
 
-        const response = await api.post('/solicitudes-fondo', payload);
+        const response = await api.post('/v1/solicitudes', payload);
         const codigoSolicitudGenerada = response.data.codigo_solicitud || 'N/A';
         Swal.fire({
           icon: 'success',

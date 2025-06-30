@@ -290,7 +290,7 @@ const paginasVisibles = computed(() => {
 // CAMBIO: Se obtiene el usuario logueado para pasarlo al modal de gestión.
 const obtenerUsuarioActual = async () => {
   try {
-    const response = await api.get('/user');
+    const response = await api.get('/auth/user');
     usuarioActual.value = response.data;
   } catch (error) {
     console.error("Error al obtener el usuario actual:", error);
@@ -306,7 +306,7 @@ const fetchGastos = async () => {
       ...filtros.value,
       scope: 'aprobaciones'
     };
-    const response = await api.get('/gastos', { params });
+    const response = await api.get('/v1/gastos', { params });
     gastos.value = response.data;
 
     if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
@@ -333,7 +333,7 @@ const verDetalles = (gasto) => {
 
 const gestionarAccion = async (gasto, accion) => {
   let config;
-
+  let endpointPrefix = '/v1';
   // Configuración para cada tipo de acción
   switch (accion) {
     case 'approve':
@@ -342,7 +342,7 @@ const gestionarAccion = async (gasto, accion) => {
         text: `¿Estás seguro de que deseas aprobar el gasto con código ${gasto.codigo_gasto}?`,
         icon: 'success',
         confirmButtonText: 'Sí, ¡Aprobar!',
-        endpoint: `/gastos/${gasto.id}/approve`,
+        endpoint: `${endpointPrefix}/gastos/${gasto.id}/approve`,
         method: 'post',
         needsComment: false
       };
@@ -353,7 +353,7 @@ const gestionarAccion = async (gasto, accion) => {
         text: `Vas a devolver el gasto ${gasto.codigo_gasto} para su corrección.`,
         icon: 'warning',
         confirmButtonText: 'Sí, ¡Observar!',
-        endpoint: `/gastos/${gasto.id}/observe-by-jefe`,
+        endpoint: `${endpointPrefix}/gastos/${gasto.id}/observe-by-jefe`,
         method: 'post',
         needsComment: true,
         commentLabel: 'Motivo de la observación:'
@@ -365,7 +365,7 @@ const gestionarAccion = async (gasto, accion) => {
         text: `Esta acción es definitiva. ¿Estás seguro de que deseas rechazar el gasto ${gasto.codigo_gasto}?`,
         icon: 'error',
         confirmButtonText: 'Sí, ¡Rechazar!',
-        endpoint: `/gastos/${gasto.id}/reject-by-jefe`,
+        endpoint: `${endpointPrefix}/gastos/${gasto.id}/reject-by-jefe`,
         method: 'post',
         needsComment: true,
         commentLabel: 'Motivo del rechazo:'
@@ -386,7 +386,7 @@ const gestionarAccion = async (gasto, accion) => {
                 `,
         icon: 'info',
         confirmButtonText: 'Enviar Directriz',
-        endpoint: `/gastos/${gasto.id}/return-to-collaborator`,
+        endpoint: `${endpointPrefix}/gastos/${gasto.id}/return-to-collaborator`,
         method: 'post',
         needsComment: true,
         commentLabel: 'Tu instrucción para el colaborador:'
@@ -408,7 +408,7 @@ const gestionarAccion = async (gasto, accion) => {
                 `,
         icon: 'info',
         confirmButtonText: 'Reenviar Gasto',
-        endpoint: `/gastos/${gasto.id}/resubmit`,
+        endpoint: `${endpointPrefix}/gastos/${gasto.id}/resubmit`,
         method: 'put',
         needsComment: true,
         commentLabel: 'Comentario de corrección:'
@@ -485,7 +485,7 @@ watch(filtros, () => {
 
 onMounted(() => {
   // Se obtiene el usuario actual para determinar los permisos de visualización.
-  api.get('/user').then(response => usuarioActual.value = response.data);
+  api.get('/auth/user').then(response => usuarioActual.value = response.data);
   fetchGastos();
 });
 </script>

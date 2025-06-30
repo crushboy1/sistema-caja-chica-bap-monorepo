@@ -26,7 +26,7 @@ const montoAReponer = computed(() => {
 const fetchFondos = async () => {
     cargandoFondos.value = true;
     try {
-        const response = await api.get('/fondos-efectivo');
+        const response = await api.get('/v1/fondos-efectivo');
         fondos.value = response.data.fondos;
     } catch (error) {
         console.error("Error al cargar los fondos:", error);
@@ -56,7 +56,7 @@ const confirmarReposicion = async () => {
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            const response = await api.post(`/fondos-efectivo/${fondoSeleccionadoId.value}/reponer`);
+            const response = await api.post(`/v1/fondos-efectivo/${fondoSeleccionadoId.value}/reponer`);
             await Swal.fire('¡Éxito!', response.data.message, 'success');
             emit('fondoRepuesto'); // Notifica al padre
             emit('close');
@@ -68,8 +68,14 @@ const confirmarReposicion = async () => {
     }
 };
 
-onMounted(() => {
-    fetchFondos();
+watch(() => props.mostrar, (newVal) => {
+    if (newVal) {
+        fetchFondos();
+    } else {
+
+        fondoSeleccionadoId.value = null;
+        fondos.value = [];
+    }
 });
 </script>
 

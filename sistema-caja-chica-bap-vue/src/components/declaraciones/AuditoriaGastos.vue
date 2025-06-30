@@ -86,7 +86,7 @@ const fetchGastos = async () => {
             delete params.registrador_name;
         }
 
-        const response = await api.get('/gastos', { params });
+        const response = await api.get('/v1/gastos', { params });
         gastos.value = response.data;
         if (paginaActual.value > totalPaginas.value) paginaActual.value = totalPaginas.value || 1;
 
@@ -127,7 +127,7 @@ const verDetalles = (gasto) => {
 
 const gestionarAccionAdm = async (gasto, accion) => {
     let config;
-
+    const endpointPrefix = '/v1';
     switch (accion) {
         case 'finalizeAsAccounted':
             config = {
@@ -135,7 +135,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 text: `¿Estás seguro de finalizar y contabilizar el gasto ${gasto.codigo_gasto}? Esta acción descontará el monto del fondo y no se puede revertir.`,
                 icon: 'success',
                 confirmButtonText: 'Sí, Contabilizar',
-                endpoint: `/gastos/${gasto.id}/finalize`,
+                endpoint: `${endpointPrefix}/gastos/${gasto.id}/finalize`,
                 method: 'post',
                 needsComment: false,
             };
@@ -146,7 +146,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 text: `Vas a devolver el gasto ${gasto.codigo_gasto} para su corrección.`,
                 icon: 'warning',
                 confirmButtonText: 'Sí, Observar',
-                endpoint: `/gastos/${gasto.id}/observe`,
+                endpoint: `${endpointPrefix}/gastos/${gasto.id}/observe`,
                 method: 'post',
                 needsComment: true,
                 commentLabel: 'Motivo de la observación:'
@@ -158,7 +158,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 text: `Esta acción es final. ¿Estás seguro de rechazar el gasto ${gasto.codigo_gasto}?`,
                 icon: 'error',
                 confirmButtonText: 'Sí, Rechazar',
-                endpoint: `/gastos/${gasto.id}/reject-final`,
+                endpoint: `${endpointPrefix}/gastos/${gasto.id}/reject-final`,
                 method: 'post',
                 needsComment: true,
                 commentLabel: 'Motivo del rechazo:'
@@ -207,7 +207,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
 const exportarGastos = async () => {
     exportando.value = true;
     try {
-        const response = await api.post('/exportar-gastos', filtros.value, {
+        const response = await api.post('/v1/gastos/exportar', filtros.value, {
             responseType: 'blob',
         });
 
@@ -244,7 +244,7 @@ const exportarGastos = async () => {
 
 const fetchAreas = async () => {
     try {
-        const response = await api.get('/areas');
+        const response = await api.get('/v1/areas');
         areas.value = response.data.areas;
     } catch (error) {
         console.error("Error al cargar las áreas:", error);
@@ -261,6 +261,10 @@ const irAPagina = (pagina) => {
 const paginaAnterior = () => { if (paginaActual.value > 1) paginaActual.value--; };
 const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) paginaActual.value++; };
 
+const handleFondoRepuesto = () => {
+    console.log("Evento 'fondoRepuesto' recibido. Refrescando la lista de gastos...");
+    fetchGastos(); // Llama al método principal para recargar los datos de la tabla.
+};
 // --- WATCHERS Y LIFECYCLE ---
 watch([() => filtros.value.estado, () => filtros.value.area_id], () => {
     buscando.value = true;

@@ -324,7 +324,7 @@ const iniciarModoEdicion = () => {
 const ejecutarAccion = async () => {
     if (!props.solicitud) return;
 
-    let endpoint = `/solicitudes/${props.solicitud.id}/gestionar-aprobacion`;
+    let endpoint = `/v1/solicitudes/${props.solicitud.id}/gestionar-aprobacion`;
     let payload = {};
     let successMessageFromAPI = ''; // Variable para el mensaje de éxito de la API
     let errorMessage = '';
