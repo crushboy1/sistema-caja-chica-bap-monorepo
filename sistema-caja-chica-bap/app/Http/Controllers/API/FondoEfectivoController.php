@@ -86,22 +86,44 @@ class FondoEfectivoController extends Controller
     }
     public function getProyeccionesPendientes(FondoEfectivo $fondo)
     {
-        // Se valida que el usuario autenticado pertenezca al área del fondo para poder acceder a sus proyecciones.
         $user = Auth::user();
+
+        // 1. VALIDACIÓN DE PERMISOS
+        // Se asegura que el usuario pertenezca al área del fondo o tenga un rol administrativo.
         if ($user->area_id !== $fondo->id_area && !$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para acceder a las proyecciones de este fondo.'], 403);
         }
 
-        // Se utiliza la relación 'solicitudApertura' para acceder a sus 'detallesGastosProyectados'.
-        // La clave está en el uso de 'whereDoesntHave('gastoDeclarado')'.
-        // Esto filtra los detalles y devuelve SOLO aquellos que NO tienen un gasto asociado en la tabla 'gastos'.
-        $proyeccionesPendientes = $fondo->solicitudApertura->detallesGastosProyectados()
-            ->whereDoesntHave('gastoDeclarado') // La magia ocurre aquí.
-            ->select('id', 'descripcion_gasto', 'monto_estimado') // Se seleccionan los campos necesarios para el frontend.
+        // 2. OBTENER PROYECCIONES CON CÁLCULO DE GASTOS
+        $proyecciones = $fondo->solicitudApertura->detallesGastosProyectados()
+            ->withSum(['gastoDeclarado as gastos_declarados_sum' => function ($query) {
+
+                $query->where('estado', '!=', 'Rechazado');
+            }], 'monto_total')
             ->get();
 
-        // Se retorna la lista de proyecciones pendientes.
-        return response()->json($proyeccionesPendientes);
+        // 3. CALCULAR SALDO RESTANTE Y FILTRAR
+        // Se procesa la colección de proyecciones para calcular el saldo real.
+        $proyeccionesPendientes = $proyecciones->map(function ($proyeccion) {
+            // Se calcula el saldo restante. La suma ahora es correcta porque excluye los rechazados.
+            $gastosSum = $proyeccion->gastos_declarados_sum ?? 0;
+            $saldoRestante = $proyeccion->monto_estimado - $gastosSum;
+
+            // Se añade el saldo calculado como un nuevo atributo al objeto.
+            $proyeccion->saldo_restante = $saldoRestante;
+
+            return $proyeccion;
+        })
+            // Finalmente, se filtran las proyecciones para devolver solo aquellas
+            // cuyo saldo restante sea mayor a cero (con un pequeño margen para errores de punto flotante).
+            ->filter(function ($proyeccion) {
+                // Se devuelven solo las proyecciones que aún tienen saldo por declarar.
+                return $proyeccion->saldo_restante > 0.005;
+            });
+
+        // 4. DEVOLVER RESULTADO
+        // Se retornan solo los campos necesarios para el frontend.
+        return response()->json($proyeccionesPendientes->values()->all());
     }
 
     /**
@@ -399,7 +421,7 @@ class FondoEfectivoController extends Controller
 
         $montoAReponer = $fondo->gastos()
             ->where('estado', 'Contabilizado')
-            ->sum('monto_final_pen');
+            ->sum('monto_total');
 
         return response()->json([
             'monto_asignado' => $fondo->monto_aprobado,
@@ -417,53 +439,71 @@ class FondoEfectivoController extends Controller
      */
     public function reponer(Request $request, FondoEfectivo $fondo)
     {
+        // 1. VALIDACIÓN DE PERMISOS
         $user = Auth::user();
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para ejecutar la reposición de este fondo.'], 403);
         }
 
-        // 1. VALIDACIÓN DE ESTADO DEL FONDO: No se puede reponer un fondo que ya está cerrado.
+        // 2. VALIDACIÓN DE ESTADO DEL FONDO: No se puede reponer un fondo que ya está cerrado.
         if ($fondo->estado !== 'Activo') {
             return response()->json(['message' => 'Solo se pueden reponer fondos que se encuentren en estado "Activo".'], 409);
         }
 
-        // 2. VALIDACIÓN CRÍTICA DE GASTOS PENDIENTES: No se puede reponer si hay gastos en CUALQUIER estado intermedio.
-        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable'];
+        // 3. VALIDACIÓN CRÍTICA DE GASTOS PENDIENTES: No se puede reponer si hay gastos en CUALQUIER estado intermedio.
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado',];
         $gastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
         if ($gastosPendientes > 0) {
             return response()->json([
                 'message' => "El fondo no puede ser repuesto. Tiene {$gastosPendientes} gasto(s) en proceso de aprobación o validación."
             ], 409);
         }
+        // Se utiliza la misma lógica de getProyeccionesPendientes para verificar si hay saldos restantes.
+        $proyeccionesConSaldo = $fondo->solicitudApertura->detallesGastosProyectados()
+            ->withSum(['gastoDeclarado as gastos_declarados_sum' => function ($query) {
+                $query->where('estado', '!=', 'Rechazado');
+            }], 'monto_total')
+            ->get()
+            ->filter(function ($proyeccion) {
+                $gastosSum = $proyeccion->gastos_declarados_sum ?? 0;
+                $saldoRestante = $proyeccion->monto_estimado - $gastosSum;
+                return $saldoRestante > 0.005;
+            });
 
-        // 3. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
-        $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_final_pen');
+        if ($proyeccionesConSaldo->isNotEmpty()) {
+            return response()->json([
+                'message' => "El fondo no puede ser repuesto porque aún tiene {$proyeccionesConSaldo->count()} concepto(s) proyectado(s) pendientes de liquidar."
+            ], 409); // 409 Conflict
+        }
+
+        // 4. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
+        $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
         if ($montoAReponer <= 0) {
             return response()->json(['message' => 'No hay monto para reponer. Asegúrate de que los gastos hayan sido marcados como "Contabilizado".'], 409);
         }
 
-        // 4. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
+        // 5. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
         if ($fondo->monto_disponible < 0) {
             Log::warning("Intento de reposición sobre fondo con saldo negativo.", ['fondo_id' => $fondo->id_fondo, 'saldo' => $fondo->monto_disponible]);
             return response()->json([
                 'message' => "Error de Integridad de Datos: El saldo disponible del fondo es negativo. Por favor, contacte a soporte."
             ], 500);
         }
-
+        // 6. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
         return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request) {
             $saldoAnterior = $fondo->monto_disponible;
             //tambien puede ir logica para generar acta de entrega pdf.
-            // 5. RESTAURACIÓN DEL SALDO
+            // RESTAURACIÓN DEL SALDO
             $fondo->increment('monto_disponible', $montoAReponer);
 
-            // 6. REGISTRO EN HISTORIAL PARA TRAZABILIDAD
+            // REGISTRO EN HISTORIAL PARA TRAZABILIDAD
             HistorialReposicion::create([
                 'id_fondo_efectivo' => $fondo->id_fondo,
                 'id_usuario_accion' => $user->id,
                 'monto_repuesto' => $montoAReponer,
                 'saldo_anterior' => $saldoAnterior,
                 'saldo_nuevo' => $fondo->monto_disponible,
-                'comentario' => $request->input('comentario'),
+                'comentario' => $request->input('comentario', 'Reposición automática del sistema.'),
                 'fecha_reposicion' => now(),
             ]);
 
@@ -474,7 +514,7 @@ class FondoEfectivoController extends Controller
 
             return response()->json([
                 'message' => "El fondo {$fondo->codigo_fondo} ha sido repuesto exitosamente.",
-                'fondo' => $fondo
+                'fondo' => $fondo->fresh()
             ]);
         });
     }
@@ -501,7 +541,7 @@ class FondoEfectivoController extends Controller
             return response()->json([
                 'message' => 'Ocurrió un error al eliminar el fondo de efectivo.',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(), 
+                'trace' => $e->getTraceAsString(),
             ], 500);
         }
     }

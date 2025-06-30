@@ -98,7 +98,7 @@ const inicializarFormulario = async () => {
       usuarioActual.value = solicitudData.solicitante;
     } else {
       // MODO CREACIÓN
-      const response = await api.get('/user');
+      const response = await api.get('/auth/user');
       usuarioActual.value = response.data;
       resetearFormulario();
     }
@@ -175,15 +175,15 @@ const manejarEnvio = async () => {
 
   // Lógica para determinar el endpoint y el método HTTP
   const esModoEdicion = !!props.solicitudAEditar;
-  let endpoint = '/solicitudes';
+  let endpoint = '/v1/solicitudes';
   let metodoApi = 'post';
 
   if (esModoEdicion) {
     metodoApi = 'put';
     if (props.modoEdicion === 'pendiente') {
-      endpoint = `/solicitudes/${props.solicitudAEditar.id}/editar-pendiente`;
+      endpoint = `/v1/solicitudes/${props.solicitudAEditar.id}/editar-pendiente`;
     } else if (props.modoEdicion === 'observada') {
-      endpoint = `/solicitudes/${props.solicitudAEditar.id}/editar-observada`;
+      endpoint = `/v1/solicitudes/${props.solicitudAEditar.id}/editar-observada`;
     }
   }
   // --- Construir el contenido HTML para el modal de resumen ---

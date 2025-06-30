@@ -75,7 +75,7 @@ const aprobarGasto = async () => {
             }
 
             // Llamada al endpoint con el payload
-            await api.post(`/gastos/${props.gasto.id}/approve`, payload);
+            await api.post(`/v1/gastos/${props.gasto.id}/approve`, payload);
 
             await Swal.fire('¡Éxito!', 'Gasto aprobado correctamente.', 'success');
             emit('accionRealizada');
@@ -111,7 +111,7 @@ const confirmarRechazo = async () => {
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            await api.post(`/gastos/${props.gasto.id}/reject-by-jefe`, {
+            await api.post(`/v1/gastos/${props.gasto.id}/reject-by-jefe`, {
                 comentario: motivoRechazo.value
             });
 

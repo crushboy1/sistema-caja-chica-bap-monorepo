@@ -45,9 +45,10 @@ const confirmarAccionConMotivo = async () => {
     let endpoint = '';
     let swalOptions = {};
     let successText = '';
+    const endpointPrefix = '/v1';
 
     if (accionActual.value === 'observar') {
-        endpoint = `/gastos/${props.gasto.id}/observe`;
+        endpoint = `${endpointPrefix}/gastos/${props.gasto.id}/observe`;
         successText = 'El gasto ha sido observado.';
         swalOptions = {
             title: '¿Confirmar Observación?',
@@ -56,7 +57,7 @@ const confirmarAccionConMotivo = async () => {
             confirmButtonColor: '#f8bb86',
         };
     } else if (accionActual.value === 'rechazar') {
-        endpoint = `/gastos/${props.gasto.id}/reject-final`;
+        endpoint = `${endpointPrefix}/gastos/${props.gasto.id}/reject-final`;
         successText = 'El gasto ha sido rechazado definitivamente.';
         swalOptions = {
             title: '¿Confirmar Rechazo Definitivo?',
@@ -107,7 +108,7 @@ const handleContabilizar = async () => {
     if (result.isConfirmed) {
         isLoading.value = true;
         try {
-            await api.post(`/gastos/${props.gasto.id}/finalize`);
+            await api.post(`/v1/gastos/${props.gasto.id}/finalize`);
             await Swal.fire('¡Éxito!', 'El gasto ha sido validado y contabilizado.', 'success');
             emit('accionRealizada');
         } catch (error) {

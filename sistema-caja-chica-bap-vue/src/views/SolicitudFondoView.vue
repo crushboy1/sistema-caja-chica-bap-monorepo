@@ -387,7 +387,7 @@ const showSuccessNotification = (message) => {
 // Obtener datos del usuario al montar
 onMounted(async () => {
   try {
-    const response = await api.get('/user')
+    const response = await api.get('/auth/user')
     user.value = response.data;
   } catch (error) {
     console.error('Error al obtener datos del usuario:', error)

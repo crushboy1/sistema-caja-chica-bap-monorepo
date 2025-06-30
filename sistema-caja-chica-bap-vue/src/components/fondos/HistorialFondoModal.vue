@@ -127,7 +127,7 @@ const fetchTimeline = async () => {
 
     try {
         // CAMBIO: Se llama al nuevo endpoint unificado
-        const response = await api.get(`/fondos-efectivo/${props.fondo.id_fondo}/timeline`);
+        const response = await api.get(`/v1/fondos-efectivo/${props.fondo.id_fondo}/timeline`);
         timeline.value = response.data.timeline;
     } catch (err) {
         console.error("Error al cargar la línea de tiempo del fondo:", err);

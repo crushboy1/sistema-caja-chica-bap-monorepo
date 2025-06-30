@@ -337,7 +337,7 @@ const fondosMostrados = computed(() => {
 const obtenerUsuarioAutenticado = async () => {
   cargandoUsuario.value = true;
   try {
-    const response = await api.get('/user');
+    const response = await api.get('/auth/user');
     usuarioActual.value = response.data;
     console.log('✅ Usuario y Rol asignados correctamente:', usuarioActual.value?.name, rolUsuario.value);
   } catch (error) {
@@ -381,7 +381,7 @@ const obtenerFondos = async () => {
 
     console.log('📤 Parámetros de búsqueda de fondos:', params);
 
-    const response = await api.get('/fondos-efectivo', { params });
+    const response = await api.get('/v1/fondos-efectivo', { params });
 
     if (response.data && Array.isArray(response.data.fondos)) {
       fondos.value = response.data.fondos.map(fondo => ({
@@ -421,7 +421,7 @@ const obtenerFondos = async () => {
 // Función para obtener las áreas
 const obtenerAreas = async () => {
   try {
-    const response = await api.get('/areas');
+    const response = await api.get('/v1/areas');
     areasDisponibles.value = response.data.areas;
   } catch (error) {
     console.error('Error al obtener áreas:', error);
