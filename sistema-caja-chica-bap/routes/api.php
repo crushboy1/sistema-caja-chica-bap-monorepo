@@ -15,9 +15,13 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('auth')->group(base_path('routes/api/auth.php'));
-Route::prefix('v1')->group(function () { // Opcional: Versiona tu API
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () { 
     require base_path('routes/api/solicitudes.php');
     require base_path('routes/api/fondos.php');
     require base_path('routes/api/gastos.php');
     require base_path('routes/api/recursos.php');
+    require base_path('routes/api/cuentas_contables.php');
+    require base_path('routes/api/proyectos.php');
+    require base_path('routes/api/gastos_proyectados.php');
+
 });

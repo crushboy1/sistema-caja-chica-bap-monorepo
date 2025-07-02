@@ -18,17 +18,18 @@ return new class extends Migration
             $table->string('codigo_solicitud', 50)->unique()->nullable();
 
             // Información del solicitante y área
-            $table->foreignId('id_solicitante') 
+            $table->foreignId('id_solicitante')
                 ->nullable() // Permite que sea NULL si el usuario es eliminado
                 ->constrained('users')
                 ->onDelete('set null'); // Si el usuario se elimina, el campo se pone en NULL
 
-            $table->foreignId('id_area') // ID del área a la que pertenece la solicitud
-                ->constrained('areas')
-                ->onDelete('cascade');
-
+            $table->unsignedBigInteger('id_area');
+            $table->foreign('id_area')->references('id')->on('areas')->onDelete('cascade');
             // Detalles de la solicitud
             $table->enum('tipo_solicitud', ['Apertura', 'Incremento', 'Decremento', 'Cierre']); // Tipos de solicitud
+            $table->enum('tipo_fondo_solicitado', ['Regular', 'Proyecto', 'Excepcional'])->default('Regular'); // Define el tipo de fondo que se está solicitando.
+            // Se define la relación con el proyecto.
+            $table->foreignId('id_proyecto')->nullable()->constrained('proyectos', 'id_proyecto');
             $table->text('motivo_detalle'); // Motivo general de la solicitud o detalle de la modificación/cierre
             $table->decimal('monto_solicitado', 10, 2); // Monto solicitado (para Apertura) o monto de la modificación (para Incremento/Decremento)
             $table->enum('prioridad', ['Baja', 'Media', 'Alta', 'Urgente'])->default('Media'); // Prioridad de la solicitud

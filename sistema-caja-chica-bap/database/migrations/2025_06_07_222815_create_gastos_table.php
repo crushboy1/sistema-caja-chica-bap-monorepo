@@ -36,7 +36,7 @@ return new class extends Migration
             $table->decimal('monto_final_pen', 10, 2)->nullable();
 
             // --- Descripción y Clasificación ---
-            $table->text('glosa');
+            $table->foreignId('id_gasto_proyectado')->constrained('gastos_proyectados', 'id_gasto_proyectado');
             $table->boolean('pertenece_proyecto')->default(false);
             $table->text('comentario')->nullable();
 

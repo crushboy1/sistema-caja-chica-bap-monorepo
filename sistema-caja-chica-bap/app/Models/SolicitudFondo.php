@@ -5,20 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany; 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Carbon\Carbon;
+use App\Services\CodeGeneratorService;
+use Illuminate\Support\Facades\DB;
 
 class SolicitudFondo extends Model
 {
     use HasFactory;
     protected $table = 'solicitudes_fondos';
-    // Campos que pueden ser asignados masivamente
+    
     protected $fillable = [
         'codigo_solicitud',
         'id_solicitante',
         'id_area',
         'tipo_solicitud',
+        'tipo_fondo_solicitado',
+        'id_proyecto',
         'motivo_detalle',
         'monto_solicitado',
         'prioridad',
@@ -33,97 +37,39 @@ class SolicitudFondo extends Model
         'historial_cambios',
     ];
 
-    // Casteo de atributos a tipos nativos de PHP
     protected $casts = [
         'monto_solicitado' => 'decimal:2',
         'historial_cambios' => 'array',
     ];
+
     protected static function booted(): void
     {
         static::creating(function (SolicitudFondo $solicitud) {
             if (is_null($solicitud->codigo_solicitud)) {
-                if (empty($solicitud->id_area)) {
-                    // Lanza una excepción si el área no está definida, para prevenir errores.
-                    throw new \InvalidArgumentException('El ID del área es requerido para generar el código de solicitud.');
-                }
-                $solicitud->codigo_solicitud = self::generarCodigoUnico($solicitud->id_area);
+                $solicitud->loadMissing('area', 'solicitudOriginal.fondoEfectivo');
+                $generator = new CodeGeneratorService();
+                $solicitud->codigo_solicitud = $generator->generateForSolicitud($solicitud);
             }
         });
     }
 
-    private static function generarCodigoUnico(int $idArea): string
-    {
-        // Usamos findOrFail para detener la ejecución si el área no existe.
-        $area = \App\Models\Area::findOrFail($idArea);
-        $acronym = $area->acronym ?: 'XXX';
+    /*
+    |--------------------------------------------------------------------------
+    | Relaciones de Eloquent
+    |--------------------------------------------------------------------------
+    */
 
-        $now = Carbon::now();
-        $month = $now->format('m'); // '06'
-        $year = $now->format('Y');  // '2025'
-
-        // Construimos el prefijo con el formato correcto. Ej: 'SOL-GPS062025-'
-        $prefix = "SOL-{$acronym}{$month}{$year}-";
-
-        // Buscamos la última solicitud con el mismo prefijo para obtener el último correlativo.
-        $latestRequest = self::where('codigo_solicitud', 'like', $prefix . '%')
-            ->orderBy('codigo_solicitud', 'desc')
-            ->first();
-
-        $correlative = 1;
-        if ($latestRequest) {
-            // Extraemos el número del último código. Ej: "SOL-GPS062025-00001" -> "00001"
-            $lastCorrelative = (int) substr($latestRequest->codigo_solicitud, strlen($prefix));
-            $correlative = $lastCorrelative + 1;
-        }
-
-        // Formateamos el correlativo a 5 dígitos con ceros a la izquierda.
-        return $prefix . str_pad($correlative, 5, '0', STR_PAD_LEFT);
-    }
     /**
-     * NUEVO MÉTODO DELEGADO: Gestiona la edición de la solicitud y su trazabilidad.
-     *
-     * @param array $validatedData Datos validados del formulario de edición.
-     * @param \App\Models\User $user El usuario que realiza la edición.
-     * @return self
+     * Relación: Una solicitud tiene muchos Gastos Proyectados a través de la tabla pivote.
+     * Esta es la nueva relación que reemplaza a la antigua 'detallesGastosProyectados'.
      */
-    public function handleEdit(array $validatedData, User $user): self
+    public function gastosProyectados(): BelongsToMany
     {
-        return DB::transaction(function () use ($validatedData, $user) {
-            // 1. Actualizar los campos principales de la solicitud.
-            $this->update($validatedData);
-
-            // 2. Sincronizar los detalles de gastos proyectados.
-            $this->detallesGastosProyectados()->delete(); // Se borran los antiguos.
-            foreach ($validatedData['gastos_proyectados'] as $gastoData) {
-                $this->detallesGastosProyectados()->create([
-                    'descripcion_gasto' => $gastoData['descripcion_gasto'],
-                    'monto_estimado' => $gastoData['monto_estimado'],
-                ]);
-            }
-
-            // 3. Incrementar el contador de ediciones.
-            $this->increment('edit_count');
-
-            // 4. Registrar la edición en el historial.
-            $this->registrarEnHistorial(
-                $this->estado, // El estado no cambia
-                'Solicitud editada por ' . $user->name . '. (Edición N°' . $this->edit_count . ')',
-                $user->id
-            );
-
-            return $this;
-        });
+        return $this->belongsToMany(GastoProyectado::class, 'solicitud_gasto_proyectado', 'solicitud_fondo_id', 'gasto_proyectado_id')
+                    ->withPivot('monto_estimado') // Importante para poder acceder al monto estimado guardado en la tabla pivote.
+                    ->withTimestamps();
     }
-    public function registrarEnHistorial(string $nuevoEstado, string $observaciones, int $userId): void
-    {
-        $this->historialEstados()->create([
-            'estado_anterior' => $this->estado, // El estado actual antes del cambio
-            'estado_nuevo' => $nuevoEstado,
-            'observaciones' => $observaciones,
-            'id_usuario_accion' => $userId,
-            'fecha_cambio' => now(),
-        ]);
-    }
+
     /**
      * Relación: Una solicitud pertenece a un solicitante (Usuario).
      */
@@ -137,7 +83,16 @@ class SolicitudFondo extends Model
      */
     public function area(): BelongsTo
     {
-        return $this->belongsTo(Area::class, 'id_area');
+        // Se especifica la clave primaria de la tabla 'areas' para evitar ambigüedades.
+        return $this->belongsTo(Area::class, 'id_area', 'id');
+    }
+    
+    /**
+     * Relación opcional: Una solicitud puede estar asociada a un proyecto.
+     */
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'id_proyecto', 'id_proyecto');
     }
 
     /**
@@ -157,7 +112,7 @@ class SolicitudFondo extends Model
     }
 
     /**
-     * Relación: Una solicitud de modificación (Incremento/Decremento/Cierre) pertenece a una solicitud original (auto-referencia).
+     * Relación: Una solicitud de modificación pertenece a una solicitud original.
      */
     public function solicitudOriginal(): BelongsTo
     {
@@ -165,20 +120,11 @@ class SolicitudFondo extends Model
     }
 
     /**
-     * Relación: Una solicitud de apertura puede tener un fondo efectivo asociado (HasOne).
-     * Esto solo aplica a solicitudes de tipo 'Apertura' que han sido 'Aprobadas'.
+     * Relación: Una solicitud de apertura puede tener un fondo efectivo asociado.
      */
     public function fondoEfectivo(): HasOne
     {
         return $this->hasOne(FondoEfectivo::class, 'id_solicitud_apertura');
-    }
-
-    /**
-     * Relación: Una solicitud tiene muchos detalles de gastos proyectados.
-     */
-    public function detallesGastosProyectados(): HasMany
-    {
-        return $this->hasMany(DetalleGastoProyectado::class, 'id_solicitud_fondo');
     }
 
     /**
@@ -187,5 +133,33 @@ class SolicitudFondo extends Model
     public function historialEstados(): HasMany
     {
         return $this->hasMany(HistorialEstadoSolicitud::class, 'id_solicitud_fondo');
+    }
+
+    /*
+    | Métodos Obsoletos (Comentados para Referencia)
+    */
+
+    /**
+     * COMENTARIO: El método 'handleEdit' ha quedado obsoleto con la nueva lógica.
+     * La sincronización de la tabla pivote (usando el método `sync()` de Eloquent)
+     * se manejará de forma más limpia y directa en el `SolicitudFondoController`.
+     *
+     * public function handleEdit(array $validatedData, User $user): self
+     * { ... }
+     */
+
+    // Métodos de Ayuda (Funcionales)
+    /**
+     * Registra una nueva entrada en el historial de estados de la solicitud.
+     */
+    public function registrarEnHistorial(string $nuevoEstado, string $observaciones, int $userId): void
+    {
+        $this->historialEstados()->create([
+            'estado_anterior' => $this->estado,
+            'estado_nuevo' => $nuevoEstado,
+            'observaciones' => $observaciones,
+            'id_usuario_accion' => $userId,
+            'fecha_cambio' => now(),
+        ]);
     }
 }
