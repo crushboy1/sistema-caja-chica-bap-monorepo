@@ -212,13 +212,14 @@
         leave-active-class="transition-all duration-300 ease-in"
         leave-from-class="opacity-100 transform translate-y-0 scale-100"
         leave-to-class="opacity-0 transform -translate-y-4 scale-95">
-        <div v-if="activeSection" class="mt-12">
+        <div v-if="activeSection && !isLoading" class="mt-12">
           <div class="glass rounded-3xl p-8 shadow-strong backdrop-blur-xl border border-white/20">
-            <AperturaFondos v-if="activeSection === 'apertura'" @solicitudEnviada="handleSolicitudEnviada"
+            <AperturaFondos v-if="activeSection === 'apertura'" :usuario-actual="user" :proyectos="proyectos"
+              :gastos-proyectados-catalogo="gastosProyectadosCatalogo" @solicitudEnviada="handleSolicitudEnviada"
               class="animate-fade-in-up" />
-            <ModificacionFondos v-if="activeSection === 'modificacion'" @close="handleClose"
+            <ModificacionFondos v-if="activeSection === 'modificacion'" :usuario-actual="user" @close="handleClose"
               class="animate-fade-in-up" />
-            <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" @close="handleClose"
+            <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" :usuario-actual="user" @close="handleClose"
               class="animate-fade-in-up" />
           </div>
         </div>
@@ -266,11 +267,12 @@ import ModificacionFondos from '@/components/solicitudes/ModificacionFondos.vue'
 import SeguimientoSolicitudes from '@/components/solicitudes/SeguimientoSolicitudes.vue'
 
 // Estado reactivo
-const activeSection = ref(null)
-const user = ref(null)
-const isLoading = ref(false)
-const cardAnimationState = ref({})
-
+const activeSection = ref(null);
+const user = ref(null);
+const isLoading = ref(true);
+const cardAnimationState = ref({});
+const proyectos = ref([]);
+const gastosProyectadosCatalogo = ref([]);
 // Roles definidos para mayor claridad y evitar errores de escritura
 const ROLES = {
   JEFE_AREA: 'jefe_area',
@@ -282,17 +284,15 @@ const ROLES = {
 
 // Propiedades computadas para la visibilidad de las tarjetas
 const showAperturaCard = computed(() => {
-  return user.value && (user.value.role.name === ROLES.JEFE_AREA || user.value.role.name === ROLES.SUPER_ADMIN);
+  return user.value?.role?.name === ROLES.JEFE_AREA || user.value?.role?.name === ROLES.SUPER_ADMIN;
 });
 
 const showModificacionCard = computed(() => {
-  // Ahora visible también para Jefe de Administración
-  return user.value && (user.value.role.name === ROLES.JEFE_AREA || user.value.role.name === ROLES.JEFE_ADM || user.value.role.name === ROLES.SUPER_ADMIN);
+  return user.value?.role?.name === ROLES.JEFE_AREA || user.value?.role?.name === ROLES.JEFE_ADM || user.value?.role?.name === ROLES.SUPER_ADMIN;
 });
 
 const showSeguimientoCard = computed(() => {
-  // Seguimiento es visible para todos los roles que acceden al módulo
-  return user.value;
+  return !!user.value;
 });
 
 
@@ -386,13 +386,31 @@ const showSuccessNotification = (message) => {
 
 // Obtener datos del usuario al montar
 onMounted(async () => {
+  isLoading.value = true;
   try {
-    const response = await api.get('/auth/user')
-    user.value = response.data;
+    // Se ejecutan todas las llamadas a la API necesarias en paralelo para máxima eficiencia.
+    // Esto asegura que solo se haga una petición por cada recurso cuando la vista se carga.
+    const [userResponse, proyectosResponse, gastosProyectadosResponse] = await Promise.all([
+      api.get('/auth/user'),
+      api.get('/v1/proyectos'),
+      api.get('/v1/gastos-proyectados')
+    ]);
+
+    // Se asignan los datos obtenidos a las variables reactivas del padre.
+    user.value = userResponse.data;
+    proyectos.value = proyectosResponse.data.proyectos;
+    gastosProyectadosCatalogo.value = gastosProyectadosResponse.data.gastos_proyectados;
+
   } catch (error) {
-    console.error('Error al obtener datos del usuario:', error)
+    console.error('Error al cargar datos iniciales para SolicitudFondoView:', error);
+    // Aquí se podría mostrar un error general al usuario.
+  } finally {
+    isLoading.value = false;
   }
-})
+
+  // Se mantiene tu listener para la tecla Escape.
+  document.addEventListener('keydown', handleKeyNavigation);
+});
 
 // Manejo de teclado para accesibilidad
 const handleKeyNavigation = (event) => {
@@ -401,10 +419,6 @@ const handleKeyNavigation = (event) => {
   }
 }
 
-// Agregar listener para ESC
-onMounted(() => {
-  document.addEventListener('keydown', handleKeyNavigation)
-})
 
 // Limpiar listener
 onUnmounted(() => {

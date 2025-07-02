@@ -1,7 +1,8 @@
 <template>
     <!-- Contenedor principal del formulario con estilos de padding y fondo. -->
     <div class="p-6 bg-gray-50 min-h-screen">
-        <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center animate-fade-in-down">Registrar Declaración de Gastos</h2>
+        <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center animate-fade-in-down">Registrar Declaración de
+            Gastos</h2>
 
         <!-- Estado de Carga Inicial -->
         <div v-if="cargandoInicial" class="text-center text-gray-500 py-10">
@@ -27,7 +28,8 @@
                     1. Selección del Fondo de Caja Chica
                 </h3>
                 <div>
-                    <label for="fondo" class="form-label">Fondo de Caja Chica <span class="text-rojo-bap">*</span></label>
+                    <label for="fondo" class="form-label">Fondo de Caja Chica <span
+                            class="text-rojo-bap">*</span></label>
                     <select id="fondo" v-model="fondoSeleccionadoId"
                         class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                         required>
@@ -37,8 +39,10 @@
                         </option>
                     </select>
                     <transition name="fade-in">
-                        <p v-if="fondoSeleccionadoId" class="text-sm text-gray-600 mt-2 p-2 rounded-lg border-l-4 border-verde-bap bg-verde-bap-extralight">
-                            💰 Saldo Disponible Actual: <strong class="text-verde-bap-dark">{{ currencyFormatter.format(fondoSeleccionado?.monto_disponible || 0) }}</strong>
+                        <p v-if="fondoSeleccionadoId"
+                            class="text-sm text-gray-600 mt-2 p-2 rounded-lg border-l-4 border-verde-bap bg-verde-bap-extralight">
+                            💰 Saldo Disponible Actual: <strong class="text-verde-bap-dark">{{
+                                currencyFormatter.format(fondoSeleccionado?.monto_disponible || 0) }}</strong>
                         </p>
                     </transition>
                 </div>
@@ -73,7 +77,8 @@
                                 <div class="flex items-center space-x-4">
                                     <div class="flex-shrink-0">
                                         <span
-                                            class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-verde-bap text-white text-sm font-bold">{{ index + 1 }}
+                                            class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-verde-bap text-white text-sm font-bold">{{
+                                                index + 1 }}
                                         </span>
                                     </div>
                                     <div class="flex-1">
@@ -310,33 +315,43 @@
                                                 Clasificación Contable
                                             </h4>
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <!-- Glosa para el asiento -->
+                                                <div>
+                                                    <label :for="'glosa_' + index"
+                                                        class="block text-sm font-medium text-gray-700 mb-2">
+                                                        Glosa / Descripción del Gasto <span
+                                                            class="text-rojo-bap">*</span>
+                                                    </label>
+                                                    <!-- Se convierte en un select -->
+                                                    <select :id="'glosa_' + index" v-model="gasto.id_glosa"
+                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                        required>
+                                                        <option disabled value="">Selecciona una glosa</option>
+                                                        <option v-for="glosa in glosas" :key="glosa.id_glosa"
+                                                            :value="glosa.id_glosa">
+                                                            {{ glosa.descripcion }}
+                                                        </option>
+                                                    </select>
+                                                </div>
+
                                                 <!-- Cuenta Contable -->
                                                 <div>
                                                     <label :for="'id_cuenta_contable_' + index"
                                                         class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Cuenta Contable <span class="text-rojo-bap">*</span>
+                                                        Cuenta Contable
                                                     </label>
+                                                    <!-- Se hace no editable (disabled) -->
                                                     <select :id="'id_cuenta_contable_' + index"
                                                         v-model="gasto.id_cuenta_contable"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                        required>
-                                                        <option disabled value="">Selecciona una cuenta</option>
+                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                                                        disabled>
+                                                        <option value="">Se asigna automáticamente</option>
+                                                        <!-- Se sigue mostrando la lista para que el v-model funcione -->
                                                         <option v-for="cuenta in cuentasContables" :key="cuenta.id"
                                                             :value="cuenta.id">
                                                             {{ cuenta.codigo_cuenta }} - {{ cuenta.descripcion }}
                                                         </option>
                                                     </select>
-                                                </div>
-
-                                                <!-- Glosa para el Asiento -->
-                                                <div>
-                                                    <label :for="'glosa_' + index"
-                                                        class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Glosa para el Asiento
-                                                    </label>
-                                                    <input type="text" :id="'glosa_' + index" v-model="gasto.glosa"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 transition-colors duration-200"
-                                                        placeholder="Se asigna automáticamente" readonly />
                                                 </div>
                                             </div>
                                         </div>
@@ -591,6 +606,7 @@ const fondosActivos = ref([]);
 const fondoSeleccionadoId = ref(''); // ID del fondo que el usuario selecciona
 const proyeccionesPendientes = ref([]); // Lista de proyecciones para el fondo seleccionado
 const cuentasContables = ref([]);
+const glosas = ref([]);
 const cargandoInicial = ref(true);
 const cargandoProyecciones = ref(false);
 const enviando = ref(false);
@@ -602,7 +618,8 @@ onMounted(async () => {
     await Promise.all([
         obtenerUsuarioLogueado(),
         obtenerFondosActivos(),
-        obtenerCuentasContables()
+        obtenerCuentasContables(),
+        obtenerGlosas()
     ]);
     cargandoInicial.value = false;
 });
@@ -623,8 +640,8 @@ const obtenerFondosActivos = async () => {
         fondosActivos.value = response.data;
         // Si solo hay un fondo, se pre-selecciona automáticamente.
         //if (fondosActivos.value.length === 1) {
-          //  fondoSeleccionadoId.value = fondosActivos.value[0].id_fondo;
-       // }
+        //  fondoSeleccionadoId.value = fondosActivos.value[0].id_fondo;
+        // }
     } catch (error) {
         console.error("Error al obtener fondos activos:", error);
         Swal.fire('Error', 'No se pudieron cargar tus fondos activos.', 'error');
@@ -637,6 +654,15 @@ const obtenerCuentasContables = async () => {
     } catch (error) {
         console.error("Error al obtener cuentas contables:", error);
         Swal.fire('Error', 'No se pudieron cargar las cuentas contables.', 'error');
+    }
+};
+const obtenerGlosas = async () => {
+    try {
+        const response = await api.get('/v1/glosas');
+        glosas.value = response.data.glosas;
+    } catch (error) {
+        console.error("Error al obtener glosas:", error);
+        Swal.fire('Error', 'No se pudieron cargar las glosas disponibles.', 'error');
     }
 };
 // --- COMPUTED PROPERTIES ---
@@ -723,11 +749,11 @@ watch(fondoSeleccionadoId, async (newFondoId) => {
 // Observa cambios en los gastos para autocompletar campos
 watch(gastosADeclarar, (nuevosGastos) => {
     nuevosGastos.forEach(gasto => {
-        // Autocompletar glosa basada en cuenta contable
-        if (gasto.id_cuenta_contable) {
-            const cuenta = cuentasContables.value.find(c => c.id === gasto.id_cuenta_contable);
-            if (cuenta && gasto.glosa !== cuenta.descripcion) {
-                gasto.glosa = cuenta.descripcion;
+        // Autocompletar Cuenta Contable basada en la Glosa seleccionada
+        if (gasto.id_glosa) {
+            const glosaSeleccionada = glosas.value.find(g => g.id_glosa === gasto.id_glosa);
+            if (glosaSeleccionada && glosaSeleccionada.id_cuenta_contable) {
+                gasto.id_cuenta_contable = glosaSeleccionada.id_cuenta_contable;
             }
         }
     });
@@ -748,7 +774,7 @@ const agregarGasto = async () => {
         correlativo_documento: '',
         monto_total: null,
         id_cuenta_contable: '',
-        glosa: '',
+        id_glosa: '',
         responsable_gasto: usuarioActual.value?.fullName || '',
         pertenece_proyecto: false,
         comentario: '',

@@ -73,7 +73,7 @@ class User extends Authenticatable // Implementa MustVerifyEmail si usas verific
      */
     public function role(): BelongsTo
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsTo(\App\Models\Role::class);
     }
 
     /**
@@ -81,7 +81,7 @@ class User extends Authenticatable // Implementa MustVerifyEmail si usas verific
      */
     public function tipoDocumentoIdentidad(): BelongsTo
     {
-        return $this->belongsTo(TipoDocumentoIdentidad::class);
+        return $this->belongsTo(\App\Models\TipoDocumentoIdentidad::class);
     }
 
     /**
@@ -89,7 +89,7 @@ class User extends Authenticatable // Implementa MustVerifyEmail si usas verific
      */
     public function area(): BelongsTo
     {
-        return $this->belongsTo(Area::class);
+        return $this->belongsTo(\App\Models\Area::class);
     }
 
     /**

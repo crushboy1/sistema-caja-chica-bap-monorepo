@@ -13,9 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // Middleware de Sanctum para asegurar que las solicitudes de frontend sean stateful
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        $middleware->statefulApi();
         
         // Laravel 12 incluye CORS automáticamente
         // Solo asegúrate de que el archivo config/cors.php esté configurado correctamente

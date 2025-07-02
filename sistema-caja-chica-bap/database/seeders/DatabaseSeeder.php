@@ -33,7 +33,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AreaSeeder::class,                     // Crea las áreas de la empresa.
             TipoDocumentoIdentidadSeeder::class,   // Crea los tipos de documento (DNI, etc.).
-            CuentaContableSeeder::class,           // Crea el catálogo inicial de cuentas contables.
+            CuentaContableSeeder::class,
+            ProyectoSeeder::class,           // Crea el catálogo inicial de cuentas contables.
         ]);
 
         // =========================================================================
@@ -41,7 +42,10 @@ class DatabaseSeeder extends Seeder
         // =========================================================================
         // Ahora que existen los roles, áreas y tipos de documento, podemos crear los usuarios.
         $this->call([
+            GastoProyectadoSeeder::class,
             UserSeeder::class,
+            SolicitudFondoSeeder::class,
+            SolicitudGastoProyectadoSeeder::class,
         ]);
 
         // =========================================================================
@@ -51,7 +55,6 @@ class DatabaseSeeder extends Seeder
         // Dependen de que todos los seeders anteriores se hayan ejecutado.
         $this->call([
             SolicitudFondoSeeder::class,           // Crea solicitudes de fondo de ejemplo.
-            DetalleGastoProyectadoSeeder::class,   // Añade detalles a esas solicitudes.
             HistorialEstadoSolicitudSeeder::class, // Genera el historial para las solicitudes.
             FondoEfectivoSeeder::class,            // Crea fondos de efectivo basados en las solicitudes aprobadas.
             // NOTA: No tenemos un GastoSeeder por ahora, pero si lo tuviéramos, iría aquí.

@@ -19,7 +19,9 @@ return new class extends Migration
             $table->enum('estado', ['Activo', 'Cerrado'])->default('Activo'); // Estado del fondo (no de la solicitud)
             $table->date('fecha_cierre')->nullable(); // Fecha de cierre del fondo, si aplica
             $table->text('motivo_cierre')->nullable(); // Motivo del cierre del fondo, si aplica
-
+            $table->enum('tipo_fondo', ['Regular', 'Proyecto', 'Excepcional'])->default('Regular');
+            $table->decimal('monto_disponible', 10, 2)->default(0.00);
+            
             $table->foreignId('id_solicitud_apertura') // FK: Referencia a la solicitud de Apertura que originó este fondo
                   ->constrained('solicitudes_fondos')
                   ->onDelete('cascade'); // Si la solicitud de apertura se elimina, el fondo también
@@ -31,6 +33,9 @@ return new class extends Migration
             $table->foreignId('id_area') // FK: Área a la que pertenece este fondo
                   ->constrained('areas')
                   ->onDelete('cascade');
+            
+            //Relación opcional con un proyecto.
+            $table->foreignId('id_proyecto')->nullable()->constrained('proyectos', 'id_proyecto');
 
             $table->timestamps(); // created_at y updated_at
         });

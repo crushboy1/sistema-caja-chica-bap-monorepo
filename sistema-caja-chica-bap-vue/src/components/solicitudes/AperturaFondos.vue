@@ -4,18 +4,27 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { isEqual, cloneDeep } from 'lodash-es';
 const props = defineProps({
-  /**
-   * Prop opcional. Si se proporciona, el componente entra en modo "Edición".
-   * Si es null, el componente está en modo "Creación".
-   */
+  // Objeto con los datos del usuario autenticado.
+  usuarioActual: {
+    type: Object,
+    required: true
+  },
+  // Array con la lista de proyectos disponibles.
+  proyectos: {
+    type: Array,
+    required: true
+  },
+  // Array con el catálogo de gastos proyectados.
+  gastosProyectadosCatalogo: {
+    type: Array,
+    required: true
+  },
+  // Prop opcional para el modo de edición.
   solicitudAEditar: {
     type: Object,
     default: null
   },
-  /**
-   * Define el contexto de la edición para llamar al endpoint correcto.
-   * Puede ser 'pendiente' o 'observada'.
-   */
+  // Define el contexto de la edición para llamar al endpoint correcto.
   modoEdicion: {
     type: String,
     default: 'crear' // 'crear', 'pendiente', 'observada'
@@ -25,10 +34,12 @@ const props = defineProps({
 const emit = defineEmits(['solicitudEnviada', 'solicitudActualizada', 'cancelar']);
 
 // --- Variables reactivas para los datos del formulario (en español) ---
-const usuarioActual = ref(null);
+
 const cargando = ref(true);
 const formData = ref({
   tipo_solicitud: 'Apertura',
+  tipo_fondo_solicitado: 'Regular',
+  id_proyecto: null,
   motivo_detalle: '',
   monto_solicitado: 0,
   prioridad: 'Media',
@@ -79,32 +90,31 @@ const totalGastosProyectados = computed(() => {
 });
 
 // Función para obtener los datos del usuario autenticado y pre-llenar campos
-const inicializarFormulario = async () => {
+const inicializarFormulario = () => {
   cargando.value = true;
   try {
     if (props.solicitudAEditar) {
-      // MODO EDICIÓN
+      // MODO EDICIÓN: El formulario se llena con los datos de la prop 'solicitudAEditar'.
       const solicitudData = JSON.parse(JSON.stringify(props.solicitudAEditar));
       formData.value = {
         ...solicitudData,
-        // Si la solicitud a editar tiene gastos, los mapeamos. Si no, el array queda vacío.
-        gastos_proyectados: solicitudData.detalles_gastos_proyectados.map(g => ({
-          descripcion_gasto: g.descripcion_gasto,
-          monto_estimado: g.monto_estimado
+        tipo_fondo_solicitado: solicitudData.tipo_fondo_solicitado || 'Regular',
+        id_proyecto: solicitudData.id_proyecto || null,
+        // Se adapta al nuevo formato de la tabla pivote que viene del backend.
+        gastos_proyectados: solicitudData.gastos_proyectados?.map(g => ({
+          gasto_proyectado_id: g.id_gasto_proyectado,
+          monto_estimado: g.pivot.monto_estimado
         })) || [],
         comentario_descargo: ''
       };
       originalData.value = cloneDeep(formData.value);
-      usuarioActual.value = solicitudData.solicitante;
     } else {
-      // MODO CREACIÓN
-      const response = await api.get('/auth/user');
-      usuarioActual.value = response.data;
+      // MODO CREACIÓN: Simplemente se resetea el formulario. El usuario ya viene en las props.
       resetearFormulario();
     }
   } catch (error) {
-    console.error('Error durante la inicialización:', error);
-    Swal.fire('Error', 'No se pudieron cargar los datos necesarios.', 'error');
+    console.error('Error al inicializar el formulario de apertura:', error);
+    Swal.fire('Error', 'Ocurrió un error al preparar el formulario.', 'error');
   } finally {
     cargando.value = false;
   }
@@ -113,17 +123,19 @@ const inicializarFormulario = async () => {
 const resetearFormulario = () => {
   formData.value = {
     tipo_solicitud: 'Apertura',
+    tipo_fondo_solicitado: 'Regular',
+    id_proyecto: null,
     motivo_detalle: '',
     monto_solicitado: 0,
     prioridad: 'Media',
-    gastos_proyectados: [{ descripcion_gasto: '', monto_estimado: null }],
+    gastos_proyectados: [{ gasto_proyectado_id: null, monto_estimado: null }],
     comentario_descargo: ''
   };
 };
 
 // Función para añadir un nuevo ítem de gasto proyectado (simplificado)
 const agregarGastoProyectado = () => {
-  formData.value.gastos_proyectados.push({ descripcion_gasto: '', monto_estimado: null });
+  formData.value.gastos_proyectados.push({ gasto_proyectado_id: null, monto_estimado: null });
 };
 
 // Función para eliminar un ítem de gasto proyectado
@@ -139,13 +151,12 @@ const manejarEnvio = async () => {
   const data = formData.value;
 
   // --- Validaciones de Frontend ---
-  // CORRECCIÓN: Todas las validaciones ahora acceden directamente a las propiedades de 'data'.
-  if (!data.motivo_detalle || !data.monto_solicitado || data.monto_solicitado <= 0) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Error de Validación',
-      text: 'Por favor, completa el motivo y el monto solicitado (debe ser mayor a 0).'
-    });
+  if (data.gastos_proyectados.some(g => !g.gasto_proyectado_id || g.monto_estimado === null || g.monto_estimado <= 0)) {
+    Swal.fire('Error de Validación', 'Todos los gastos proyectados deben tener un tipo seleccionado y un monto estimado válido (> 0).', 'error');
+    return;
+  }
+  if (data.tipo_fondo_solicitado === 'Proyecto' && !data.id_proyecto) {
+    Swal.fire('Error de Validación', 'Debe seleccionar un proyecto cuando el tipo de fondo es "Proyecto".', 'error');
     return;
   }
   if (!data.prioridad) {
@@ -162,10 +173,6 @@ const manejarEnvio = async () => {
       title: 'Error de Validación',
       text: 'Debes añadir al menos un gasto proyectado.'
     });
-    return;
-  }
-  if (data.gastos_proyectados.some(g => !g.descripcion_gasto || !g.monto_estimado || g.monto_estimado <= 0)) {
-    Swal.fire('Error de Validación', 'Todos los gastos proyectados deben tener una descripción y un monto estimado válido (> 0).', 'error');
     return;
   }
   if (parseFloat(data.monto_solicitado) !== parseFloat(totalGastosProyectados.value)) {
@@ -190,11 +197,14 @@ const manejarEnvio = async () => {
   const gastosHtml = `
         <div class="scroll-modal" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 10px;">
             <ul>
-                ${data.gastos_proyectados.map(g => `<li><strong>${g.descripcion_gasto}:</strong> S/. ${parseFloat(g.monto_estimado || 0).toFixed(2)}</li>`).join('')}
+            ${data.gastos_proyectados.map(g => {
+              const desc = props.gastosProyectadosCatalogo.find(cat => cat.id_gasto_proyectado === g.gasto_proyectado_id)?.descripcion || 'N/A';
+              return `<li><strong>${desc}:</strong> S/. ${parseFloat(g.monto_estimado || 0).toFixed(2)}</li>`;
+            }).join('')}
             </ul>
         </div>
         <p class="mt-2 text-right"><strong>Total: S/. ${totalGastosProyectados.value.toFixed(2)}</strong></p>
-    `;
+      `;
   const resumenHtml = `<div style="text-align: left; padding: 0 1rem;"><p><strong>Motivo:</strong> ${data.motivo_detalle}</p><p><strong>Monto Solicitado:</strong> ${currencyFormatter.format(data.monto_solicitado || 0)}</p><hr style="margin: 1rem 0;" /><Strong>Gastos Proyectados:</Strong>${gastosHtml}</div>`;
 
   // --- Mostrar el modal de confirmación con resumen ---
@@ -210,17 +220,23 @@ const manejarEnvio = async () => {
     cancelButtonText: 'Cancelar'
   });
 
-
   if (isConfirmed) {
-    // Si el usuario confirma, proceder con el envío al backend
-    const payload = {
-      ...data,
-      id_solicitante: usuarioActual.value.id,
-      id_area: usuarioActual.value.area_id,
-      tipo_solicitud: props.solicitudAEditar?.tipo_solicitud || 'Apertura',
-    };
+    // 1. Creamos una copia del objeto 'data' para no modificar el estado original del formulario.
+    const payload = { ...data };
 
+    // 2. Verificamos el tipo de fondo. Si NO es 'Proyecto', eliminamos la propiedad 'id_proyecto' del payload.
+    //    Esto evita que se envíe 'id_proyecto: null' al backend innecesariamente.
+    if (payload.tipo_fondo_solicitado !== 'Proyecto') {
+      delete payload.id_proyecto;
+    }
+
+    // 3. Añadimos el resto de datos necesarios al payload.
+    payload.id_solicitante = props.usuarioActual.id;
+    payload.id_area = props.usuarioActual.area_id;
+    payload.tipo_solicitud = props.solicitudAEditar?.tipo_solicitud || 'Apertura';
+  
     try {
+      // Usamos el 'payload' limpio para la solicitud
       const response = await api[metodoApi](endpoint, payload);
 
       let successTitle = esModoEdicion ? '¡Solicitud Actualizada!' : '¡Solicitud Enviada!';
@@ -240,7 +256,7 @@ const manejarEnvio = async () => {
       if (esModoEdicion) {
         emit('solicitudActualizada', response.data.solicitud);
       } else {
-        resetearFormulario(); // Solo reseteamos si estamos creando.
+        resetearFormulario();
         emit('solicitudEnviada', response.data.solicitud);
       }
 
@@ -253,7 +269,7 @@ const manejarEnvio = async () => {
         if (error.response.data.errors) {
           errorMessage = '<ul style="text-align: left; list-style-position: inside;">';
           for (const key in error.response.data.errors) {
-            errorMessage += `<li li > - ${error.response.data.errors[key].join(', ')}</li > `;
+            errorMessage += `<li> - ${error.response.data.errors[key].join(', ')}</li > `;
           }
           errorMessage += '</ul>';
         } else if (error.response.data.message) {
@@ -276,7 +292,12 @@ const manejarEnvio = async () => {
 watch(totalGastosProyectados, (newTotal) => {
   formData.value.monto_solicitado = newTotal;
 }, { deep: true });
-
+// Cuando el tipo de fondo cambia, si no es 'Proyecto', reseteamos el id_proyecto.
+watch(() => formData.value.tipo_fondo_solicitado, (newType) => {
+  if (newType !== 'Proyecto') {
+    formData.value.id_proyecto = null;
+  }
+});
 // Observa la prop para re-inicializar el formulario cuando cambia (para edición).
 watch(() => props.solicitudAEditar, () => {
   inicializarFormulario();
@@ -319,7 +340,38 @@ onMounted(() => {
               class="mt-1 block w-full p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed" disabled />
           </div>
         </div>
+        <div class="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-800 mb-4">Tipo de Fondo</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="tipo_fondo" class="block text-sm font-medium text-gray-700 mb-1">
+                Seleccione el Tipo de Fondo <span class="text-rojo-bap">*</span>
+              </label>
+              <select id="tipo_fondo" v-model="formData.tipo_fondo_solicitado"
+                class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
+                required>
+                <option value="Regular">Fondo Regular</option>
+                <option value="Proyecto">Fondo de Proyecto</option>
+                <option value="Excepcional">Fondo Excepcional</option>
+              </select>
+            </div>
 
+            <!-- Este campo solo aparece si el tipo de fondo es 'Proyecto' -->
+            <div v-if="formData.tipo_fondo_solicitado === 'Proyecto'">
+              <label for="proyecto" class="block text-sm font-medium text-gray-700 mb-1">
+                Proyecto Asociado <span class="text-rojo-bap">*</span>
+              </label>
+              <select id="proyecto" v-model="formData.id_proyecto"
+                class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
+                :required="formData.tipo_fondo_solicitado === 'Proyecto'">
+                <option :value="null" disabled>Seleccione un proyecto</option>
+                <option v-for="proyecto in proyectos" :key="proyecto.id_proyecto" :value="proyecto.id_proyecto">
+                  {{ proyecto.nombre_proyecto }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div class="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50">
           <h3 class="text-xl font-semibold text-gray-800 mb-4 flex justify-between items-center">
             Gastos Proyectados
@@ -342,12 +394,18 @@ onMounted(() => {
             class="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-100">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div class="md:col-span-2">
-                <label :for="'descripcion_gasto_' + index"
-                  class="block text-sm font-medium text-gray-700 mb-1">Descripción del Tipo de Gasto <span
-                    class="text-rojo-bap">*</span></label>
-                <input type="text" :id="'descripcion_gasto_' + index" v-model="item.descripcion_gasto"
+                <label :for="'gasto_proyectado_' + index" class="block text-sm font-medium text-gray-700 mb-1">
+                  Gasto Proyectado <span class="text-rojo-bap">*</span>
+                </label>
+                <select :id="'gasto_proyectado_' + index" v-model="item.gasto_proyectado_id"
                   class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-                  required />
+                  required>
+                  <option :value="null" disabled>Seleccione un tipo de gasto</option>
+                  <option v-for="gastoCatalogo in gastosProyectadosCatalogo" :key="gastoCatalogo.id_gasto_proyectado"
+                    :value="gastoCatalogo.id_gasto_proyectado">
+                    {{ gastoCatalogo.descripcion }}
+                  </option>
+                </select>
               </div>
               <div class="flex items-center justify-between">
                 <div>
@@ -436,6 +494,7 @@ onMounted(() => {
     </div>
 
   </div>
+  
 </template>
 
 <style>

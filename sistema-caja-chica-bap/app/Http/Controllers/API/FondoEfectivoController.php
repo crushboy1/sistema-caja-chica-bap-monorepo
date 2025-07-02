@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\FondoEfectivo;
 use App\Models\SolicitudFondo;
 use App\Models\HistorialReposicion;
-use App\Models\DetalleGastoProyectado;
+use App\Models\Gasto;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -89,40 +89,47 @@ class FondoEfectivoController extends Controller
         $user = Auth::user();
 
         // 1. VALIDACIÓN DE PERMISOS
-        // Se asegura que el usuario pertenezca al área del fondo o tenga un rol administrativo.
         if ($user->area_id !== $fondo->id_area && !$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
-            return response()->json(['message' => 'No tienes permiso para acceder a las proyecciones de este fondo.'], 403);
+            // Excepción para fondos de proyecto
+            if ($fondo->tipo_fondo !== 'Proyecto' || !$fondo->proyecto->areas->contains($user->area_id)) {
+                return response()->json(['message' => 'No tienes permiso para acceder a las proyecciones de este fondo.'], 403);
+            }
         }
 
         // 2. OBTENER PROYECCIONES CON CÁLCULO DE GASTOS
-        $proyecciones = $fondo->solicitudApertura->detallesGastosProyectados()
-            ->withSum(['gastoDeclarado as gastos_declarados_sum' => function ($query) {
+        $fondo->load('solicitudApertura.gastosProyectados');
 
-                $query->where('estado', '!=', 'Rechazado');
-            }], 'monto_total')
-            ->get();
+        if (!$fondo->solicitudApertura) {
+            return response()->json([]);
+        }
 
-        // 3. CALCULAR SALDO RESTANTE Y FILTRAR
-        // Se procesa la colección de proyecciones para calcular el saldo real.
-        $proyeccionesPendientes = $proyecciones->map(function ($proyeccion) {
-            // Se calcula el saldo restante. La suma ahora es correcta porque excluye los rechazados.
-            $gastosSum = $proyeccion->gastos_declarados_sum ?? 0;
-            $saldoRestante = $proyeccion->monto_estimado - $gastosSum;
+        // 3. OBTENER GASTOS YA DECLARADOS
+        // Suma todos los gastos que ya se han hecho contra este fondo, agrupados por el gasto proyectado.
+        $gastosRealizados = Gasto::where('id_fondo_efectivo', $fondo->id_fondo)
+            ->where('estado', '!=', 'Rechazado')
+            ->select('id_gasto_proyectado', DB::raw('SUM(monto_total) as total_gastado'))
+            ->groupBy('id_gasto_proyectado')
+            ->get()
+            ->keyBy('id_gasto_proyectado');
 
-            // Se añade el saldo calculado como un nuevo atributo al objeto.
-            $proyeccion->saldo_restante = $saldoRestante;
+        // 4. CALCULAR SALDO RESTANTE Y FILTRAR
+        $proyeccionesPendientes = $fondo->solicitudApertura->gastosProyectados->map(function ($proyeccion) use ($gastosRealizados) {
+            $montoEstimado = $proyeccion->pivot->monto_estimado;
+            $totalGastado = $gastosRealizados->get($proyeccion->id_gasto_proyectado)['total_gastado'] ?? 0;
+            $saldoRestante = $montoEstimado - $totalGastado;
 
-            return $proyeccion;
-        })
-            // Finalmente, se filtran las proyecciones para devolver solo aquellas
-            // cuyo saldo restante sea mayor a cero (con un pequeño margen para errores de punto flotante).
-            ->filter(function ($proyeccion) {
-                // Se devuelven solo las proyecciones que aún tienen saldo por declarar.
-                return $proyeccion->saldo_restante > 0.005;
-            });
+            // Devolvemos la proyección solo si todavía tiene saldo.
+            if ($saldoRestante > 0.005) {
+                return [
+                    'id' => $proyeccion->id_gasto_proyectado,
+                    'descripcion_gasto' => $proyeccion->descripcion,
+                    'monto_proyectado' => (float) $montoEstimado,
+                    'saldo_restante' => (float) $saldoRestante,
+                ];
+            }
+            return null;
+        })->filter(); // filter() sin argumentos elimina los valores nulos
 
-        // 4. DEVOLVER RESULTADO
-        // Se retornan solo los campos necesarios para el frontend.
         return response()->json($proyeccionesPendientes->values()->all());
     }
 
@@ -133,23 +140,28 @@ class FondoEfectivoController extends Controller
     public function getFondosActivosParaUsuario()
     {
         $user = Auth::user();
-
         if (!$user) {
             return response()->json(['message' => 'No autenticado.'], 401);
         }
 
-        // Se buscan todos los fondos activos que pertenecen al ÁREA del usuario.
-        $query = FondoEfectivo::where('estado', 'Activo');
+        // 1. Obtener los IDs de los proyectos en los que participa el área del usuario.
+        $proyectosDelAreaIds = DB::table('area_proyecto')
+            ->where('id_area', $user->area_id)
+            ->pluck('id_proyecto');
 
-        if ($user->area_id) {
-            $query->where('id_area', $user->area_id);
-        } else {
-            // Si el usuario no tiene área, no puede ver ningún fondo.
-            $query->whereRaw('1 = 0');
-        }
-
-        // Se seleccionan los campos más relevantes para el desplegable.
-        $fondos = $query->select('id_fondo', 'codigo_fondo', 'monto_disponible', 'monto_aprobado')->get();
+        // 2. Construir la consulta principal.
+        $fondos = FondoEfectivo::where('estado', 'Activo')
+            ->where(function ($query) use ($user, $proyectosDelAreaIds) {
+                // Condición 1: El fondo pertenece directamente al área del usuario (Regular o Excepcional).
+                $query->where('id_area', $user->area_id);
+                // Condición 2: O el fondo es de tipo 'Proyecto' y el área del usuario participa en ese proyecto.
+                $query->orWhere(function ($subQuery) use ($proyectosDelAreaIds) {
+                    $subQuery->where('tipo_fondo', 'Proyecto')
+                        ->whereIn('id_proyecto', $proyectosDelAreaIds);
+                });
+            })
+            ->select('id_fondo', 'codigo_fondo', 'monto_disponible', 'monto_aprobado', 'tipo_fondo')
+            ->get();
 
         return response()->json($fondos);
     }

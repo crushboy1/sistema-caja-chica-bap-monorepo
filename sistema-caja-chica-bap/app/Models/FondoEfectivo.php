@@ -18,6 +18,7 @@ class FondoEfectivo extends Model
     // Campos que pueden ser asignados masivamente
     protected $fillable = [
         'codigo_fondo',
+        'tipo_fondo',
         'monto_aprobado',
         'monto_disponible',
         'fecha_apertura',
@@ -27,6 +28,7 @@ class FondoEfectivo extends Model
         'id_solicitud_apertura',
         'id_responsable',
         'id_area',
+        'id_proyecto',
     ];
 
     // Casteo de atributos
@@ -37,6 +39,14 @@ class FondoEfectivo extends Model
         'fecha_cierre' => 'date',
     ];
 
+    // Se añade la relación con el modelo Proyecto.
+    /**
+     * Relación opcional: Un fondo puede pertenecer a un proyecto.
+     */
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class, 'id_proyecto', 'id_proyecto');
+    }
     /**
      * Relación: Un fondo efectivo fue originado por una solicitud de apertura.
      */
@@ -134,8 +144,10 @@ class FondoEfectivo extends Model
         // Si no existe, procedemos a crearlo
         $fondoEfectivo->fill([
             'codigo_fondo' => self::generateUniqueFondoCode(), // Genera un código de fondo único
+            'tipo_fondo' => $solicitud->tipo_fondo_solicitado,
             'id_responsable' => $solicitud->id_solicitante, // El solicitante de la apertura es el responsable inicial
             'id_area' => $solicitud->id_area,
+            'id_proyecto' => $solicitud->id_proyecto,
             'monto_aprobado' => $solicitud->monto_solicitado, // El monto solicitado es el monto aprobado inicial
             'monto_disponible' => $solicitud->monto_solicitado,
             'fecha_apertura' => now()->toDateString(),
