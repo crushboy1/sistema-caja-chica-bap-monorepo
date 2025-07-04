@@ -473,7 +473,7 @@ onMounted(() => {
                                 </span>
                             </td>
                             <td class="py-4 px-4 text-gray-500">{{ new
-                                Date(gasto.created_at).toLocaleDateString('es-ES') }}</td>
+                                Date(gasto.created_at).toLocaleDateString('es-PE') }}</td>
                             <td class="py-4 px-4">
                                 <div class="flex flex-col items-center justify-center space-y-2">
                                     

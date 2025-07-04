@@ -40,6 +40,7 @@ const solicitudGestionSeleccionada = ref(null);
 // --- Variables para Filtros y Búsqueda ---
 const filtroEstado = ref('Todas');
 const filtroTipoSolicitud = ref('Todos');
+const filtroArea = ref('');
 const busquedaNumeroSolicitud = ref('');
 const busquedaSolicitante = ref('');
 const filtroFechaInicio = ref('');
@@ -47,8 +48,8 @@ const filtroFechaFin = ref('');
 
 // Variables para el debounce de los campos de texto y fecha
 let debounceTimeout = null;
-const DEBOUNCE_DELAY = 800; // Aumentado para mejor UX
-const MIN_SEARCH_LENGTH = 3;
+const DEBOUNCE_DELAY = 500; // Aumentado para mejor UX
+const MIN_SEARCH_LENGTH = 4;
 
 // --- Variables para Paginación ---
 const paginaActual = ref(1);
@@ -105,12 +106,37 @@ const estadosVisiblesEnTabla = computed(() => {
 const hayFiltrosActivos = computed(() => {
     return filtroEstado.value !== 'Todas' ||
         filtroTipoSolicitud.value !== 'Todos' ||
+        filtroArea.value !== '' ||
         busquedaNumeroSolicitud.value.length > 0 ||
         busquedaSolicitante.value.length > 0 ||
         filtroFechaInicio.value ||
         filtroFechaFin.value;
 });
 
+const areasDisponibles = computed(() => {
+    if (!props.areasCatalogo || !Array.isArray(props.areasCatalogo)) {
+        return [];
+    }
+
+    const rol = rolUsuario.value;
+
+    // Solo administradores pueden ver todas las áreas
+    if ([ROLES.JEFE_ADM, ROLES.SUPER_ADMIN, ROLES.GERENTE_GENERAL].includes(rol)) {
+        return props.areasCatalogo;
+    }
+
+    // Otros usuarios solo ven su área
+    if (props.usuarioActual?.area) {
+        return props.areasCatalogo.filter(area => area.id === props.usuarioActual.area.id);
+    }
+
+    return [];
+});
+const mostrarFiltroArea = computed(() => {
+    const rol = rolUsuario.value;
+    // Solo mostrar filtro de área a administradores
+    return [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN, ROLES.GERENTE_GENERAL].includes(rol);
+});
 // Computed para mostrar indicador de búsqueda (ahora más preciso con debounce)
 const mostrarIndicadorBusqueda = computed(() => {
     // Muestra el indicador si hay una búsqueda pendiente por debounce
@@ -206,19 +232,34 @@ const puedeEditarProactivamente = (solicitud) => {
 
 // --- Función para obtener solicitudes (ahora llamada por los watchers) ---
 const obtenerSolicitudes = async () => {
-    if (!buscandoSolicitudes.value) cargandoSolicitudes.value = true;
+    // Solo mostrar cargandoSolicitudes en la carga inicial
+    if (!buscandoSolicitudes.value && solicitudes.value.length === 0) {
+        cargandoSolicitudes.value = true;
+    }
+
     try {
         const params = {
             estado: filtroEstado.value !== 'Todas' ? filtroEstado.value : undefined,
             tipo_solicitud: filtroTipoSolicitud.value !== 'Todos' ? filtroTipoSolicitud.value : undefined,
+            area_id: filtroArea.value || undefined,
             codigo_solicitud: busquedaNumeroSolicitud.value.length >= MIN_SEARCH_LENGTH ? busquedaNumeroSolicitud.value : undefined,
             solicitante_name: busquedaSolicitante.value.length >= MIN_SEARCH_LENGTH ? busquedaSolicitante.value : undefined,
             fecha_inicio: filtroFechaInicio.value || undefined,
             fecha_fin: filtroFechaFin.value || undefined,
         };
+
+        if (!mostrarFiltroArea.value && props.usuarioActual?.id) {
+            params.id_responsable = props.usuarioActual.id;
+        }
+
         const response = await api.get('/v1/solicitudes', { params });
-        solicitudes.value = response.data.solicitudes;
-        paginaActual.value = 1;
+
+        // Solo actualizar si la búsqueda/filtrado ha terminado
+        if (!buscandoSolicitudes.value || response.data.solicitudes) {
+            solicitudes.value = response.data.solicitudes;
+            paginaActual.value = 1;
+        }
+
     } catch (error) {
         console.error('❌ Error al obtener solicitudes:', error);
         Swal.fire('Error', 'No se pudieron cargar las solicitudes.', 'error');
@@ -230,7 +271,7 @@ const obtenerSolicitudes = async () => {
 
 // --- Función para manejar búsquedas con debounce (general) ---
 const triggerSearchWithDebounce = () => {
-    buscandoSolicitudes.value = true; // Indicar que hay una búsqueda pendiente
+    buscandoSolicitudes.value = true;
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
         obtenerSolicitudes();
@@ -241,15 +282,14 @@ const triggerSearchWithDebounce = () => {
 const limpiarFiltros = () => {
     filtroEstado.value = 'Todas';
     filtroTipoSolicitud.value = 'Todos';
+    filtroArea.value = '';
     busquedaNumeroSolicitud.value = '';
     busquedaSolicitante.value = '';
     filtroFechaInicio.value = '';
     filtroFechaFin.value = '';
-
     // Limpiar timeout pendiente y resetear indicador de búsqueda
     clearTimeout(debounceTimeout);
     buscandoSolicitudes.value = false;
-
     // Recargar datos inmediatamente después de limpiar todos los filtros
     obtenerSolicitudes();
 };
@@ -340,21 +380,19 @@ const onSolicitudActualizada = () => {
 // --- Watchers mejorados ---
 
 // Watchers para filtros de selección (disparan búsqueda inmediata)
-watch([filtroEstado, filtroTipoSolicitud], () => {
+watch([filtroEstado, filtroTipoSolicitud, filtroArea], () => {
     console.log('🔄 Filtros de selección cambiados');
-    clearTimeout(debounceTimeout); // Limpiar cualquier debounce pendiente
-    buscandoSolicitudes.value = false; // Resetear indicador de búsqueda pendiente
-    obtenerSolicitudes(); // Disparar búsqueda inmediatamente
+    clearTimeout(debounceTimeout);
+    buscandoSolicitudes.value = true; // Activar overlay
+    obtenerSolicitudes();
 });
 
 // Watchers para campos de texto (debounced, con lógica de longitud mínima)
 watch(busquedaNumeroSolicitud, (newValue) => {
     console.log('🔍 Búsqueda número solicitud:', newValue);
     if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
-        // Si cumple el mínimo de caracteres o si se ha vaciado el campo, dispara el debounce
         triggerSearchWithDebounce();
     } else {
-        // Si no cumple el mínimo, solo marca como buscando (sin disparar el debounce aún)
         buscandoSolicitudes.value = true;
     }
 });
@@ -362,10 +400,8 @@ watch(busquedaNumeroSolicitud, (newValue) => {
 watch(busquedaSolicitante, (newValue) => {
     console.log('🔍 Búsqueda solicitante:', newValue);
     if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
-        // Si cumple el mínimo de caracteres o si se ha vaciado el campo, dispara el debounce
         triggerSearchWithDebounce();
     } else {
-        // Si no cumple el mínimo, solo marca como buscando (sin disparar el debounce aún)
         buscandoSolicitudes.value = true;
     }
 });
@@ -375,12 +411,31 @@ watch([filtroFechaInicio, filtroFechaFin], () => {
     console.log('🗓️ Filtros de fecha cambiados (debounced)');
     triggerSearchWithDebounce();
 });
+const obtenerNombreArea = (areaId) => {
+    if (!areaId || !props.areasCatalogo) return 'N/A';
+    const area = props.areasCatalogo.find(a => a.id === areaId);
+    return area?.nombre || 'N/A';
+};
 
+const inicializarFiltroArea = () => {
+    // Si el usuario no es administrador, pre-seleccionar su área
+    if (!mostrarFiltroArea.value && props.usuarioActual?.area?.id) {
+        filtroArea.value = props.usuarioActual.area.id;
+    }
+};
 
 // --- Ciclo de Vida ---
 onMounted(() => {
+    inicializarFiltroArea();
     obtenerSolicitudes();
 });
+watch(() => props.usuarioActual, (newUser) => {
+    if (newUser) {
+        inicializarFiltroArea();
+        obtenerSolicitudes();
+    }
+}, { immediate: true });
+
 </script>
 
 <template>
@@ -389,7 +444,7 @@ onMounted(() => {
 
         <div v-if="cargandoSolicitudes" class="text-center text-gray-500 py-8">
             <div class="inline-flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg"
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg"
                     fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
@@ -403,14 +458,14 @@ onMounted(() => {
         <div v-else>
             <!-- Panel de filtros mejorado -->
             <div class="mb-6 p-4 bg-gray-50 rounded-lg shadow-sm">
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-4 mb-4">
                     <!-- Filtro por Estado -->
                     <div>
                         <label for="filtroEstado" class="block text-sm font-medium text-gray-700 mb-1">
                             Filtrar por Estado:
                         </label>
                         <select id="filtroEstado" v-model="filtroEstado"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500">
                             <option v-for="estado in estadosVisiblesEnTabla" :key="estado" :value="estado">
                                 {{ estado }}
                             </option>
@@ -423,12 +478,26 @@ onMounted(() => {
                             Filtrar por Tipo:
                         </label>
                         <select id="filtroTipoSolicitud" v-model="filtroTipoSolicitud"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500">
                             <option value="Todos">Todos</option>
                             <option value="Apertura">Apertura</option>
                             <option value="Incremento">Incremento</option>
                             <option value="Decremento">Decremento</option>
                             <option value="Cierre">Cierre</option>
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Área (solo visible para administradores) -->
+                    <div v-if="mostrarFiltroArea">
+                        <label for="filtroArea" class="block text-sm font-medium text-gray-700 mb-1">
+                            Filtrar por Área:
+                        </label>
+                        <select id="filtroArea" v-model="filtroArea"
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500">
+                            <option value="">Todas las áreas</option>
+                            <option v-for="area in areasDisponibles" :key="area.id" :value="area.id">
+                                {{ area.name }}
+                            </option>
                         </select>
                     </div>
 
@@ -453,7 +522,7 @@ onMounted(() => {
                         </label>
                         <input type="text" id="busquedaNumeroSolicitud" v-model="busquedaNumeroSolicitud"
                             placeholder="Ej. SOL-00001"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500" />
                         <!-- Indicador de búsqueda -->
                         <div v-if="buscandoSolicitudes && busquedaNumeroSolicitud.length > 0 && busquedaNumeroSolicitud.length < MIN_SEARCH_LENGTH"
                             class="absolute right-3 top-8 text-gray-400">
@@ -480,7 +549,7 @@ onMounted(() => {
                         </label>
                         <input type="text" id="busquedaSolicitante" v-model="busquedaSolicitante"
                             placeholder="Nombre o Apellido"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500" />
                         <!-- Indicador de búsqueda -->
                         <div v-if="buscandoSolicitudes && busquedaSolicitante.length > 0 && busquedaSolicitante.length < MIN_SEARCH_LENGTH"
                             class="absolute right-3 top-8 text-gray-400">
@@ -506,7 +575,7 @@ onMounted(() => {
                             Fecha Inicio:
                         </label>
                         <input type="date" id="filtroFechaInicio" v-model="filtroFechaInicio"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500" />
                     </div>
 
                     <!-- Fecha Fin -->
@@ -515,14 +584,14 @@ onMounted(() => {
                             Fecha Fin:
                         </label>
                         <input type="date" id="filtroFechaFin" v-model="filtroFechaFin"
-                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap" />
+                            class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500" />
                     </div>
                 </div>
 
                 <!-- Indicador de estado de búsqueda -->
                 <div v-if="buscandoSolicitudes && (busquedaNumeroSolicitud.length >= MIN_SEARCH_LENGTH || busquedaSolicitante.length >= MIN_SEARCH_LENGTH || filtroFechaInicio || filtroFechaFin)"
-                    class="mt-3 text-sm text-verde-bap flex items-center">
-                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-verde-bap" xmlns="http://www.w3.org/2000/svg"
+                    class="mt-3 text-sm text-green-600 flex items-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-green-600" xmlns="http://www.w3.org/2000/svg"
                         fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                         </circle>
@@ -534,8 +603,25 @@ onMounted(() => {
                 </div>
             </div>
 
+            <!-- Overlay con spinner cuando se está cargando -->
+            <div v-if="buscandoSolicitudes || cargandoSolicitudes" class="relative">
+                <div class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div class="inline-flex items-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span class="text-green-600 font-medium">Cargando solicitudes...</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Mensaje cuando no hay resultados -->
-            <div v-if="solicitudesFiltradas.length === 0 && !cargandoSolicitudes"
+            <div v-if="solicitudesFiltradas.length === 0 && !cargandoSolicitudes && !buscandoSolicitudes"
                 class="text-center text-gray-500 py-8">
                 <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -547,11 +633,13 @@ onMounted(() => {
                     }}
                 </p>
                 <button v-if="hayFiltrosActivos" @click="limpiarFiltros"
-                    class="mt-3 px-4 py-2 bg-verde-bap text-white rounded-md hover:bg-verde-bap-dark transition-colors duration-200 text-sm">
+                    class="mt-3 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200 text-sm">
                     Limpiar filtros
                 </button>
             </div>
-            <div v-else>
+
+            <!-- Contenido de la tabla (se mantiene oculto durante la carga) -->
+            <div v-else-if="!buscandoSolicitudes && !cargandoSolicitudes">
                 <div class="mb-4 text-sm text-gray-600 text-center">
                     Mostrando {{ (paginaActual - 1) * registrosPorPagina + 1 }} -
                     {{ Math.min(paginaActual * registrosPorPagina, solicitudesFiltradas.length) }}
@@ -569,6 +657,7 @@ onMounted(() => {
                                 <th class="py-3 px-2 text-center font-semibold">Prioridad</th>
                                 <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
                                 <th class="py-3 px-2 text-center font-semibold">Solicitante</th>
+                                <th class="py-3 px-2 text-center font-semibold">Área</th>
                                 <th class="py-3 px-2 text-center font-semibold">Fecha Creación</th>
                                 <th class="py-3 px-2 text-center font-semibold w-32">Acciones</th>
                             </tr>
@@ -576,27 +665,28 @@ onMounted(() => {
                         <tbody class="text-gray-600 text-sm">
                             <tr v-for="solicitud in solicitudesMostradas" :key="solicitud.id"
                                 class="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
-                                <td class="py-4 px-4 text-center text-sm whitespace-nowrap">{{
+                                <td class="py-3 px-2 text-center text-sm whitespace-nowrap">{{
                                     solicitud.codigo_solicitud ||
                                     solicitud.id }}</td>
-                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.tipo_solicitud || 'N/A' }}</td>
-                                <td class="py-4 px-4 text-center text-sm">
+                                <td class="py-3 px-2 text-center text-sm">{{ solicitud.tipo_solicitud || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-center text-sm">
                                     {{ solicitud.tipo_fondo_solicitado || 'N/A' }}
                                 </td>
-                                <td class="py-4 px-4 text-center text-sm whitespace-nowrap">S/. {{
+                                <td class="py-3 px-2 text-center text-sm whitespace-nowrap">S/. {{
                                     solicitud.monto_solicitado ?
                                         parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</td>
-                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.prioridad || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-center text-sm">{{ solicitud.prioridad || 'N/A' }}</td>
 
-                                <td class="py-4 px-4 flex justify-center items-center text-xs">
+                                <td class="py-3 px-2 flex justify-center items-center text-xs">
                                     <span :class="getClassesForBadge(solicitud.estado)">
                                         {{ solicitud.estado }}
                                     </span>
                                 </td>
-                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.solicitante?.name || 'N/A' }} {{
+                                <td class="py-3 px-2 text-center text-sm">{{ solicitud.solicitante?.name || 'N/A' }} {{
                                     solicitud.solicitante?.last_name || '' }}</td>
-                                <td class="py-4 px-4 text-center text-sm">
-                                    {{ new Date(solicitud.created_at).toLocaleDateString('es-ES') }}
+                                <td class="py-3 px-2 text-center">{{ solicitud.area?.name || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-center text-sm">
+                                    {{ new Date(solicitud.created_at).toLocaleDateString('es-PE') }}
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="flex items-center justify-center space-x-2">

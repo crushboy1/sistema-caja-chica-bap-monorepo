@@ -149,27 +149,27 @@
           <table class="min-w-full bg-white border border-gray-200 rounded-lg">
             <thead>
               <tr class="bg-gray-100 text-gray-700 uppercase text-sm leading-normal">
-                <th class="py-4 px-4 text-left font-semibold">Código Fondo</th>
-                <th class="py-4 px-4 text-left font-semibold">Responsable Fondo</th>
-                <th class="py-4 px-4 text-left font-semibold">Área Fondo</th>
-                <th class="py-4 px-4 text-left font-semibold">Monto Aprobado</th>
-                <th class="py-4 px-4 text-left font-semibold">Estado</th>
-                <th class="py-4 px-4 text-left font-semibold">Fecha Apertura</th>
-                <th class="py-4 px-4 text-left font-semibold">Solicitud Apertura</th>
-                <th class="py-4 px-4 text-left font-semibold">Aprobador ADM</th>
-                <th class="py-4 px-4 text-left font-semibold">Aprobador GRTE</th>
-                <th class="py-4 px-4 text-center font-semibold w-4">Historial</th>
+                <th class="py-3 px-2 text-center font-semibold">Código Fondo</th>
+                <th class="py-3 px-2 text-center font-semibold">Responsable Fondo</th>
+                <th class="py-3 px-2 text-center font-semibold">Área Fondo</th>
+                <th class="py-3 px-2 text-center font-semibold">Monto Aprobado</th>
+                <th class="py-3 px-2 text-center font-semibold">Estado</th>
+                <th class="py-3 px-2 text-center font-semibold">Fecha Apertura</th>
+                <th class="py-3 px-2 text-center font-semibold w-32">Solicitud Apertura</th>
+                <th class="py-3 px-2 text-center font-semibold">Aprobador ADM</th>
+                <th class="py-3 px-2 text-center font-semibold">Aprobador GRTE</th>
+                <th class="py-3 px-2 text-center font-semibold w-4">Historial</th>
               </tr>
             </thead>
             <tbody class="text-gray-600 text-sm">
               <tr v-for="fondo in fondosMostrados" :key="fondo.id_fondo"
                 class="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
-                <td class="py-4 px-4 text-left whitespace-nowrap">{{ fondo.codigo_fondo }}</td>
-                <td class="py-4 px-4 text-left">{{ fondo.responsable?.name }} {{ fondo.responsable?.last_name }}</td>
-                <td class="py-4 px-4 text-left">{{ fondo.area?.name }}</td>
-                <td class="py-4 px-4 text-left font-medium whitespace-nowrap">S/. {{ fondo.monto_aprobado ?
+                <td class="py-3 px-2 text-center whitespace-nowrap">{{ fondo.codigo_fondo }}</td>
+                <td class="py-3 px-2 text-center">{{ fondo.responsable?.name }} {{ fondo.responsable?.last_name }}</td>
+                <td class="py-3 px-2 text-center">{{ fondo.area?.name }}</td>
+                <td class="py-3 px-2 text-center font-medium whitespace-nowrap">S/. {{ fondo.monto_aprobado ?
                   parseFloat(fondo.monto_aprobado).toFixed(2) : '0.00' }}</td>
-                <td class="py-4 px-4 text-left">
+                <td class="py-3 px-2 text-center">
                   <span :class="{
                     'bg-green-200 text-green-600': fondo.estado === 'Activo',
                     'bg-red-200 text-red-600': fondo.estado === 'Cerrado'
@@ -177,17 +177,17 @@
                     {{ fondo.estado }}
                   </span>
                 </td>
-                <td class="py-4 px-4 text-left">
-                  {{ new Date(fondo.fecha_apertura).toLocaleDateString('es-ES') }}
+                <td class="py-3 px-2 text-center">
+                  {{ formatearFechaSinHora(fondo.fecha_apertura) }}
                 </td>
-                <td class="py-4 px-4 text-left">
+                <td class="py-3 px-2 text-center">
                   {{ fondo.solicitud_apertura?.codigo_solicitud || 'N/A' }}
                 </td>
-                <td class="py-4 px-4 text-left">
+                <td class="py-3 px-2 text-center">
                   {{ fondo.solicitud_apertura?.revisor_adm?.name ? `${fondo.solicitud_apertura.revisor_adm.name}
                   ${fondo.solicitud_apertura.revisor_adm.last_name}` : 'N/A' }}
                 </td>
-                <td class="py-4 px-4 text-left">
+                <td class="py-3 px-2 text-center">
                   {{ fondo.solicitud_apertura?.aprobador_gerente?.name ?
                     `${fondo.solicitud_apertura.aprobador_gerente.name}
                   ${fondo.solicitud_apertura.aprobador_gerente.last_name}` : 'N/A' }}
@@ -270,6 +270,25 @@ import { useRouter } from 'vue-router';
 // Asumiendo que ya tienes este modal:
 import HistorialFondoModal from './HistorialFondoModal.vue'; 
 
+const formatearFechaSinHora = (fechaString) => {
+  if (!fechaString) return '';
+  
+  try {
+    // Para fechas que vienen como "2025-07-04" sin hora
+    const [año, mes, dia] = fechaString.split('-');
+    const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+    
+    return fechaLocal.toLocaleDateString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error al formatear fecha sin hora:', error);
+    return '';
+  }
+};
+
 // --- Variables de Estado ---
 const usuarioActual = ref(null);
 const cargandoUsuario = ref(true);
@@ -302,6 +321,7 @@ const registrosPorPagina = ref(10);
 const router = useRouter(); // Para redirección si no hay autenticación
 
 // --- Propiedades Computadas ---
+
 const rolUsuario = computed(() => {
   return usuarioActual.value?.role?.name || null;
 });
