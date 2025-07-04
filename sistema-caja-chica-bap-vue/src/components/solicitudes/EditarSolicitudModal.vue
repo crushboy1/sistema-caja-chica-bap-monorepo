@@ -13,7 +13,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        Editar Solicitud: {{ solicitud?.codigo_solicitud }}
+                        <!-- Se usa la prop correcta 'solicitudAEditar' -->
+                        <span v-if="modo === 'observada'">Subsanar Solicitud: {{ solicitudAEditar?.codigo_solicitud
+                        }}</span>
+                        <span v-else>Editar Solicitud: {{ solicitudAEditar?.codigo_solicitud }}</span>
                     </h3>
                     <button @click="cerrar" class="text-gray-500 hover:text-gray-700 transition-colors">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -30,8 +33,11 @@
                         Le pasamos la solicitud a editar y el modo de edición.
                         Escuchamos sus eventos para saber cuándo se actualizó o se canceló.
                     -->
-                    <AperturaFondos :solicitudAEditar="solicitud" :modoEdicion="modo"
-                        @solicitud-actualizada="handleActualizacionExitosa" @cancelar="cerrar" />
+                    <AperturaFondos :solicitudAEditar="props.solicitudAEditar" :modoEdicion="props.modo"
+                        :usuario-actual="props.usuarioActual" :proyectos="props.proyectos"
+                        :gastos-proyectados-catalogo="props.gastosProyectadosCatalogo"
+                        :areas-catalogo="props.areasCatalogo" @solicitud-actualizada="handleActualizacionExitosa"
+                        @cancelar="cerrar" />
                 </div>
             </div>
         </div>
@@ -43,12 +49,17 @@ import { defineProps, defineEmits } from 'vue';
 import AperturaFondos from './AperturaFondos.vue';
 
 const props = defineProps({
-    mostrar: Boolean,
-    solicitud: Object,
-    modo: String, // 'pendiente' o 'observada'
+    mostrar: { type: Boolean, default: false },
+    solicitudAEditar: { type: Object, required: true },
+    modo: { type: String, required: true }, // 'pendiente' o 'observada'
+    // Props que se pasarán hacia abajo
+    usuarioActual: { type: Object, required: true },
+    proyectos: { type: Array, required: true },
+    gastosProyectadosCatalogo: { type: Array, required: true },
+    areasCatalogo: { type: Array, required: true }
 });
 
-const emit = defineEmits(['close', 'solicitud-actualizada']);
+const emit = defineEmits(['cancelar', 'solicitud-actualizada']);
 
 /**
  * Esta función simplemente re-emite el evento hacia arriba.
@@ -63,7 +74,7 @@ const handleActualizacionExitosa = (solicitudActualizada) => {
  * Emite el evento para cerrar el modal.
  */
 const cerrar = () => {
-    emit('close');
+    emit('cancelar');
 };
 </script>
 

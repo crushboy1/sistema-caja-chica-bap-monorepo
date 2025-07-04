@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { isEqual, cloneDeep } from 'lodash-es';
+
 const props = defineProps({
   // Objeto con los datos del usuario autenticado.
   usuarioActual: {
@@ -19,6 +20,10 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  areasCatalogo: {
+    type: Array,
+    required: true
+  },
   // Prop opcional para el modo de edición.
   solicitudAEditar: {
     type: Object,
@@ -30,6 +35,7 @@ const props = defineProps({
     default: 'crear' // 'crear', 'pendiente', 'observada'
   }
 });
+
 // Definir eventos que este componente puede emitir a su padre
 const emit = defineEmits(['solicitudEnviada', 'solicitudActualizada', 'cancelar']);
 
@@ -40,6 +46,7 @@ const formData = ref({
   tipo_solicitud: 'Apertura',
   tipo_fondo_solicitado: 'Regular',
   id_proyecto: null,
+  areas_participantes: [],
   motivo_detalle: '',
   monto_solicitado: 0,
   prioridad: 'Media',
@@ -48,6 +55,43 @@ const formData = ref({
 });
 
 const originalData = ref(null);
+
+// Computed properties
+
+const puedeCrearSolicitudProyecto = computed(() => {
+  return props.usuarioActual?.role?.name === 'jefe_area' &&
+    props.usuarioActual?.area?.name?.toLowerCase() === 'proyectos';
+});
+
+const opcionesTipoFondo = computed(() => {
+  const opciones = [
+    { value: 'Regular', text: 'Fondo Regular' },
+    { value: 'Excepcional', text: 'Fondo Excepcional' }
+  ];
+
+  // Si el usuario tiene permisos, se añade la opción "Proyecto" en la segunda posición.
+  if (puedeCrearSolicitudProyecto.value) {
+    opciones.splice(1, 0, { value: 'Proyecto', text: 'Fondo de Proyecto' });
+  }
+
+  return opciones;
+});
+const mostrarAlertaPermisos = () => {
+  Swal.fire({
+    icon: 'warning',
+    title: 'Permisos Insuficientes',
+    text: 'Solo los Jefes del área de Proyectos pueden crear solicitudes de este tipo.',
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#38a169' // Un color verde similar al de BAP
+  });
+};
+const onTipoFondoChange = () => {
+  if (formData.value.tipo_fondo_solicitado === 'Proyecto' && !puedeCrearSolicitudProyecto.value) {
+    mostrarAlertaPermisos();
+    // Resetea a una opción válida por defecto
+    formData.value.tipo_fondo_solicitado = 'Regular';
+  }
+};
 const mostrarPrioridad = computed(() => {
   // En modo creación (sin solicitudAEditar), solo mostrar si NO es Apertura
   if (!props.solicitudAEditar) {
@@ -56,6 +100,23 @@ const mostrarPrioridad = computed(() => {
   // En modo edición, mostrar según el tipo de la solicitud existente
   return props.solicitudAEditar.tipo_solicitud !== 'Apertura';
 });
+
+// Nueva computed property para mostrar el selector de áreas participantes
+const mostrarAreasParticipantes = computed(() => {
+  return formData.value.tipo_fondo_solicitado === 'Proyecto' && formData.value.id_proyecto;
+});
+
+// Computed property para obtener las áreas disponibles para el proyecto seleccionado
+const areasDisponiblesParaProyecto = computed(() => {
+  if (!formData.value.id_proyecto || !props.proyectos.length) {
+    return props.areasCatalogo || [];
+  }
+
+  // Aquí puedes filtrar las áreas según el proyecto si es necesario
+  // Por ahora retornamos todas las áreas disponibles
+  return props.areasCatalogo || [];
+});
+
 const hayCambios = computed(() => {
   if (!props.solicitudAEditar || !originalData.value) {
     // Si no estamos en modo edición, no aplicamos esta lógica.
@@ -65,6 +126,7 @@ const hayCambios = computed(() => {
   // Usamos isEqual de lodash para una comparación profunda y fiable de objetos y arrays.
   return !isEqual(formData.value, originalData.value);
 });
+
 const tituloComponente = computed(() => {
   return props.solicitudAEditar ? 'Editar Solicitud de Fondo' : 'Apertura de Fondo de Efectivo';
 });
@@ -100,6 +162,7 @@ const inicializarFormulario = () => {
         ...solicitudData,
         tipo_fondo_solicitado: solicitudData.tipo_fondo_solicitado || 'Regular',
         id_proyecto: solicitudData.id_proyecto || null,
+        areas_participantes: solicitudData.areas_participantes || [],
         // Se adapta al nuevo formato de la tabla pivote que viene del backend.
         gastos_proyectados: solicitudData.gastos_proyectados?.map(g => ({
           gasto_proyectado_id: g.id_gasto_proyectado,
@@ -125,6 +188,7 @@ const resetearFormulario = () => {
     tipo_solicitud: 'Apertura',
     tipo_fondo_solicitado: 'Regular',
     id_proyecto: null,
+    areas_participantes: [],
     motivo_detalle: '',
     monto_solicitado: 0,
     prioridad: 'Media',
@@ -133,8 +197,52 @@ const resetearFormulario = () => {
   };
 };
 
+// Función para manejar la selección/deselección de áreas participantes
+const toggleAreaParticipante = (areaId) => {
+  const index = formData.value.areas_participantes.indexOf(areaId);
+  if (index > -1) {
+    // Si ya está seleccionada, la removemos
+    formData.value.areas_participantes.splice(index, 1);
+  } else {
+    // Si no está seleccionada, la agregamos
+    formData.value.areas_participantes.push(areaId);
+  }
+};
+
+// Función para verificar si un área está seleccionada
+const isAreaSeleccionada = (areaId) => {
+  return formData.value.areas_participantes.includes(areaId);
+};
+/**
+ * Propiedad computada que devuelve un array de los IDs de los gastos ya seleccionados.
+ * Esto nos ayudará a determinar qué opciones deshabilitar.
+ */
+const idsGastosSeleccionados = computed(() => {
+  // Mapeamos el array de gastos para obtener solo los IDs que no son nulos.
+  return formData.value.gastos_proyectados
+    .map(g => g.gasto_proyectado_id)
+    .filter(id => id !== null);
+});
+
+/**
+ * Función que determina si una opción de gasto proyectado debe estar deshabilitada en un dropdown.
+ * @param {number} gastoId - El ID del gasto del catálogo que se está evaluando.
+ * @param {number} gastoIdActualFila - El ID del gasto que ya está seleccionado en la fila actual.
+ * @returns {boolean} - True si la opción debe estar deshabilitada.
+ */
+const esOpcionDeshabilitada = (gastoId, gastoIdActualFila) => {
+  // Una opción está deshabilitada si:
+  // 1. Ya está en la lista de IDs seleccionados.
+  // 2. Y NO es el gasto que ya está seleccionado en esta misma fila (para permitir que se vea la selección actual).
+  return idsGastosSeleccionados.value.includes(gastoId) && gastoId !== gastoIdActualFila;
+};
 // Función para añadir un nuevo ítem de gasto proyectado (simplificado)
 const agregarGastoProyectado = () => {
+  // Antes de añadir, verificamos si hay opciones disponibles.
+  if (idsGastosSeleccionados.value.length >= props.gastosProyectadosCatalogo.length) {
+    Swal.fire('Límite alcanzado', 'Ya has seleccionado todos los tipos de gastos proyectados disponibles.', 'info');
+    return;
+  }
   formData.value.gastos_proyectados.push({ gasto_proyectado_id: null, monto_estimado: null });
 };
 
@@ -159,13 +267,22 @@ const manejarEnvio = async () => {
     Swal.fire('Error de Validación', 'Debe seleccionar un proyecto cuando el tipo de fondo es "Proyecto".', 'error');
     return;
   }
-  if (!data.prioridad) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Error de Validación',
-      text: 'Por favor, selecciona una prioridad de solicitud.'
-    });
+  // Nueva validación para áreas participantes
+  if (data.tipo_fondo_solicitado === 'Proyecto' && (!data.areas_participantes || data.areas_participantes.length === 0)) {
+    Swal.fire('Error de Validación', 'Debe seleccionar al menos un área participante para el proyecto.', 'error');
     return;
+  }
+  const tipoRealDeSolicitud = props.solicitudAEditar?.tipo_solicitud || data.tipo_solicitud;
+
+  if (tipoRealDeSolicitud !== 'Apertura') {
+    if (!data.prioridad) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Validación',
+        text: 'Por favor, selecciona una prioridad de solicitud.'
+      });
+      return;
+    }
   }
   if (!data.gastos_proyectados || data.gastos_proyectados.length === 0) {
     Swal.fire({
@@ -193,19 +310,48 @@ const manejarEnvio = async () => {
       endpoint = `/v1/solicitudes/${props.solicitudAEditar.id}/editar-observada`;
     }
   }
+
   // --- Construir el contenido HTML para el modal de resumen ---
   const gastosHtml = `
-        <div class="scroll-modal" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 10px;">
+        <div class="text-sm scroll-modal" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 10px;">
             <ul>
             ${data.gastos_proyectados.map(g => {
-              const desc = props.gastosProyectadosCatalogo.find(cat => cat.id_gasto_proyectado === g.gasto_proyectado_id)?.descripcion || 'N/A';
-              return `<li><strong>${desc}:</strong> S/. ${parseFloat(g.monto_estimado || 0).toFixed(2)}</li>`;
-            }).join('')}
+    const desc = props.gastosProyectadosCatalogo.find(cat => cat.id_gasto_proyectado === g.gasto_proyectado_id)?.descripcion || 'N/A';
+    return `<li><strong>${desc}:</strong> S/. ${parseFloat(g.monto_estimado || 0).toFixed(2)}</li>`;
+  }).join('')}
             </ul>
         </div>
         <p class="mt-2 text-right"><strong>Total: S/. ${totalGastosProyectados.value.toFixed(2)}</strong></p>
       `;
-  const resumenHtml = `<div style="text-align: left; padding: 0 1rem;"><p><strong>Motivo:</strong> ${data.motivo_detalle}</p><p><strong>Monto Solicitado:</strong> ${currencyFormatter.format(data.monto_solicitado || 0)}</p><hr style="margin: 1rem 0;" /><Strong>Gastos Proyectados:</Strong>${gastosHtml}</div>`;
+  let tipoFondoHtml = `<p><strong>Tipo de Fondo:</strong> ${data.tipo_fondo_solicitado}</p>`;
+
+  // Agregar información del proyecto si es tipo Proyecto
+  let proyectoHtml = '';
+  if (data.tipo_fondo_solicitado === 'Proyecto' && data.id_proyecto) {
+    const proyectoSeleccionado = props.proyectos.find(p => p.id_proyecto === data.id_proyecto);
+    if (proyectoSeleccionado) {
+      proyectoHtml = `<p><strong>Proyecto:</strong> ${proyectoSeleccionado.nombre_proyecto}</p>`;
+    }
+  }
+  // Agregar información de áreas participantes al resumen si es tipo Proyecto
+  let areasHtml = '';
+  if (data.tipo_fondo_solicitado === 'Proyecto' && data.areas_participantes.length > 0) {
+    const nombresAreas = data.areas_participantes.map(areaId => {
+      const area = props.areasCatalogo.find(a => a.id === areaId || a.id_area === areaId);
+      return area ? area.name || area.id : 'Área desconocida';
+    });
+    areasHtml = `<p><strong>Áreas Participantes:</strong> ${nombresAreas.join(', ')}</p>`;
+  }
+
+  const resumenHtml = `<div style="text-align: left; padding: 0 1rem;">
+    <p><strong>Motivo:</strong> ${data.motivo_detalle}</p>
+    <p><strong>Monto Solicitado:</strong> ${currencyFormatter.format(data.monto_solicitado || 0)}</p>
+    ${tipoFondoHtml}
+    ${proyectoHtml}
+    ${areasHtml}
+    <hr style="margin: 1rem 0;" />
+    <strong>Gastos Proyectados:</strong>${gastosHtml}
+  </div>`;
 
   // --- Mostrar el modal de confirmación con resumen ---
   const { isConfirmed } = await Swal.fire({
@@ -224,26 +370,37 @@ const manejarEnvio = async () => {
     // 1. Creamos una copia del objeto 'data' para no modificar el estado original del formulario.
     const payload = { ...data };
 
-    // 2. Verificamos el tipo de fondo. Si NO es 'Proyecto', eliminamos la propiedad 'id_proyecto' del payload.
-    //    Esto evita que se envíe 'id_proyecto: null' al backend innecesariamente.
+    // 2. Verificamos el tipo de fondo y manejamos los campos específicos
+    // Esto asegura que no se envíe ningún valor para este campo.
+    if (tipoRealDeSolicitud === 'Apertura') {
+      delete payload.prioridad;
+    }
     if (payload.tipo_fondo_solicitado !== 'Proyecto') {
+      // Si NO es 'Proyecto', eliminamos ambos campos del payload
       delete payload.id_proyecto;
+      delete payload.areas_participantes;
+    } else {
+      // Si ES 'Proyecto', verificamos que tenga áreas participantes
+      if (!payload.areas_participantes || payload.areas_participantes.length === 0) {
+        Swal.fire('Error de Validación', 'Debe seleccionar al menos un área participante para el proyecto.', 'error');
+        return;
+      }
     }
 
     // 3. Añadimos el resto de datos necesarios al payload.
     payload.id_solicitante = props.usuarioActual.id;
     payload.id_area = props.usuarioActual.area_id;
     payload.tipo_solicitud = props.solicitudAEditar?.tipo_solicitud || 'Apertura';
-  
+
     try {
       // Usamos el 'payload' limpio para la solicitud
       const response = await api[metodoApi](endpoint, payload);
 
-      let successTitle = esModoEdicion ? '¡Solicitud Actualizada!' : '¡Solicitud Enviada!';
+      let successTitle = esModoEdicion ? '¡Solicitud Actualizada!' : '¡Acción Completada!';
       let successHtml = response.data.message;
 
-      if (!esModoEdicion && response.data.solicitud?.codigo_solicitud) {
-        successHtml = `¡Solicitud registrada y enviada! Código: <strong>${response.data.solicitud.codigo_solicitud}</strong>`;
+      if (!successHtml && !esModoEdicion && response.data.solicitud?.codigo_solicitud) {
+        successHtml = `¡Solicitud procesada! Código: <strong>${response.data.solicitud.codigo_solicitud}</strong>`;
       }
 
       Swal.fire({
@@ -269,7 +426,7 @@ const manejarEnvio = async () => {
         if (error.response.data.errors) {
           errorMessage = '<ul style="text-align: left; list-style-position: inside;">';
           for (const key in error.response.data.errors) {
-            errorMessage += `<li> - ${error.response.data.errors[key].join(', ')}</li > `;
+            errorMessage += `<li> - ${error.response.data.errors[key].join(', ')}</li>`;
           }
           errorMessage += '</ul>';
         } else if (error.response.data.message) {
@@ -292,18 +449,39 @@ const manejarEnvio = async () => {
 watch(totalGastosProyectados, (newTotal) => {
   formData.value.monto_solicitado = newTotal;
 }, { deep: true });
-// Cuando el tipo de fondo cambia, si no es 'Proyecto', reseteamos el id_proyecto.
-watch(() => formData.value.tipo_fondo_solicitado, (newType) => {
-  if (newType !== 'Proyecto') {
+
+watch(() => formData.value.tipo_fondo_solicitado, (newValue, oldValue) => {
+  // Si el nuevo valor es 'Proyecto' y el usuario no tiene permisos, se revierte.
+  // Esto actúa como una doble seguridad si el cambio no proviene de una interacción directa del usuario.
+  if (newValue === 'Proyecto' && !puedeCrearSolicitudProyecto.value) {
+    // Usamos nextTick para asegurar que la alerta se muestre después de que el DOM intente actualizarse.
+    nextTick(() => {
+      mostrarAlertaPermisos();
+      formData.value.tipo_fondo_solicitado = 'Regular';
+    });
+  }
+
+  // Si el tipo de fondo deja de ser 'Proyecto', se limpian los campos relacionados.
+  if (newValue !== 'Proyecto') {
     formData.value.id_proyecto = null;
+    formData.value.areas_participantes = [];
   }
 });
+
+// Cuando cambia el proyecto seleccionado, reseteamos las áreas participantes
+watch(() => formData.value.id_proyecto, (newProyecto) => {
+  if (newProyecto) {
+    // Resetear áreas cuando cambia el proyecto
+    formData.value.areas_participantes = [];
+  }
+});
+
 // Observa la prop para re-inicializar el formulario cuando cambia (para edición).
 watch(() => props.solicitudAEditar, () => {
   inicializarFormulario();
 }, { immediate: true, deep: true });
+
 onMounted(() => {
-  //obtenerUsuarioAutenticado();
   inicializarFormulario();
 });
 </script>
@@ -340,6 +518,7 @@ onMounted(() => {
               class="mt-1 block w-full p-3 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed" disabled />
           </div>
         </div>
+
         <div class="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50">
           <h3 class="text-xl font-semibold text-gray-800 mb-4">Tipo de Fondo</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -347,13 +526,33 @@ onMounted(() => {
               <label for="tipo_fondo" class="block text-sm font-medium text-gray-700 mb-1">
                 Seleccione el Tipo de Fondo <span class="text-rojo-bap">*</span>
               </label>
-              <select id="tipo_fondo" v-model="formData.tipo_fondo_solicitado"
+              <select id="tipo_fondo" v-model="formData.tipo_fondo_solicitado" @change="onTipoFondoChange"
                 class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                 required>
-                <option value="Regular">Fondo Regular</option>
-                <option value="Proyecto">Fondo de Proyecto</option>
-                <option value="Excepcional">Fondo Excepcional</option>
+                <option v-for="opcion in opcionesTipoFondo" :key="opcion.value" :value="opcion.value">
+                  {{ opcion.text }}
+                </option>
               </select>
+
+              <!-- Alerta informativa si no tiene permisos -->
+              <div v-if="!puedeCrearSolicitudProyecto"
+                class="mt-2 p-3 bg-verde-bap-extralight border-b-verde-bap-extralight rounded-r-md">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-verde-bap-dark" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clip-rule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-verde-bap-dark">
+                      <strong>Información:</strong> El tipo "Fondo de Proyecto" solo está disponible para usuarios con
+                      rol de Jefe de Área del área de Proyectos.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Este campo solo aparece si el tipo de fondo es 'Proyecto' -->
@@ -370,20 +569,60 @@ onMounted(() => {
                 </option>
               </select>
             </div>
+
+            <div v-if="mostrarAreasParticipantes" class="md:col-span-2">
+              <label for="areas_participantes" class="block text-sm font-medium text-gray-700 mb-1">
+                Áreas Participantes <span class="text-rojo-bap">*</span>
+              </label>
+
+
+              <div class="mt-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50">
+                <div class="space-y-2">
+                  <div v-for="area in areasDisponiblesParaProyecto" :key="area.id || area.id_area"
+                    class="flex items-center">
+                    <input :id="`area_${area.id || area.id_area}`" type="checkbox" :value="area.id || area.id_area"
+                      :checked="isAreaSeleccionada(area.id || area.id_area)"
+                      @change="toggleAreaParticipante(area.id || area.id_area)"
+                      class="h-4 w-4 text-verde-bap focus:ring-verde-bap border-gray-300 rounded" />
+                    <label :for="`area_${area.id || area.id_area}`" class="ml-2 text-sm text-gray-700 cursor-pointer">
+                      {{ area.name || area.nombre || area.nombre_area }}
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Contador de áreas seleccionadas -->
+                <div v-if="formData.areas_participantes.length > 0" class="mt-3 pt-2 border-t border-gray-200">
+                  <span class="text-xs text-verde-bap font-medium">
+                    {{ formData.areas_participantes.length }} área(s) seleccionada(s)
+                  </span>
+                </div>
+              </div>
+              <div v-if="formData.areas_participantes.length > 0" class="mt-2">
+                <div class="flex flex-wrap gap-2">
+                  <span v-for="areaId in formData.areas_participantes" :key="areaId"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-verde-bap text-white">
+                    {{areasDisponiblesParaProyecto.find(a => (a.id || a.id_area) === areaId)?.name ||
+                      areasDisponiblesParaProyecto.find(a => (a.id || a.id_area) === areaId)?.nombre ||
+                      areasDisponiblesParaProyecto.find(a => (a.id || a.id_area) === areaId)?.nombre_area || 'Área desconocida' }}
+                    <button type="button" @click="toggleAreaParticipante(areaId)"
+                      class="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-verde-bap-dark focus:outline-none">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                          clip-rule="evenodd"></path>
+                      </svg>
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
         <div class="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50">
           <h3 class="text-xl font-semibold text-gray-800 mb-4 flex justify-between items-center">
             Gastos Proyectados
-            <button type="button" @click="agregarGastoProyectado"
-              class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-4 rounded-full transition-colors flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                  clip-rule="evenodd" />
-              </svg>
-              Añadir Gasto
-            </button>
+
           </h3>
 
           <div v-if="formData.gastos_proyectados.length === 0" class="text-gray-500 text-center py-4">
@@ -402,7 +641,8 @@ onMounted(() => {
                   required>
                   <option :value="null" disabled>Seleccione un tipo de gasto</option>
                   <option v-for="gastoCatalogo in gastosProyectadosCatalogo" :key="gastoCatalogo.id_gasto_proyectado"
-                    :value="gastoCatalogo.id_gasto_proyectado">
+                    :value="gastoCatalogo.id_gasto_proyectado"
+                    :disabled="esOpcionDeshabilitada(gastoCatalogo.id_gasto_proyectado, item.gasto_proyectado_id)">
                     {{ gastoCatalogo.descripcion }}
                   </option>
                 </select>
@@ -431,6 +671,15 @@ onMounted(() => {
           </div>
 
           <div class="text-right mt-6 pt-4 border-t border-gray-200">
+            <button type="button" @click="agregarGastoProyectado"
+              class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-4 rounded-full transition-colors flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                  clip-rule="evenodd" />
+              </svg>
+              Añadir Gasto
+            </button>
             <span class="text-lg font-semibold text-gray-800">Total Gastos Proyectados: {{
               currencyFormatter.format(totalGastosProyectados) }}</span>
           </div>
@@ -494,7 +743,7 @@ onMounted(() => {
     </div>
 
   </div>
-  
+
 </template>
 
 <style>

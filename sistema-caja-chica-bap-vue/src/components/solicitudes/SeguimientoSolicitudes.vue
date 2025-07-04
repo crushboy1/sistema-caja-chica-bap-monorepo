@@ -7,9 +7,16 @@ import HistorialEstadosModal from './HistorialEstadosModal.vue';
 import EditarSolicitudModal from './EditarSolicitudModal.vue';
 import GestionSolicitudModal from './GestionSolicitudModal.vue';
 import { getClassesForBadge } from '@/utils/statusStyles.js';
+
+const props = defineProps({
+    usuarioActual: { type: Object, required: true },
+    proyectos: { type: Array, required: true },
+    gastosProyectadosCatalogo: { type: Array, required: true },
+    areasCatalogo: { type: Array, required: true }
+});
 // --- Variables de Estado ---
-const usuarioActual = ref(null);
-const cargandoUsuario = ref(true);
+
+
 const solicitudes = ref([]);
 const cargandoSolicitudes = ref(true);
 const buscandoSolicitudes = ref(false);
@@ -59,6 +66,7 @@ const estadosSolicitud = [
     'Pendiente Aprobación GRTE',
     'Observada GRTE',
     'Descargo Enviado GRTE',
+    'Pendiente Re-evaluacion GRTE',
     'Aprobada',
     'Rechazada Final'
 ];
@@ -73,9 +81,7 @@ const ROLES = {
 };
 
 // --- Propiedades Computadas ---
-const rolUsuario = computed(() => {
-    return usuarioActual.value?.role?.name || null;
-});
+const rolUsuario = computed(() => props.usuarioActual?.role?.name || null);
 
 // Estados visibles en el filtro de la tabla principal
 // No incluir aquí estados que son solo para el historial o transitorios en la tabla principal
@@ -89,6 +95,7 @@ const estadosVisiblesEnTabla = computed(() => {
         'Pendiente Aprobación GRTE',
         'Observada GRTE',
         'Descargo Enviado GRTE',
+        'Pendiente Re-evaluacion GRTE',
         'Aprobada',
         'Rechazada Final'
     ];
@@ -131,160 +138,93 @@ const solicitudesMostradas = computed(() => {
 
 // --- Función de Ayuda para Verificar Permisos (simplificada) ---
 // La implementación de hasPermission se ha simplificado a la esperada por el backend de Laravel Spatie
-const hasPermission = (permissionName) => {
-    if (!usuarioActual.value?.role?.permissions) {
-        // console.log('No hay permisos o usuario cargado');
-        return false;
-    }
-    // Asumimos que los permisos vienen como un array de objetos con una propiedad 'name'
-    return usuarioActual.value.role.permissions.some(permission => permission.name === permissionName);
-};
 
 
-// --- Función para verificar si puede gestionar solicitud ---
+
 const puedeGestionarSolicitud = (solicitud) => {
     const rol = rolUsuario.value;
     const estado = solicitud.estado;
-    const usuarioEsSolicitante = usuarioActual.value?.id === solicitud.id_solicitante;
-
-    // Es crucial que solicitud.solicitante.role.name esté cargado.
-    // El backend ya lo carga en el index y show, así que debería estar disponible.
-    const solicitanteRol = solicitud.solicitante?.role?.name;
-    const solicitanteEsAdminOSuperAdmin = [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(solicitanteRol);
+    const usuarioEsSolicitante = props.usuarioActual?.id === solicitud.id_solicitante;
     const esDecrementoCierre = ['Decremento', 'Cierre'].includes(solicitud.tipo_solicitud);
 
-    console.log(`[puedeGestionarSolicitud] Rol: ${rol}, Estado: ${estado}, SolicitanteID: ${solicitud.id_solicitante}, UsuarioActualID: ${usuarioActual.value?.id}, EsSolicitante: ${usuarioEsSolicitante}, SolicitanteRol: ${solicitanteRol}, EsDecrementoCierre: ${esDecrementoCierre}`);
-
-    // Reglas para Super Admin: Siempre puede gestionar el botón, las restricciones finas están en el modal.
+    // REGLA 0: Super Admin siempre puede gestionar.
     if (rol === ROLES.SUPER_ADMIN) {
         return true;
     }
-
-    // Reglas para Jefe de Administración
-    if (rol === ROLES.JEFE_ADM) {
-        // Un Jefe ADM no puede "aprobar", "observar" o "rechazar" sus propias solicitudes de Decremento/Cierre
-        // si él mismo es el solicitante. Solo puede enviar un descargo si fue observada por GRTE.
-        if (usuarioEsSolicitante && solicitanteEsAdminOSuperAdmin && esDecrementoCierre) {
-            return estado === 'Observada GRTE'; // Solo si es observada por GRTE, puede enviar descargo
+    // REGLA 1: LÓGICA PARA APROBADORES (El usuario actual NO es quien pidió la solicitud)
+    if (!usuarioEsSolicitante) {
+        // El Jefe de ADM puede gestionar lo que está en su bandeja de entrada.
+        if (rol === ROLES.JEFE_ADM) {
+            return ['Pendiente Aprobación ADM', 'Pendiente Re-evaluacion'].includes(estado);
         }
-        // Para otras solicitudes (que no sean sus propios Decremento/Cierre)
-        // o si es un Decremento/Cierre de OTRA persona,
-        // el Jefe ADM puede gestionar si está en Pendiente ADM o si hay un descargo enviado (vuelve a Pendiente ADM).
-        return ['Pendiente Aprobación ADM', 'Descargo Enviado ADM', 'Pendiente Re-evaluacion'].includes(estado);
-    }
-
-    // Reglas para Gerente General
-    if (rol === ROLES.GERENTE_GENERAL) {
-        // Gerente General puede gestionar solicitudes pendientes para él o con descargo enviado a él.
-        // Similar a Jefe ADM, si el propio Gerente es el solicitante de un Decremento/Cierre, solo puede
-        // enviar descargo si fue Observada GRTE.
-        if (usuarioEsSolicitante && solicitanteRol === ROLES.GERENTE_GENERAL && esDecrementoCierre) {
-            return estado === 'Observada GRTE'; // Solo si es observada por GRTE, puede enviar descargo
+        // El Gerente General puede gestionar lo que está en su bandeja de entrada.
+        if (rol === ROLES.GERENTE_GENERAL) {
+            // Se incluye el nuevo estado 'Pendiente Re-evaluacion GRTE'.
+            return ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'].includes(estado);
         }
-        return ['Pendiente Aprobación GRTE', 'Descargo Enviado GRTE'].includes(estado);
     }
-
-    // Reglas para Jefe de Área / Colaborador (solo pueden presentar descargo de sus propias solicitudes observadas)
-    if (rol === ROLES.JEFE_AREA || rol === ROLES.COLABORADOR) {
-        // Solicitantes (Jefe de Área o Colaborador) solo pueden gestionar para enviar un descargo
-        // si su solicitud ha sido observada por ADM o GRTE.
-        return usuarioEsSolicitante && (estado === 'Observada ADM' || estado === 'Observada GRTE');
+    // REGLA 2: LÓGICA PARA SOLICITANTES (El usuario actual SÍ es quien pidió la solicitud)
+    if (usuarioEsSolicitante) {
+        // REGLA 2.1: Lógica de negocio específica para Decremento/Cierre solicitados por ADM/GRTE.
+        // Se preserva la regla de que no pueden auto-gestionar, solo enviar descargos.
+        if ((rol === ROLES.JEFE_ADM || rol === ROLES.GERENTE_GENERAL) && esDecrementoCierre) {
+            return estado === 'Observada GRTE'; // Solo pueden actuar si GRTE observó.
+        }
+        // REGLA 2.2: Para CUALQUIER OTRA solicitud, el solicitante solo puede "gestionar"
+        // para enviar un descargo si su solicitud fue previamente observada.
+        return ['Observada ADM', 'Observada GRTE'].includes(estado);
     }
-
-    return false; // Por defecto, no se puede gestionar
+    // Si ninguna regla se cumple, no se muestra el botón.
+    return false;
 };
 
 // --- Función de permiso para edición proactiva ---
 const puedeEditarProactivamente = (solicitud) => {
-    if (!usuarioActual.value) return false;
-    return usuarioActual.value.id === solicitud.id_solicitante && solicitud.estado === 'Pendiente Aprobación ADM';
-};
-
-// --- Funciones de Carga de Datos ---
-const obtenerUsuarioAutenticado = async () => {
-    cargandoUsuario.value = true;
-    try {
-        console.log('🔍 Haciendo petición a /user...');
-        const response = await api.get('/auth/user');
-
-        usuarioActual.value = response.data;
-
-        console.log('✅ Usuario y Rol asignados correctamente:', usuarioActual.value?.name, rolUsuario.value);
-        if (!usuarioActual.value?.role?.permissions) {
-            console.warn('⚠️ El usuario autenticado no tiene permisos cargados.');
-        }
-
-    } catch (error) {
-        console.error('❌ Error al obtener datos del usuario autenticado:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error de Autenticación',
-            text: 'No se pudieron cargar los datos del usuario. Por favor, inicia sesión de nuevo.',
-            confirmButtonText: 'Ok'
-        });
-    } finally {
-        cargandoUsuario.value = false;
+    // REGLA 0: Solo el solicitante puede editar y debe existir un usuario actual.
+    if (!props.usuarioActual || props.usuarioActual.id !== solicitud.id_solicitante) {
+        return false;
     }
+    const estado = solicitud.estado;
+    const solicitanteRol = solicitud.solicitante?.role?.name;
+    // REGLA 1: Solicitantes "regulares" (Jefe de Área, Colaborador) solo pueden editar
+    // ANTES de la primera revisión por parte de Administración.
+    if ([ROLES.JEFE_AREA, ROLES.COLABORADOR].includes(solicitanteRol)) {
+        return estado === 'Pendiente Aprobación ADM';
+    }
+    // REGLA 2: Solicitantes de "alto nivel" (Jefe ADM) solo pueden editar ANTES de la
+    // primera revisión por parte de Gerencia (su solicitud salta a ADM).
+    // Esta lógica es segura porque el backend usará 'Pendiente Re-evaluacion GRTE'
+    // para los descargos, impidiendo que la solicitud vuelva a este estado inicial.
+    if ([ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(solicitanteRol)) {
+        return estado === 'Pendiente Aprobación GRTE';
+    }
+    // REGLA 3: El Gerente General no edita proactivamente, sus solicitudes se auto-aprueban.
+    // Si ninguna regla aplica, no se puede editar.
+    return false;
 };
+
 
 // --- Función para obtener solicitudes (ahora llamada por los watchers) ---
 const obtenerSolicitudes = async () => {
-    // Solo mostrar loading si no es una búsqueda en tiempo real (debounce ya maneja el indicador)
-    if (!buscandoSolicitudes.value) {
-        cargandoSolicitudes.value = true;
-    }
-
+    if (!buscandoSolicitudes.value) cargandoSolicitudes.value = true;
     try {
-        const params = {};
-
-        // Filtros de selección (siempre se aplican)
-        if (filtroEstado.value !== 'Todas') {
-            params.estado = filtroEstado.value;
-        }
-
-        if (filtroTipoSolicitud.value !== 'Todos') {
-            params.tipo_solicitud = filtroTipoSolicitud.value;
-        }
-
-        // Filtros de texto (solo si cumplen el mínimo de caracteres)
-        if (busquedaNumeroSolicitud.value.length >= MIN_SEARCH_LENGTH) {
-            params.codigo_solicitud = busquedaNumeroSolicitud.value;
-        }
-
-        if (busquedaSolicitante.value.length >= MIN_SEARCH_LENGTH) {
-            params.solicitante_name = busquedaSolicitante.value;
-        }
-
-        // Filtros de fecha (se aplican si tienen valor)
-        if (filtroFechaInicio.value) {
-            params.fecha_inicio = filtroFechaInicio.value;
-        }
-
-        if (filtroFechaFin.value) {
-            params.fecha_fin = filtroFechaFin.value;
-        }
-
-        console.log('📤 Parámetros de búsqueda:', params);
-
+        const params = {
+            estado: filtroEstado.value !== 'Todas' ? filtroEstado.value : undefined,
+            tipo_solicitud: filtroTipoSolicitud.value !== 'Todos' ? filtroTipoSolicitud.value : undefined,
+            codigo_solicitud: busquedaNumeroSolicitud.value.length >= MIN_SEARCH_LENGTH ? busquedaNumeroSolicitud.value : undefined,
+            solicitante_name: busquedaSolicitante.value.length >= MIN_SEARCH_LENGTH ? busquedaSolicitante.value : undefined,
+            fecha_inicio: filtroFechaInicio.value || undefined,
+            fecha_fin: filtroFechaFin.value || undefined,
+        };
         const response = await api.get('/v1/solicitudes', { params });
         solicitudes.value = response.data.solicitudes;
-
-        console.log(`📥 Solicitudes cargadas: ${solicitudes.value.length}`);
-
-        // Resetear a la primera página cuando se aplican filtros
         paginaActual.value = 1;
-
     } catch (error) {
         console.error('❌ Error al obtener solicitudes:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error al cargar solicitudes',
-            text: 'No se pudieron cargar las solicitudes. Por favor, inténtalo de nuevo.',
-            confirmButtonText: 'Ok'
-        });
+        Swal.fire('Error', 'No se pudieron cargar las solicitudes.', 'error');
     } finally {
         cargandoSolicitudes.value = false;
-        buscandoSolicitudes.value = false; // Resetear indicador de búsqueda pendiente
+        buscandoSolicitudes.value = false;
     }
 };
 
@@ -439,7 +379,6 @@ watch([filtroFechaInicio, filtroFechaFin], () => {
 
 // --- Ciclo de Vida ---
 onMounted(() => {
-    obtenerUsuarioAutenticado();
     obtenerSolicitudes();
 });
 </script>
@@ -448,7 +387,7 @@ onMounted(() => {
     <div class="p-6 bg-white rounded-lg shadow-md">
         <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Seguimiento de Solicitudes de Fondos</h2>
 
-        <div v-if="cargandoUsuario || cargandoSolicitudes" class="text-center text-gray-500 py-8">
+        <div v-if="cargandoSolicitudes" class="text-center text-gray-500 py-8">
             <div class="inline-flex items-center">
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg"
                     fill="none" viewBox="0 0 24 24">
@@ -623,39 +562,43 @@ onMounted(() => {
                     <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                         <thead>
                             <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
-                                <th class="py-4 px-4 text-center font-semibold">NRO SOLICITUD</th>
-                                <th class="py-4 px-4 text-center font-semibold">Tipo</th>
-                                <th class="py-4 px-4 text-center font-semibold">Monto</th>
-                                <th class="py-4 px-4 text-center font-semibold">Prioridad</th>
-                                <th class="py-4 px-4 text-center font-semibold w-48">Estado</th>
-                                <th class="py-4 px-4 text-center font-semibold">Solicitante</th>
-                                <th class="py-4 px-4 text-center font-semibold">Fecha Creación</th>
-                                <th class="py-4 px-4 text-center font-semibold w-32">Acciones</th>
+                                <th class="py-3 px-2 text-center font-semibold">COD SOLICITUD</th>
+                                <th class="py-3 px-2 text-center font-semibold">Tipo</th>
+                                <th class="py-3 px-2 text-center font-semibold">Tipo Fondo</th>
+                                <th class="py-3 px-2 text-center font-semibold">Monto</th>
+                                <th class="py-3 px-2 text-center font-semibold">Prioridad</th>
+                                <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
+                                <th class="py-3 px-2 text-center font-semibold">Solicitante</th>
+                                <th class="py-3 px-2 text-center font-semibold">Fecha Creación</th>
+                                <th class="py-3 px-2 text-center font-semibold w-32">Acciones</th>
                             </tr>
                         </thead>
                         <tbody class="text-gray-600 text-sm">
                             <tr v-for="solicitud in solicitudesMostradas" :key="solicitud.id"
                                 class="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
-                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">{{
+                                <td class="py-4 px-4 text-center text-sm whitespace-nowrap">{{
                                     solicitud.codigo_solicitud ||
                                     solicitud.id }}</td>
-                                <td class="py-4 px-4 text-center">{{ solicitud.tipo_solicitud || 'N/A' }}</td>
-                                <td class="py-4 px-4 text-center font-medium whitespace-nowrap">S/. {{
+                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.tipo_solicitud || 'N/A' }}</td>
+                                <td class="py-4 px-4 text-center text-sm">
+                                    {{ solicitud.tipo_fondo_solicitado || 'N/A' }}
+                                </td>
+                                <td class="py-4 px-4 text-center text-sm whitespace-nowrap">S/. {{
                                     solicitud.monto_solicitado ?
                                         parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</td>
-                                <td class="py-4 px-4 text-center">{{ solicitud.prioridad || 'N/A' }}</td>
+                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.prioridad || 'N/A' }}</td>
 
-                                <td class="py-4 px-4 flex justify-center items-center">
+                                <td class="py-4 px-4 flex justify-center items-center text-xs">
                                     <span :class="getClassesForBadge(solicitud.estado)">
                                         {{ solicitud.estado }}
                                     </span>
                                 </td>
-                                <td class="py-4 px-4 text-center">{{ solicitud.solicitante?.name || 'N/A' }} {{
+                                <td class="py-4 px-4 text-center text-sm">{{ solicitud.solicitante?.name || 'N/A' }} {{
                                     solicitud.solicitante?.last_name || '' }}</td>
-                                <td class="py-4 px-4 text-center">
+                                <td class="py-4 px-4 text-center text-sm">
                                     {{ new Date(solicitud.created_at).toLocaleDateString('es-ES') }}
                                 </td>
-                                <td class="py-4 px-4 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <div class="flex items-center justify-center space-x-2">
                                         <button @click="verDetalles(solicitud)"
                                             class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-700 transition-colors duration-200"
@@ -755,16 +698,19 @@ onMounted(() => {
         </div>
 
         <SolicitudDetalleModal :mostrar="mostrarDetalleModal" :solicitud="solicitudSeleccionada"
-            @close="cerrarDetalleModal" />
+            :gastos-catalogo="props.gastosProyectadosCatalogo" @close="cerrarDetalleModal" />
 
         <HistorialEstadosModal :mostrar="mostrarHistorialModal" :solicitud="solicitudHistorialSeleccionada"
             @close="cerrarHistorialModal" />
-        <EditarSolicitudModal :mostrar="mostrarEditarModal" :solicitud="solicitudParaEditar" :modo="modoEdicion"
-            @close="cerrarEditarModal" @solicitud-actualizada="onSolicitudActualizada" />
+        <EditarSolicitudModal v-if="mostrarEditarModal && solicitudParaEditar" :mostrar="mostrarEditarModal"
+            :solicitud-a-editar="solicitudParaEditar" :modo="modoEdicion" :usuario-actual="props.usuarioActual"
+            :proyectos="props.proyectos" :gastos-proyectados-catalogo="props.gastosProyectadosCatalogo"
+            :areas-catalogo="props.areasCatalogo" @solicitud-actualizada="onSolicitudActualizada"
+            @cancelar="cerrarEditarModal" />
 
         <!-- Se pasa el objeto usuarioActual al componente GestionSolicitudModal -->
         <GestionSolicitudModal :mostrar="mostrarGestionModal" :solicitud="solicitudGestionSeleccionada"
-            :usuarioActual="usuarioActual" @close="cerrarGestionModal" @open-edit-modal="handleOpenEditModal" />
+            :usuario-actual="props.usuarioActual" @close="cerrarGestionModal" @open-edit-modal="handleOpenEditModal" />
     </div>
 </template>
 

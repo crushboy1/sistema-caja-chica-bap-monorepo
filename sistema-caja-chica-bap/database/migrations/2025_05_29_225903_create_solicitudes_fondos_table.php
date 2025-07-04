@@ -32,7 +32,7 @@ return new class extends Migration
             $table->foreignId('id_proyecto')->nullable()->constrained('proyectos', 'id_proyecto');
             $table->text('motivo_detalle'); // Motivo general de la solicitud o detalle de la modificación/cierre
             $table->decimal('monto_solicitado', 10, 2); // Monto solicitado (para Apertura) o monto de la modificación (para Incremento/Decremento)
-            $table->enum('prioridad', ['Baja', 'Media', 'Alta', 'Urgente'])->default('Media'); // Prioridad de la solicitud
+            $table->enum('prioridad', ['Baja', 'Media', 'Alta', 'Urgente'])->default('Media')->nullable(); // Prioridad de la solicitud
 
             // Estados de la solicitud (según nuestra última definición)
             $table->enum('estado', [
@@ -41,6 +41,7 @@ return new class extends Migration
                 'Observada ADM',
                 'Descargo Enviado ADM',
                 'Pendiente Re-evaluacion',
+                'Pendiente Re-evaluacion GRTE',
                 'Aprobada ADM', // Estado transicional interno
                 'Pendiente Aprobación GRTE',
                 'Observada GRTE',

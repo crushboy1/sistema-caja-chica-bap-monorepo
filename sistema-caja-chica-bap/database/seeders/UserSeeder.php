@@ -22,32 +22,27 @@ class UserSeeder extends Seeder
         User::truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        // Obtener IDs de roles usando el modelo Eloquent
-        $superAdminRole = Role::where('name', 'super_admin')->first();
-        $jefeAreaRole = Role::where('name', 'jefe_area')->first();
-        $jefeAdministracionRole = Role::where('name', 'jefe_administracion')->first();
-        $gerenteGeneralRole = Role::where('name', 'gerente_general')->first();
-        $colaboradorRole = Role::where('name', 'colaborador')->first();
+        // Obtener IDs de roles
+        $superAdminRole = Role::where('name', 'super_admin')->firstOrFail();
+        $jefeAreaRole = Role::where('name', 'jefe_area')->firstOrFail();
+        $jefeAdministracionRole = Role::where('name', 'jefe_administracion')->firstOrFail();
+        $gerenteGeneralRole = Role::where('name', 'gerente_general')->firstOrFail();
+        $colaboradorRole = Role::where('name', 'colaborador')->firstOrFail();
 
         // Obtener ID de tipo de documento
-        $dniType = TipoDocumentoIdentidad::where('name', 'DNI')->first();
+        $dniType = TipoDocumentoIdentidad::where('name', 'DNI')->firstOrFail();
 
-        // Obtener IDs de las áreas
-        $gerenciaGeneralArea = Area::where('name', 'Gerencia General')->first();
-        $administracionContabilidadArea = Area::where('name', 'Administración y Contabilidad')->first();
-        $gestionProyeccionArea = Area::where('name', 'Gestión y Proyección Social')->first();
-        $tiArea = Area::where('name', 'Tecnología de la Información')->first();
-        $estrategiaAlianzasArea = Area::where('name', 'Estrategia y Alianzas')->first();
+        // Obtener IDs de las áreas con los nuevos nombres
+        $gerenciaGeneralArea = Area::where('name', 'Gerencia General')->firstOrFail();
+        $administracionArea = Area::where('name', 'Administración')->firstOrFail();
+        $gestionSocialArea = Area::where('name', 'Gestión Social')->firstOrFail();
+        $proyectosArea = Area::where('name', 'Proyectos')->firstOrFail();
+        $tiArea = Area::where('name', 'Tecnología de la Información')->firstOrFail();
+        $alianzasArea = Area::where('name', 'Alianzas y Estrategias')->firstOrFail();
 
-        // Verificar que todos los datos necesarios existen
-        if (!$superAdminRole || !$jefeAreaRole || !$jefeAdministracionRole || !$gerenteGeneralRole || !$colaboradorRole || !$dniType || !$gerenciaGeneralArea || !$administracionContabilidadArea || !$gestionProyeccionArea || !$tiArea || !$estrategiaAlianzasArea) {
-            $this->command->error('No se encontraron todos los roles, áreas o tipos de documento necesarios. Ejecuta los seeders correspondientes primero.');
-            return;
-        }
+        // --- Creación de Usuarios ---
 
-        // --- INICIO DE REFACTORIZACIÓN: Usar User::create() ---
-
-        // 1. Crear Super Admin
+        // 1. Super Admin
         User::create([
             'numero_documento_identidad' => '12345678',
             'last_name' => 'Admin',
@@ -63,7 +58,7 @@ class UserSeeder extends Seeder
             'jefe_area_id' => null,
         ]);
 
-        // 2. Crear Gerente General (Carlos Lopez)
+        // 2. Gerente General (Carlos Lopez)
         $gerenteCarlos = User::create([
             'numero_documento_identidad' => '55667788',
             'last_name' => 'Lopez',
@@ -79,7 +74,7 @@ class UserSeeder extends Seeder
             'jefe_area_id' => null,
         ]);
 
-        // 3. Crear Jefe de Administración (Maria Gomez)
+        // 3. Jefe de Administración (Maria Gomez)
         $jefeAdmMaria = User::create([
             'numero_documento_identidad' => '11223344',
             'last_name' => 'Gomez',
@@ -90,12 +85,12 @@ class UserSeeder extends Seeder
             'password' => Hash::make('123456'),
             'role_id' => $jefeAdministracionRole->id,
             'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $administracionContabilidadArea->id,
+            'area_id' => $administracionArea->id,
             'email_verified_at' => now(),
-            'jefe_area_id' => $gerenteCarlos->id, // Reporta al Gerente General
+            'jefe_area_id' => $gerenteCarlos->id,
         ]);
 
-        // 4. Crear Jefe de Área (Juan Perez)
+        // 4. Jefe de Área de Gestión Social (Juan Perez)
         $jefeAreaJuan = User::create([
             'numero_documento_identidad' => '87654321',
             'last_name' => 'Perez',
@@ -106,12 +101,28 @@ class UserSeeder extends Seeder
             'password' => Hash::make('123456'),
             'role_id' => $jefeAreaRole->id,
             'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $gestionProyeccionArea->id,
+            'area_id' => $gestionSocialArea->id,
             'email_verified_at' => now(),
-            'jefe_area_id' => $jefeAdmMaria->id, // Reporta al Jefe de Administración
+            'jefe_area_id' => $jefeAdmMaria->id,
         ]);
 
-        // 5. Crear Colaborador (Ana Diaz) que reporta a Juan Perez
+        // 5. NUEVO: Jefe de Área de Proyectos (Laura Torres)
+        $jefeProyectosLaura = User::create([
+            'numero_documento_identidad' => '20000001',
+            'last_name' => 'Torres',
+            'name' => 'Laura',
+            'cargo' => 'Jefe de Proyectos',
+            'email' => 'laura.torres@bap.com',
+            'telefono' => '922334455',
+            'password' => Hash::make('123456'),
+            'role_id' => $jefeAreaRole->id,
+            'tipo_documento_identidad_id' => $dniType->id,
+            'area_id' => $proyectosArea->id,
+            'email_verified_at' => now(),
+            'jefe_area_id' => $gerenteCarlos->id,
+        ]);
+
+        // 6. Colaborador (Ana Diaz) que reporta a Juan Perez
         User::create([
             'numero_documento_identidad' => '99887766',
             'last_name' => 'Diaz',
@@ -122,12 +133,12 @@ class UserSeeder extends Seeder
             'password' => Hash::make('123456'),
             'role_id' => $colaboradorRole->id,
             'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $gestionProyeccionArea->id,
+            'area_id' => $gestionSocialArea->id,
             'email_verified_at' => now(),
-            'jefe_area_id' => $jefeAreaJuan->id, // Se asigna directamente el ID de Juan
+            'jefe_area_id' => $jefeAreaJuan->id,
         ]);
 
-        // 6. Crear otro Jefe de Área (Roberto Garcia)
+        // 7. Jefe de Área de Alianzas (Roberto Garcia)
         User::create([
             'numero_documento_identidad' => '10000001',
             'last_name' => 'Garcia',
@@ -138,9 +149,9 @@ class UserSeeder extends Seeder
             'password' => Hash::make('123456'),
             'role_id' => $jefeAreaRole->id,
             'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $estrategiaAlianzasArea->id,
+            'area_id' => $alianzasArea->id,
             'email_verified_at' => now(),
-            'jefe_area_id' => $gerenteCarlos->id, // Reporta al Gerente General
+            'jefe_area_id' => $gerenteCarlos->id,
         ]);
 
         $this->command->info('Usuarios de prueba creados exitosamente.');

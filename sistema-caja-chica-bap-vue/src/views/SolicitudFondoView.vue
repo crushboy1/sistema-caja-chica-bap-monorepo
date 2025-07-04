@@ -215,11 +215,12 @@
         <div v-if="activeSection && !isLoading" class="mt-12">
           <div class="glass rounded-3xl p-8 shadow-strong backdrop-blur-xl border border-white/20">
             <AperturaFondos v-if="activeSection === 'apertura'" :usuario-actual="user" :proyectos="proyectos"
-              :gastos-proyectados-catalogo="gastosProyectadosCatalogo" @solicitudEnviada="handleSolicitudEnviada"
-              class="animate-fade-in-up" />
+              :gastos-proyectados-catalogo="gastosProyectadosCatalogo" :areas-catalogo="areas"
+              @solicitudEnviada="handleSolicitudEnviada" class="animate-fade-in-up" />
             <ModificacionFondos v-if="activeSection === 'modificacion'" :usuario-actual="user" @close="handleClose"
               class="animate-fade-in-up" />
-            <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" :usuario-actual="user" @close="handleClose"
+            <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" :usuario-actual="user" :proyectos="proyectos"
+              :gastos-proyectados-catalogo="gastosProyectadosCatalogo" :areas-catalogo="areas" @close="handleClose"
               class="animate-fade-in-up" />
           </div>
         </div>
@@ -273,6 +274,7 @@ const isLoading = ref(true);
 const cardAnimationState = ref({});
 const proyectos = ref([]);
 const gastosProyectadosCatalogo = ref([]);
+const areas = ref([]);
 // Roles definidos para mayor claridad y evitar errores de escritura
 const ROLES = {
   JEFE_AREA: 'jefe_area',
@@ -284,17 +286,38 @@ const ROLES = {
 
 // Propiedades computadas para la visibilidad de las tarjetas
 const showAperturaCard = computed(() => {
-  return user.value?.role?.name === ROLES.JEFE_AREA || user.value?.role?.name === ROLES.SUPER_ADMIN;
+  if (!user.value?.role?.name) return false;
+  // Visible para todas las jefaturas, Gerente y Super Admin.
+  return [
+    ROLES.JEFE_AREA,
+    ROLES.JEFE_ADM,
+    ROLES.GERENTE_GENERAL,
+    ROLES.SUPER_ADMIN
+  ].includes(user.value.role.name);
 });
 
 const showModificacionCard = computed(() => {
-  return user.value?.role?.name === ROLES.JEFE_AREA || user.value?.role?.name === ROLES.JEFE_ADM || user.value?.role?.name === ROLES.SUPER_ADMIN;
+  if (!user.value?.role?.name) return false;
+  // Visible para todas las jefaturas, Gerente y Super Admin.
+  return [
+    ROLES.JEFE_AREA,
+    ROLES.JEFE_ADM,
+    ROLES.GERENTE_GENERAL,
+    ROLES.SUPER_ADMIN
+  ].includes(user.value.role.name);
 });
 
 const showSeguimientoCard = computed(() => {
-  return !!user.value;
+  if (!user.value?.role?.name) return false;
+  // CORRECCIÓN: La tarjeta de seguimiento solo es visible para roles que gestionan o crean solicitudes.
+  // Un colaborador no verá datos en la tabla, por lo que se le oculta la tarjeta.
+  return [
+    ROLES.JEFE_AREA,
+    ROLES.JEFE_ADM,
+    ROLES.GERENTE_GENERAL,
+    ROLES.SUPER_ADMIN
+  ].includes(user.value.role.name);
 });
-
 
 // Métodos mejorados
 const handleCardClick = async (section) => {
@@ -390,17 +413,18 @@ onMounted(async () => {
   try {
     // Se ejecutan todas las llamadas a la API necesarias en paralelo para máxima eficiencia.
     // Esto asegura que solo se haga una petición por cada recurso cuando la vista se carga.
-    const [userResponse, proyectosResponse, gastosProyectadosResponse] = await Promise.all([
+    const [userResponse, proyectosResponse, gastosProyectadosResponse, areasResponse] = await Promise.all([
       api.get('/auth/user'),
       api.get('/v1/proyectos'),
-      api.get('/v1/gastos-proyectados')
+      api.get('/v1/gastos-proyectados'),
+      api.get('/v1/areas')
     ]);
 
     // Se asignan los datos obtenidos a las variables reactivas del padre.
     user.value = userResponse.data;
     proyectos.value = proyectosResponse.data.proyectos;
     gastosProyectadosCatalogo.value = gastosProyectadosResponse.data.gastos_proyectados;
-
+    areas.value = areasResponse.data.areas;
   } catch (error) {
     console.error('Error al cargar datos iniciales para SolicitudFondoView:', error);
     // Aquí se podría mostrar un error general al usuario.

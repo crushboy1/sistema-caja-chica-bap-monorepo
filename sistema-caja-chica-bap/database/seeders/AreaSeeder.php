@@ -19,62 +19,57 @@ class AreaSeeder extends Seeder
         // Se limpia la tabla antes de insertar para evitar duplicados en re-ejecuciones.
         DB::table('areas')->delete();
 
+        $now = Carbon::now();
+
         $areas = [
             [
-                'name' => 'Administración y Contabilidad',
-                'acronym' => 'AC', // Acrónimo añadido
-                'description' => 'Área encargada de la gestión administrativa.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ],
-            [
-                'name' => 'Estrategia y Alianzas',
-                'acronym' => 'EA', // Acrónimo añadido
-                'description' => 'Área encargada de la gestión de convenios.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ],
-            [
-                'name' => 'Gestión y Proyección Social',
-                'acronym' => 'GPS', // Acrónimo añadido
+                'name' => 'Gestión Social',
+                'acronym' => 'GSO',
                 'description' => 'Área que gestiona los programas de ayuda y distribución.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'created_at' => $now, 'updated_at' => $now
             ],
             [
-                'name' => 'Voluntariado',
-                'acronym' => 'VOL', // Acrónimo añadido
-                'description' => 'Área encargada de la gestión de voluntarios.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'name' => 'Proyectos',
+                'acronym' => 'PRY',
+                'description' => 'Área encargada de la gestión y ejecución de proyectos.',
+                'created_at' => $now, 'updated_at' => $now
             ],
             [
                 'name' => 'Logística',
-                'acronym' => 'LOG', // Acrónimo añadido
+                'acronym' => 'LOG',
                 'description' => 'Área encargada de la cadena de suministro y transporte.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'created_at' => $now, 'updated_at' => $now
             ],
             [
-                'name' => 'Tecnología de la Información',
-                'acronym' => 'TI', // Acrónimo añadido
-                'description' => 'Área encargada de los sistemas y la infraestructura tecnológica.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'name' => 'Procesos',
+                'acronym' => 'PRO',
+                'description' => 'Área encargada de la optimización de procesos de la organización.',
+                'created_at' => $now, 'updated_at' => $now
             ],
             [
-                'name' => 'Calidad y Procesos',
-                'acronym' => 'CP', // Acrónimo añadido
-                'description' => 'Área encargada de los procesos de la organización.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'name' => 'Alianzas y Estrategias',
+                'acronym' => 'AYE',
+                'description' => 'Área encargada de la gestión de convenios y alianzas estratégicas.',
+                'created_at' => $now, 'updated_at' => $now
+            ],
+            [
+                'name' => 'Administración',
+                'acronym' => 'ADM',
+                'description' => 'Área encargada de la gestión administrativa y contable.',
+                'created_at' => $now, 'updated_at' => $now
             ],
             [
                 'name' => 'Gerencia General',
-                'acronym' => 'GG', // Acrónimo añadido
+                'acronym' => 'GG',
                 'description' => 'Área que encargada de tomar decisiones relevantes para la organización.',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'created_at' => $now, 'updated_at' => $now
+            ],
+             // Puedes añadir otras áreas si es necesario, como TI, Voluntariado, etc.
+            [
+                'name' => 'Tecnología de la Información',
+                'acronym' => 'TI',
+                'description' => 'Área encargada de los sistemas y la infraestructura tecnológica.',
+                'created_at' => $now, 'updated_at' => $now
             ],
         ];
 
