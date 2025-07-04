@@ -98,7 +98,9 @@ class SolicitudFondoController extends Controller
         if ($request->has('fecha_fin')) {
             $query->whereDate('created_at', '<=', $request->fecha_fin);
         }
-
+        if ($request->has('area_id') && !empty($request->area_id)) {
+            $query->where('id_area', $request->area_id);
+        }
         $solicitudes = $query->orderBy('codigo_solicitud', 'desc')->get();
 
         return response()->json([
@@ -148,6 +150,7 @@ class SolicitudFondoController extends Controller
             'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required|numeric|min:0.01',
         ]);
+
         $user = Auth::user();
         $user->loadMissing('area', 'role'); // Cargar relaciones
 
@@ -159,13 +162,14 @@ class SolicitudFondoController extends Controller
                 ]);
             }
         }
+
         // Validaciones adicionales de lógica de negocio
         if (in_array($request->tipo_solicitud, ['Incremento', 'Decremento', 'Cierre'])) {
             if (!$request->id_solicitud_original) {
                 throw ValidationException::withMessages(['id_solicitud_original' => 'Para solicitudes de tipo Incremento, Decremento o Cierre, el ID de la solicitud original es requerido.']);
             }
             // Validar que el fondo efectivo original exista y esté Activo
-            $fondoOriginal = FondoEfectivo::where('id_solicitud_apertura', $request->id_solicitud_original)->first();
+            $fondoOriginal = FondoEfectivo::where('id_solicitud_apertura', $request->id_solicitud_original)->firstOrFail();
             if (!$fondoOriginal) {
                 throw ValidationException::withMessages(['id_solicitud_original' => 'No se encontró un fondo efectivo activo asociado a la solicitud original proporcionada.']);
             }
@@ -174,7 +178,7 @@ class SolicitudFondoController extends Controller
             }
             // Validar que no haya solicitudes de modificación pendientes para este mismo fondo
             $existingPendingModification = SolicitudFondo::where('id_solicitud_original', $request->id_solicitud_original)
-                ->whereIn('estado', ['Pendiente Aprobación ADM', 'Observada ADM', 'Descargo Enviado ADM', 'Aprobada ADM', 'Pendiente Aprobación GRTE', 'Observada GRTE', 'Descargo Enviado GRTE'])
+                ->whereIn('estado', ['Pendiente Aprobación ADM', 'Observada ADM', 'Pendiente Re-evaluacion', 'Aprobada ADM', 'Pendiente Aprobación GRTE', 'Observada GRTE', 'Pendiente Re-evaluacion GRTE'])
                 ->whereIn('tipo_solicitud', ['Incremento', 'Decremento', 'Cierre'])
                 ->exists();
             if ($existingPendingModification) {
@@ -215,25 +219,23 @@ class SolicitudFondoController extends Controller
 
             // Usamos el nombre del rol desde la relación: $user->role->name
             $userRoleName = $user->role->name;
-
+            $tipoFondoParaGuardar = $request->tipo_solicitud === 'Apertura'
+                ? $request->tipo_fondo_solicitado
+                : ($fondoOriginal ? $fondoOriginal->tipo_fondo : null);
             // --- ESCENARIO 1: Solicitud de Apertura de tipo "Proyecto" ---
-            if ($request->tipo_solicitud === 'Apertura' && $request->tipo_fondo_solicitado === 'Proyecto') {
+            if ($tipoFondoParaGuardar === 'Proyecto') {
                 $initialStateInDB = 'Aprobada';
                 $initialHistorialObservation = 'aprobada automáticamente (Fondo de Proyecto)';
                 $revisorAdmId = $user->id;
                 $aprobadorGerenteId = $user->id;
-
-                // --- ESCENARIO 2: Solicitud de Apertura creada por el Gerente General ---
-            } elseif ($request->tipo_solicitud === 'Apertura' && $userRoleName === 'gerente_general') {
+            } elseif ($userRoleName === 'gerente_general') {
                 $initialStateInDB = 'Aprobada';
                 $initialHistorialObservation = 'aprobada automáticamente (solicitud de Gerente General)';
                 $revisorAdmId = $user->id;
                 $aprobadorGerenteId = $user->id;
-
-                // --- ESCENARIO 3: Solicitud de Apertura creada por el Jefe de Administración ---
-            } elseif ($request->tipo_solicitud === 'Apertura' && ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin')) {
+            } elseif ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin') {
                 $initialStateInDB = 'Pendiente Aprobación GRTE';
-                $initialHistorialObservation = 'enviada directamente a Gerencia General (solicitud de Administración)';
+                $initialHistorialObservation = 'enviada directamente a Gerencia General';
                 $revisorAdmId = $user->id;
 
                 // NUEVA LÓGICA: Flujo especial para Decremento/Cierre iniciado por un Administrador
@@ -241,7 +243,20 @@ class SolicitudFondoController extends Controller
                 $initialStateInDB = 'Pendiente Aprobación GRTE';
                 $initialHistorialObservation = 'enviada directamente a Gerencia General';
                 $revisorAdmId = $user->id;
-            }
+            } else {
+                if ($userRoleName === 'gerente_general') {
+                    $initialStateInDB = 'Aprobada';
+                    $initialHistorialObservation = 'aprobada automáticamente (modificación por Gerente General)';
+                    $revisorAdmId = $user->id;
+                    $aprobadorGerenteId = $user->id;
+                } elseif ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin') {
+                    $initialStateInDB = 'Pendiente Aprobación GRTE';
+                    $initialHistorialObservation = 'enviada directamente a Gerencia General';
+                    $revisorAdmId = $user->id;
+                }
+                // Si es jefe_area o colaborador, se mantiene el estado por defecto: 'Pendiente Aprobación ADM'
+            } // ← LLAVE FALTANTE AGREGADA AQUÍ
+
             $solicitud = SolicitudFondo::create([
                 'id_solicitante' => $user->id,
                 'id_area' => $user->area_id,
@@ -251,7 +266,7 @@ class SolicitudFondoController extends Controller
                 'prioridad' => $request->prioridad,
                 'estado' => $initialStateInDB,
                 'id_solicitud_original' => $request->id_solicitud_original,
-                'tipo_fondo_solicitado' => $request->tipo_fondo_solicitado,
+                'tipo_fondo_solicitado' => $tipoFondoParaGuardar,
                 'id_proyecto' => $request->id_proyecto,
                 'id_revisor_adm' => $revisorAdmId,
                 'id_aprobador_gerente' => $aprobadorGerenteId,
@@ -272,6 +287,7 @@ class SolicitudFondoController extends Controller
                     $solicitud->gastosProyectados()->attach($gastosParaPivot);
                 }
             }
+
             HistorialEstadoSolicitud::create([
                 'id_solicitud_fondo' => $solicitud->id,
                 'estado_anterior' => null,
@@ -280,6 +296,7 @@ class SolicitudFondoController extends Controller
                 'id_usuario_accion' => $user->id,
                 'fecha_cambio' => $solicitud->created_at, // Usar la fecha de creación de la solicitud
             ]);
+
             HistorialEstadoSolicitud::create([
                 'id_solicitud_fondo' => $solicitud->id,
                 'estado_anterior' => 'Creada', // El estado anterior para esta entrada es 'Creada'
@@ -288,23 +305,17 @@ class SolicitudFondoController extends Controller
                 'id_usuario_accion' => $user->id,
                 'fecha_cambio' => now(),
             ]);
+
             // --- INICIO DE CAMBIOS: CREACIÓN DE FONDO PARA PROYECTOS ---  
-            $fondoCreado = null;
+            $fondoGestionado = null;
             $successMessage = "¡Solicitud registrada y enviada! Código: <strong>{$solicitud->codigo_solicitud}</strong>";
+
+            // --- ANOTACIÓN: La gestión del fondo (creación o actualización) solo ocurre si la solicitud se auto-aprueba ---
             if ($solicitud->estado === 'Aprobada') {
-                // Capturamos la instancia del fondo que devuelve el método
-                $fondoCreado = FondoEfectivo::crearDesdeSolicitudApertura($solicitud);
-                Log::info('Fondo creado automáticamente.', ['solicitud_id' => $solicitud->id, 'fondo_id' => $fondoCreado->id_fondo]);
-
-                // Asociamos las áreas participantes al proyecto
-                if ($request->has('areas_participantes') && $solicitud->proyecto) {
-                    $solicitud->proyecto->areas()->sync($request->areas_participantes);
-                    Log::info('Áreas participantes asociadas al proyecto.', ['proyecto_id' => $solicitud->id_proyecto, 'areas' => $request->areas_participantes]);
-                }
-
-                // Construimos el mensaje de éxito usando la variable que ya tenemos
-                if ($fondoCreado) {
-                    $successMessage = "¡Fondo creado exitosamente! Código de Fondo Asignado: <strong>{$fondoCreado->codigo_fondo}</strong>";
+                $fondoGestionado = $this->manageFondoEfectivo($solicitud, $user);
+                if ($fondoGestionado) {
+                    $action = $solicitud->tipo_solicitud === 'Apertura' ? 'creado' : 'actualizado';
+                    $successMessage = "¡Fondo {$action} exitosamente! Código de Fondo: <strong>{$fondoGestionado->codigo_fondo}</strong>";
                 }
             }
 
@@ -347,6 +358,7 @@ class SolicitudFondoController extends Controller
             ], 500);
         }
     }
+
     /**
      * Muestra una solicitud de fondo específica.
      *

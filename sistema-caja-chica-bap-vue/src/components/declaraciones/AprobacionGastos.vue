@@ -110,7 +110,7 @@
               <td class="py-4 px-4 text-center">{{ gasto.registrador.name }} {{
                 gasto.registrador.last_name }}</td>
               <td class="py-4 px-4 text-center text-gray-500">{{ new
-                Date(gasto.created_at).toLocaleDateString('es-ES') }}</td>
+                Date(gasto.created_at).toLocaleDateString('es-PE') }}</td>
               <td class="py-4 px-4 text-center">
 
                 <div class="flex items-center justify-center space-x-2">

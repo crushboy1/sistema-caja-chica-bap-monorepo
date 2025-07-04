@@ -217,7 +217,8 @@
             <AperturaFondos v-if="activeSection === 'apertura'" :usuario-actual="user" :proyectos="proyectos"
               :gastos-proyectados-catalogo="gastosProyectadosCatalogo" :areas-catalogo="areas"
               @solicitudEnviada="handleSolicitudEnviada" class="animate-fade-in-up" />
-            <ModificacionFondos v-if="activeSection === 'modificacion'" :usuario-actual="user" @close="handleClose"
+            <ModificacionFondos v-if="activeSection === 'modificacion'"
+              :gastos-proyectados-catalogo="gastosProyectadosCatalogo" :usuario-actual="user" @close="handleClose"
               class="animate-fade-in-up" />
             <SeguimientoSolicitudes v-if="activeSection === 'seguimiento'" :usuario-actual="user" :proyectos="proyectos"
               :gastos-proyectados-catalogo="gastosProyectadosCatalogo" :areas-catalogo="areas" @close="handleClose"

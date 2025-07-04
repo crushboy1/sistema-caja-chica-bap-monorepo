@@ -38,16 +38,21 @@ class FondoEfectivoController extends Controller
             'responsable:id,name,last_name,email,cargo',
             'area:id,name',
             'solicitudApertura' => function ($q) {
-                $q->select('id', 'codigo_solicitud', 'id_revisor_adm', 'id_aprobador_gerente')
-                    ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name']);
+                // Se asegura de seleccionar los campos necesarios, incluyendo las claves foráneas para las relaciones anidadas.
+                $q->select('id', 'codigo_solicitud', 'id_solicitante', 'id_revisor_adm', 'id_aprobador_gerente')
+                    ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name', 'gastosProyectados']);
             }
         ]);
 
         // Lógica de visibilidad por rol
-        if ($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) {
+        if ($user->role->name === 'super_admin' || $user->role->name === 'gerente_general' || $user->role->name === 'jefe_administracion') {
             // Acceso total para roles de administración.
-        } elseif ($user->hasRole('jefe_area') || $user->hasRole('colaborador')) {
-            $query->where('id_area', $user->area_id);
+        } elseif ($user->role->name === 'jefe_area' || $user->role->name === 'colaborador') {
+            // Un usuario regular solo ve los fondos de su área o de los que es responsable.
+            $query->where(function ($q) use ($user) {
+                $q->where('id_area', $user->area_id)
+                    ->orWhere('id_responsable', $user->id);
+            });
         } else {
             return response()->json(['message' => 'Acceso denegado. Rol no reconocido.'], 403);
         }
@@ -72,7 +77,7 @@ class FondoEfectivoController extends Controller
                     ->orWhere(DB::raw('LOWER(last_name)'), 'like', '%' . $searchTerm . '%');
             });
         }
-        if (($user->hasRole('super_admin') || $user->hasRole('gerente_general') || $user->hasRole('jefe_administracion')) && $request->filled('area_id')) {
+        if (($user->role->name === 'super_admin' || $user->role->name === 'gerente_general' || $user->role->name === 'jefe_administracion') && $request->filled('area_id')) {
             $query->where('id_area', $request->area_id);
         }
 
@@ -250,7 +255,7 @@ class FondoEfectivoController extends Controller
                 'solicitudApertura' => function ($query) {
                     $query->select('id', 'codigo_solicitud', 'tipo_solicitud', 'monto_solicitado', 'estado', 'id_revisor_adm', 'id_aprobador_gerente');
                     $query->with([
-                        'detallesGastosProyectados:id,id_solicitud_fondo,descripcion_gasto,monto_estimado',
+                        'gastosProyectados:id,id_solicitud_fondo,descripcion_gasto,monto_estimado',
                         'revisorAdm:id,name,last_name',
                         'aprobadorGerente:id,name,last_name',
                         'historialEstados' => function ($qHist) {
