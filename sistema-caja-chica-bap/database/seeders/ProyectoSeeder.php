@@ -15,12 +15,11 @@ class ProyectoSeeder extends Seeder
      */
     public function run(): void
     {
-        // Desactiva temporalmente la revisión de claves foráneas para evitar problemas de orden.
+        // Limpieza segura de las tablas
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        
-        // Limpia la tabla antes de poblarla para evitar duplicados en ejecuciones repetidas.
         Proyecto::truncate();
         DB::table('area_proyecto')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Crear los proyectos
         $proyecto1 = Proyecto::create([
@@ -41,35 +40,32 @@ class ProyectoSeeder extends Seeder
 
         $this->command->info('Proyectos creados exitosamente.');
 
-        // --- ASOCIACIÓN DE ÁREAS A PROYECTOS ---
-        // Obtener las áreas por su nombre o acrónimo. Es más robusto que usar IDs fijos.
-        $areaGestionSocial = Area::where('acronym', 'GSO')->first();
-        $areaLogistica = Area::where('acronym', 'LOG')->first();
-        $areaProyectos = Area::where('acronym', 'PRY')->first();
-        $areaCalidad = Area::where('acronym', 'PRO')->first(); // Asumiendo que 'PRO' es de Procesos/Calidad
-        $areaAlianzas = Area::where('acronym', 'AYE')->first();
+        // --- INICIO DE CORRECCIÓN ---
+        // Se asocian las áreas de una forma más segura.
 
+        // 1. Obtener las áreas por su acrónimo.
+        $acronimosProyecto1 = ['GSO', 'LOG', 'PRY', 'PRO'];
+        $acronimosProyecto2 = ['GSO', 'AYE'];
+
+        $areasProyecto1 = Area::whereIn('acronym', $acronimosProyecto1)->get();
+        $areasProyecto2 = Area::whereIn('acronym', $acronimosProyecto2)->get();
         
-        if ($proyecto1 && $areaGestionSocial && $areaLogistica && $areaProyectos && $areaCalidad) {
-            $proyecto1->areas()->attach([
-                $areaGestionSocial->id_area,
-                $areaLogistica->id_area,
-                $areaProyectos->id_area,
-                $areaCalidad->id_area,
-            ]);
-            $this->command->info('Áreas asociadas a "Fuertes como el hierro".');
+        // 2. Asociar áreas al proyecto "Fuertes como el hierro" solo si se encontraron áreas.
+        if ($proyecto1 && $areasProyecto1->isNotEmpty()) {
+            // Usamos pluck('id') para obtener solo los IDs de las áreas encontradas.
+            $proyecto1->areas()->attach($areasProyecto1->pluck('id'));
+            $this->command->info($areasProyecto1->count() . ' áreas asociadas a "Fuertes como el hierro".');
+        } else {
+            $this->command->warn('No se asociaron áreas a "Fuertes como el hierro" porque no se encontraron las áreas con los acrónimos especificados.');
         }
 
-        // Asociar áreas al proyecto "Cucharones Luchadores" (Ejemplo)
-        if ($proyecto2 && $areaGestionSocial && $areaAlianzas) {
-            $proyecto2->areas()->attach([
-                $areaGestionSocial->id_area,
-                $areaAlianzas->id_area,
-            ]);
-            $this->command->info('Áreas asociadas a "Cucharones Luchadores".');
+        // 3. Asociar áreas al proyecto "Cucharones Luchadores"
+        if ($proyecto2 && $areasProyecto2->isNotEmpty()) {
+            $proyecto2->areas()->attach($areasProyecto2->pluck('id'));
+            $this->command->info($areasProyecto2->count() . ' áreas asociadas a "Cucharones Luchadores".');
+        } else {
+            $this->command->warn('No se asociaron áreas a "Cucharones Luchadores" porque no se encontraron las áreas con los acrónimos especificados.');
         }
-        
-        // Reactiva la revisión de claves foráneas.
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        // --- FIN DE CORRECCIÓN ---
     }
 }

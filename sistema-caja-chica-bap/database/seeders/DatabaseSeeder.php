@@ -54,7 +54,6 @@ class DatabaseSeeder extends Seeder
         // Estos seeders crean datos de ejemplo que simulan el uso de la aplicación.
         // Dependen de que todos los seeders anteriores se hayan ejecutado.
         $this->call([
-            SolicitudFondoSeeder::class,           // Crea solicitudes de fondo de ejemplo.
             HistorialEstadoSolicitudSeeder::class, // Genera el historial para las solicitudes.
             FondoEfectivoSeeder::class,            // Crea fondos de efectivo basados en las solicitudes aprobadas.
             // NOTA: No tenemos un GastoSeeder por ahora, pero si lo tuviéramos, iría aquí.

@@ -5,16 +5,18 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\SolicitudFondo;
-use App\Models\DetalleGastoProyectado;
-use App\Models\FondoEfectivo; // Importar el modelo FondoEfectivo
-use App\Models\HistorialEstadoSolicitud; // Para registrar cambios de estado
+use App\Models\GastoProyectado;
+use App\Models\FondoEfectivo;
+use App\Models\Proyecto;
+use App\Models\HistorialEstadoSolicitud;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB; // Para transacciones de base de datos
-use Illuminate\Support\Str; // Para funciones de cadena, útil en la generación de códigos
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Arr;
+
 class SolicitudFondoController extends Controller
 {
     /**
@@ -30,7 +32,7 @@ class SolicitudFondoController extends Controller
         if (!$user) {
             return response()->json(['message' => 'No autenticado.'], 401);
         }
-
+        $user->loadMissing('role');
         $query = SolicitudFondo::query();
 
         // Cargar relaciones necesarias para la visualización detallada de las solicitudes
@@ -41,7 +43,7 @@ class SolicitudFondoController extends Controller
             'area:id,name',
             'revisorAdm:id,name,last_name',
             'aprobadorGerente:id,name,last_name',
-            'detallesGastosProyectados',
+            'gastosProyectados',
 
             // Cargar solicitudOriginal completa para mostrar detalles en la UI
             'solicitudOriginal:id,codigo_solicitud,id_solicitante,id_area,tipo_solicitud,motivo_detalle,monto_solicitado,prioridad,estado,motivo_observacion,motivo_descargo,motivo_rechazo_final,id_revisor_adm,id_aprobador_gerente,id_solicitud_original,created_at,updated_at',
@@ -63,16 +65,14 @@ class SolicitudFondoController extends Controller
             },
         ]);
         // --- Filtrado por Rol (Backend Enforcement para Seguridad y Eficiencia) ---
-        if ($user->hasRole('jefe_area')) {
+        if ($user->role->name === 'jefe_area' || $user->role->name === 'colaborador') {
             $query->where('id_solicitante', $user->id);
-        } elseif ($user->hasRole('gerente_general')) {
+        } elseif ($user->role->name === 'gerente_general') {
             $query->where(function ($q) use ($user) {
-                // El Gerente General ve solicitudes pendientes para él o que ya aprobó
                 $q->whereIn('estado', ['Pendiente Aprobación GRTE', 'Descargo Enviado GRTE'])
-                    ->orWhere('id_aprobador_gerente', $user->id);
+                    ->orWhere('id_aprobador_gerente', $user->id)
+                    ->orWhere('id_solicitante', $user->id);
             });
-        } elseif ($user->hasRole('colaborador')) {
-            $query->where('id_solicitante', $user->id);
         }
         // Para 'super_admin' y 'jefe_administracion', no se aplica filtro de rol aquí, ven todas.
         // --- Aplicar Filtros Adicionales de la Request (GET parameters) ---
@@ -120,33 +120,45 @@ class SolicitudFondoController extends Controller
             'tipo_solicitud' => 'required|in:Apertura,Incremento,Decremento,Cierre',
             'tipo_fondo_solicitado' => 'required_if:tipo_solicitud,Apertura|in:Regular,Proyecto,Excepcional',
             'id_proyecto' => 'required_if:tipo_fondo_solicitado,Proyecto|exists:proyectos,id_proyecto',
+            'areas_participantes' => 'nullable|array|required_if:tipo_fondo_solicitado,Proyecto',
+            'areas_participantes.*' => 'exists:areas,id',
             'motivo_detalle' => 'required|string|max:1000',
             'monto_solicitado' => [
-            'required',
-            'numeric',
-            'min:0',
-            // Se añade una regla de validación personalizada (Closure).
-            function ($attribute, $value, $fail) use ($request) {
-                // Solo se aplica esta regla si hay gastos proyectados (para tipos como Apertura, etc.)
-                if ($request->has('gastos_proyectados') && is_array($request->gastos_proyectados)) {
-                    // Se calcula la suma de los montos estimados del array de gastos.
-                    $totalProyectado = collect($request->gastos_proyectados)->sum('monto_estimado');
-                    
-                    // Se comparan los valores como flotantes para evitar problemas de precisión.
-                    if (floatval($value) !== floatval($totalProyectado)) {
-                        // Si no coinciden, la validación falla con este mensaje.
-                        $fail('El monto solicitado (S/ ' . $value . ') debe ser exactamente igual al total de gastos proyectados (S/ ' . $totalProyectado . ').');
+                'required',
+                'numeric',
+                'min:0',
+                // Se añade una regla de validación personalizada (Closure).
+                function ($attribute, $value, $fail) use ($request) {
+                    // Solo se aplica esta regla si hay gastos proyectados (para tipos como Apertura, etc.)
+                    if ($request->has('gastos_proyectados') && is_array($request->gastos_proyectados)) {
+                        // Se calcula la suma de los montos estimados del array de gastos.
+                        $totalProyectado = collect($request->gastos_proyectados)->sum('monto_estimado');
+
+                        // Se comparan los valores como flotantes para evitar problemas de precisión.
+                        if (floatval($value) !== floatval($totalProyectado)) {
+                            // Si no coinciden, la validación falla con este mensaje.
+                            $fail('El monto solicitado (S/ ' . $value . ') debe ser exactamente igual al total de gastos proyectados (S/ ' . $totalProyectado . ').');
+                        }
                     }
-                }
-            },
-        ], // Ahora es el NUEVO MONTO TOTAL DESEADO
+                },
+            ], // Ahora es el NUEVO MONTO TOTAL DESEADO
             'prioridad' => 'nullable|in:Baja,Media,Alta,Urgente',
             'id_solicitud_original' => 'nullable|exists:solicitudes_fondos,id',
             'gastos_proyectados' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|array|min:1',
             'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required|numeric|min:0.01',
         ]);
+        $user = Auth::user();
+        $user->loadMissing('area', 'role'); // Cargar relaciones
 
+        // Solo el Jefe del Área de Proyectos puede crear fondos de tipo "Proyecto"
+        if ($request->tipo_fondo_solicitado === 'Proyecto') {
+            if (!($user->role->name === 'jefe_area' && $user->area->name === 'Proyectos')) {
+                throw ValidationException::withMessages([
+                    'tipo_fondo_solicitado' => 'No tienes los permisos necesarios para crear un fondo de tipo Proyecto. Debes ser Jefe del área de Proyectos.'
+                ]);
+            }
+        }
         // Validaciones adicionales de lógica de negocio
         if (in_array($request->tipo_solicitud, ['Incremento', 'Decremento', 'Cierre'])) {
             if (!$request->id_solicitud_original) {
@@ -197,31 +209,55 @@ class SolicitudFondoController extends Controller
             // Cargar el rol del usuario para la lógica condicional
             $user->loadMissing('role');
             $initialStateInDB = 'Pendiente Aprobación ADM';
-            $initialHistorialObservation = 'enviada a Administración'; // Observación inicial para historial
+            $initialHistorialObservation = 'enviada a Administración';
+            $aprobadorGerenteId = null;
+            $revisorAdmId = null;
 
+            // Usamos el nombre del rol desde la relación: $user->role->name
+            $userRoleName = $user->role->name;
+
+            // --- ESCENARIO 1: Solicitud de Apertura de tipo "Proyecto" ---
             if ($request->tipo_solicitud === 'Apertura' && $request->tipo_fondo_solicitado === 'Proyecto') {
                 $initialStateInDB = 'Aprobada';
                 $initialHistorialObservation = 'aprobada automáticamente (Fondo de Proyecto)';
-            }
-            // Se mantiene tu lógica para Decremento/Cierre por parte de Admins.
-            elseif (in_array($request->tipo_solicitud, ['Decremento', 'Cierre']) && ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))) {
+                $revisorAdmId = $user->id;
+                $aprobadorGerenteId = $user->id;
+
+                // --- ESCENARIO 2: Solicitud de Apertura creada por el Gerente General ---
+            } elseif ($request->tipo_solicitud === 'Apertura' && $userRoleName === 'gerente_general') {
+                $initialStateInDB = 'Aprobada';
+                $initialHistorialObservation = 'aprobada automáticamente (solicitud de Gerente General)';
+                $revisorAdmId = $user->id;
+                $aprobadorGerenteId = $user->id;
+
+                // --- ESCENARIO 3: Solicitud de Apertura creada por el Jefe de Administración ---
+            } elseif ($request->tipo_solicitud === 'Apertura' && ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin')) {
+                $initialStateInDB = 'Pendiente Aprobación GRTE';
+                $initialHistorialObservation = 'enviada directamente a Gerencia General (solicitud de Administración)';
+                $revisorAdmId = $user->id;
+
+                // NUEVA LÓGICA: Flujo especial para Decremento/Cierre iniciado por un Administrador
+            } elseif (in_array($request->tipo_solicitud, ['Decremento', 'Cierre']) && ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin')) {
                 $initialStateInDB = 'Pendiente Aprobación GRTE';
                 $initialHistorialObservation = 'enviada directamente a Gerencia General';
+                $revisorAdmId = $user->id;
             }
             $solicitud = SolicitudFondo::create([
-                'id_solicitante' => $user->id, // El usuario autenticado es el solicitante
+                'id_solicitante' => $user->id,
                 'id_area' => $user->area_id,
                 'tipo_solicitud' => $request->tipo_solicitud,
                 'motivo_detalle' => $request->motivo_detalle,
-                'monto_solicitado' => $request->monto_solicitado, // AHORA ES EL NUEVO MONTO TOTAL DESEADO
+                'monto_solicitado' => $request->monto_solicitado,
                 'prioridad' => $request->prioridad,
-                'estado' => $initialStateInDB, 
+                'estado' => $initialStateInDB,
                 'id_solicitud_original' => $request->id_solicitud_original,
                 'tipo_fondo_solicitado' => $request->tipo_fondo_solicitado,
                 'id_proyecto' => $request->id_proyecto,
+                'id_revisor_adm' => $revisorAdmId,
+                'id_aprobador_gerente' => $aprobadorGerenteId,
             ]);
 
-            
+
             // Guardar los detalles de gastos proyectados (solo si se proporcionan y son relevantes para el tipo de solicitud)
             // CAMBIO 4: Lógica para no guardar gastos proyectados si es tipo Cierre
             if ($request->has('gastos_proyectados') && in_array($request->tipo_solicitud, ['Apertura', 'Incremento', 'Decremento'])) {
@@ -252,14 +288,29 @@ class SolicitudFondoController extends Controller
                 'id_usuario_accion' => $user->id,
                 'fecha_cambio' => now(),
             ]);
-            // --- INICIO DE CAMBIOS: CREACIÓN DE FONDO PARA PROYECTOS ---
+            // --- INICIO DE CAMBIOS: CREACIÓN DE FONDO PARA PROYECTOS ---  
+            $fondoCreado = null;
+            $successMessage = "¡Solicitud registrada y enviada! Código: <strong>{$solicitud->codigo_solicitud}</strong>";
             if ($solicitud->estado === 'Aprobada') {
-                FondoEfectivo::crearDesdeSolicitudApertura($solicitud);
-                Log::info('Fondo de proyecto creado automáticamente.', ['solicitud_id' => $solicitud->id]);
+                // Capturamos la instancia del fondo que devuelve el método
+                $fondoCreado = FondoEfectivo::crearDesdeSolicitudApertura($solicitud);
+                Log::info('Fondo creado automáticamente.', ['solicitud_id' => $solicitud->id, 'fondo_id' => $fondoCreado->id_fondo]);
+
+                // Asociamos las áreas participantes al proyecto
+                if ($request->has('areas_participantes') && $solicitud->proyecto) {
+                    $solicitud->proyecto->areas()->sync($request->areas_participantes);
+                    Log::info('Áreas participantes asociadas al proyecto.', ['proyecto_id' => $solicitud->id_proyecto, 'areas' => $request->areas_participantes]);
+                }
+
+                // Construimos el mensaje de éxito usando la variable que ya tenemos
+                if ($fondoCreado) {
+                    $successMessage = "¡Fondo creado exitosamente! Código de Fondo Asignado: <strong>{$fondoCreado->codigo_fondo}</strong>";
+                }
             }
-            DB::commit(); 
+
+            DB::commit();
             return response()->json([
-                'message' => 'Solicitud de fondo creada exitosamente. ',
+                'message' => $successMessage,
                 'solicitud' => $solicitud->load([
                     'solicitante.area',
                     'solicitante.role',
@@ -317,7 +368,7 @@ class SolicitudFondoController extends Controller
                 'area:id,name',
                 'revisorAdm:id,name,last_name',
                 'aprobadorGerente:id,name,last_last_name',
-                'detallesGastosProyectados',
+                'gastosProyectados',
                 'historialEstados' => function ($q) {
                     $q->orderBy('created_at', 'asc')
                         ->with('usuarioAccion:id,name,last_name');
@@ -401,7 +452,6 @@ class SolicitudFondoController extends Controller
         Log::info('SolicitudFondoController@update - Inicio del método. Payload recibido:', $request->all());
 
         try {
-            Log::info('SolicitudFondoController@update - Intentando obtener usuario autenticado.');
             $user = Auth::user();
 
             if (!$user) {
@@ -410,12 +460,7 @@ class SolicitudFondoController extends Controller
             }
 
             // Cargar explícitamente el rol y los permisos del usuario que realiza la acción
-            $user->loadMissing('role.permissions');
-            Log::info('SolicitudFondoController@update - Usuario autenticado y relaciones cargadas:', ['user_id' => $user->id, 'user_role' => $user->role->name ?? 'N/A']);
-
-
-            Log::info('SolicitudFondoController@update - Intentando encontrar solicitud de fondo por ID.', ['solicitud_id' => $id]);
-            // Cargar la solicitud con su solicitante para verificar roles del solicitante
+            $user->loadMissing('role');
             $solicitud = SolicitudFondo::with('solicitante.role')->findOrFail($id);
             Log::info('SolicitudFondoController@update - Solicitud encontrada.', ['solicitud_id' => $solicitud->id, 'estado_actual' => $solicitud->estado]);
 
@@ -423,35 +468,32 @@ class SolicitudFondoController extends Controller
             $requestedState = $request->estado; // Capturar el estado solicitado (que puede ser un hito del historial o el estado final)
 
             // Validar los datos de la solicitud
-            Log::info('SolicitudFondoController@update - Realizando validación de request.');
             $request->validate([
-                'estado' => 'required|in:Observada ADM,Aprobada ADM,Descargo Enviado ADM,Observada GRTE,Aprobada,Rechazada Final,Descargo Enviado GRTE,Pendiente Re-evaluacion',
+                'estado' => 'required|in:Observada ADM,Aprobada ADM,Descargo Enviado ADM,Observada GRTE,Aprobada,Rechazada Final,Descargo Enviado GRTE,Pendiente Re-evaluacion,Pendiente Re-evaluacion GRTE',
                 'motivo_observacion' => 'required_if:estado,Observada ADM,Observada GRTE|string|max:1000',
                 'motivo_descargo' => 'required_if:estado,Descargo Enviado ADM,Descargo Enviado GRTE|string|max:1000',
                 'motivo_rechazo_final' => 'required_if:estado,Rechazada Final|string|max:1000',
             ]);
-            Log::info('SolicitudFondoController@update - Validación de request exitosa.');
 
-            $newState = $oldState; // Inicialmente, el nuevo estado principal es el mismo que el anterior, cambiará en el switch
-            $historialState = $requestedState; // Por defecto, el estado a registrar en historial es el solicitado
-            $observacionesHistorial = ''; // La variable observacionesHistorial ahora se construirá de forma dinámica
+            $newState = $oldState;
+            $historialState = $requestedState;
+            $observacionesHistorial = '';
             $responseMessage = 'Solicitud actualizada exitosamente.';
-            $managedFondoCodigo = null; // Variable para almacenar el código del fondo gestionado
-
-            // CAMBIO (Parte 2): Lógica para restricciones de auto-aprobación para Jefe de Administración/Super Admin en Decremento/Cierre
+            $managedFondoCodigo = null;
+            $userRoleName = $user->role->name;
+            $solicitanteRoleName = $solicitud->solicitante->role->name ?? null;
             $isSolicitanteAdminOrSuperAdmin = ($solicitud->id_solicitante === $user->id &&
-                ($user->hasRole('jefe_administracion') || $user->hasRole('super_admin')));
+                in_array($solicitanteRoleName, ['jefe_administracion', 'super_admin']));
             $isDecrementoCierre = in_array($solicitud->tipo_solicitud, ['Decremento', 'Cierre']);
-
 
             DB::beginTransaction();
             switch ($requestedState) {
                 case 'Observada ADM':
-                    if (!($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))) {
+                    if (!in_array($userRoleName, ['jefe_administracion', 'super_admin'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Jefe de Administración puede observar solicitudes.'], 403);
                     }
-                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Descargo Enviado ADM','Pendiente Re-evaluacion'])) {
+                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Pendiente Re-evaluacion'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser observada por Administración.'], 400);
                     }
@@ -459,19 +501,20 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'No puedes observar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
                     }
+
                     $solicitud->motivo_observacion = $request->motivo_observacion;
                     $solicitud->id_revisor_adm = $user->id;
                     $newState = 'Observada ADM';
                     $observacionesHistorial = 'Solicitud observada por Administración: ' . $request->motivo_observacion;
-                    $responseMessage = 'Observación enviada exitosamente por Administración.'; 
+                    $responseMessage = 'Observación enviada exitosamente por Administración.';
                     break;
 
                 case 'Aprobada ADM':
-                    if (!($user->hasRole('jefe_administracion') || $user->hasRole('super_admin'))) {
+                    if (!in_array($userRoleName, ['jefe_administracion', 'super_admin'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Jefe de Administración puede aprobar solicitudes.'], 403);
                     }
-                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Descargo Enviado ADM','Pendiente Re-evaluacion'])) {
+                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Pendiente Re-evaluacion'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser aprobada por Administración.'], 400);
                     }
@@ -485,29 +528,22 @@ class SolicitudFondoController extends Controller
                     $solicitud->motivo_descargo = null;
                     $historialState = 'Aprobada ADM';
 
-                    if (
-                        in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento']) ||
-                        ($isDecrementoCierre && $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_administracion') || $solicitud->solicitante->hasRole('super_admin')))
-                    ) {
+                    $solicitanteIsAdmin = in_array($solicitanteRoleName, ['jefe_administracion', 'super_admin']);
+                    $solicitanteIsRegularUser = in_array($solicitanteRoleName, ['jefe_area', 'colaborador']);
 
+                    if (in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento']) || ($isDecrementoCierre && $solicitanteIsAdmin)) {
                         $newState = 'Pendiente Aprobación GRTE';
                         $observacionesHistorial = 'Solicitud aprobada por Administración. Pasa a pendiente de aprobación de Gerencia General.';
-                        $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.'; // Mensaje personalizado
-                    } else if (
-                        in_array($solicitud->tipo_solicitud, ['Decremento', 'Cierre']) &&
-                        $solicitud->solicitante && ($solicitud->solicitante->hasRole('jefe_area') || $solicitud->solicitante->hasRole('colaborador'))
-                    ) {
-
-                        $newState = 'Aprobada'; // Aprobación final por ADM
+                        $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.';
+                    } else if ($isDecrementoCierre && $solicitanteIsRegularUser) {
+                        $newState = 'Aprobada';
                         $solicitud->id_aprobador_gerente = $user->id;
                         $observacionesHistorial = 'Solicitud de ' . $solicitud->tipo_solicitud . ' aprobada finalmente por Administración.';
-                        // Gestionar el fondo efectivo (crear/actualizar) una vez la solicitud es aprobada finalmente por ADM
+
                         $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
                         if ($managedFondo) {
                             $managedFondoCodigo = $managedFondo->codigo_fondo;
                             $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada por Administración. El fondo " . $managedFondoCodigo . " ha sido " . ($solicitud->tipo_solicitud === 'Cierre' ? 'cerrado.' : 'actualizado.');
-                        } else {
-                            $responseMessage = 'Solicitud aprobada por Administración exitosamente.';
                         }
                     } else {
                         DB::rollBack();
@@ -516,99 +552,88 @@ class SolicitudFondoController extends Controller
                     break;
 
                 case 'Descargo Enviado ADM':
-                    Log::info('SolicitudFondoController@update - Procesando Descargo Enviado ADM. Old State:', ['old_state' => $oldState]);
-                    if (!($user->id === $solicitud->id_solicitante || $user->hasRole('super_admin'))) {
-                        Log::warning('SolicitudFondoController@update - Acceso denegado para Descargo Enviado ADM.', ['user_id' => $user->id, 'solicitante_id' => $solicitud->id_solicitante, 'user_roles' => $user->getRoleNames()]);
+                    if ($user->id !== $solicitud->id_solicitante && $userRoleName !== 'super_admin') {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el solicitante puede enviar un descargo.'], 403);
                     }
                     if ($oldState !== 'Observada ADM') {
-                        Log::warning('SolicitudFondoController@update - Transición de estado inválida para Descargo Enviado ADM.', ['old_state' => $oldState, 'expected_old_state' => 'Observada ADM']);
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en estado "Observada ADM" para enviar un descargo.'], 400);
                     }
+
                     $solicitud->motivo_descargo = $request->motivo_descargo;
+                    $newState = 'Pendiente Re-evaluacion';
                     $historialState = 'Descargo Enviado ADM';
                     $observacionesHistorial = 'Descargo enviado por el solicitante: ' . $request->motivo_descargo . '. La solicitud vuelve a ser revisada por Administración.';
-                    $newState = 'Pendiente Re-evaluacion';
-                    $responseMessage = 'Descargo enviado exitosamente a Administración.'; 
-                    Log::info('SolicitudFondoController@update - Descargo Enviado ADM procesado. Nuevo estado:', ['new_state' => $newState]);
+                    $responseMessage = 'Descargo enviado exitosamente a Administración.';
                     break;
 
                 case 'Observada GRTE':
-                    if (!($user->hasRole('gerente_general') || $user->hasRole('super_admin'))) {
+                    if (!in_array($userRoleName, ['gerente_general', 'super_admin'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Gerente General puede observar solicitudes.'], 403);
                     }
-                    if (!in_array($oldState, ['Pendiente Aprobación GRTE', 'Descargo Enviado GRTE'])) {
+                    if (!in_array($oldState, ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser observada por Gerencia.'], 400);
                     }
+
                     $solicitud->motivo_observacion = $request->motivo_observacion;
                     $solicitud->id_aprobador_gerente = $user->id;
                     $newState = 'Observada GRTE';
-                    $observacionesHistorial = 'Solicitud observada por Gerencia General: ' . $request->motivo_observacion . '. Se espera el descargo del solicitante.';
-                    $responseMessage = 'Observación enviada exitosamente por Gerencia General.'; 
+                    $observacionesHistorial = 'Solicitud observada por Gerencia General: ' . $request->motivo_observacion;
+                    $responseMessage = 'Observación enviada exitosamente por Gerencia General.';
                     break;
                 case 'Aprobada':
-                    if (!($user->hasRole('gerente_general') || $user->hasRole('super_admin'))) {
+                    if (!in_array($userRoleName, ['gerente_general', 'super_admin'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el Gerente General puede aprobar solicitudes.'], 403);
                     }
-                    if (!in_array($oldState, ['Pendiente Aprobación GRTE', 'Descargo Enviado GRTE'])) {
+                    if (!in_array($oldState, ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser aprobada por Gerencia.'], 400);
                     }
                     if ($isSolicitanteAdminOrSuperAdmin && $isDecrementoCierre) {
                         DB::rollBack();
-                        return response()->json(['message' => 'No puedes aprobar tu propia solicitud de Decremento/Cierre. Solo el Gerente General (otro usuario) puede hacerlo.'], 403);
+                        return response()->json(['message' => 'Un usuario no puede aprobar su propia solicitud de Decremento/Cierre.'], 403);
                     }
+
                     $solicitud->id_aprobador_gerente = $user->id;
                     $solicitud->motivo_observacion = null;
                     $solicitud->motivo_descargo = null;
+                    $newState = 'Aprobada';
                     $historialState = 'Aprobada';
                     $observacionesHistorial = 'Solicitud aprobada finalmente por Gerencia General. Proceso completado.';
 
                     $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
-                    $newState = 'Aprobada';
                     if ($managedFondo) {
                         $managedFondoCodigo = $managedFondo->codigo_fondo;
-                        if ($solicitud->tipo_solicitud === 'Apertura') {
-                            $responseMessage = "¡Éxito! Solicitud de Apertura aprobada. Fondo asignado: " . $managedFondoCodigo;
-                        } elseif (in_array($solicitud->tipo_solicitud, ['Incremento', 'Decremento'])) {
-                            $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada. El fondo " . $managedFondoCodigo . " ha sido actualizado.";
-                        } elseif ($solicitud->tipo_solicitud === 'Cierre') {
-                            $responseMessage = "¡Éxito! Solicitud de Cierre aprobada. El fondo " . $managedFondoCodigo . " ha sido cerrado.";
-                        }
-                    } else {
-                        $responseMessage = 'Solicitud aprobada por Gerencia General exitosamente.';
+                        $action = $solicitud->tipo_solicitud === 'Cierre' ? 'cerrado' : ($solicitud->tipo_solicitud === 'Apertura' ? 'asignado' : 'actualizado');
+                        $responseMessage = "¡Éxito! Solicitud de {$solicitud->tipo_solicitud} aprobada. El fondo {$managedFondoCodigo} ha sido {$action}.";
                     }
                     break;
                 case 'Descargo Enviado GRTE':
-                    Log::info('SolicitudFondoController@update - Procesando Descargo Enviado GRTE. Old State:', ['old_state' => $oldState]);
-                    if (!($user->id === $solicitud->id_solicitante || $user->hasRole('super_admin'))) {
-                        Log::warning('SolicitudFondoController@update - Acceso denegado para Descargo Enviado GRTE.', ['user_id' => $user->id, 'solicitante_id' => $solicitud->id_solicitante, 'user_roles' => $user->getRoleNames()]);
+                    if ($user->id !== $solicitud->id_solicitante && $userRoleName !== 'super_admin') {
                         DB::rollBack();
                         return response()->json(['message' => 'Acceso denegado. Solo el solicitante puede enviar un descargo.'], 403);
                     }
                     if ($oldState !== 'Observada GRTE') {
-                        Log::warning('SolicitudFondoController@update - Transición de estado inválida para Descargo Enviado GRTE.', ['old_state' => $oldState, 'expected_old_state' => 'Observada GRTE']);
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en estado "Observada GRTE" para enviar un descargo.'], 400);
                     }
+
                     $solicitud->motivo_descargo = $request->motivo_descargo;
+                    $newState = 'Pendiente Re-evaluacion GRTE';
                     $historialState = 'Descargo Enviado GRTE';
                     $observacionesHistorial = 'Descargo enviado por el solicitante: ' . $request->motivo_descargo . '. La solicitud vuelve a ser revisada por Gerencia General.';
-                    $newState = 'Pendiente Aprobación GRTE';
-                    $responseMessage = 'Descargo enviado exitosamente a Gerencia General.'; // Mensaje personalizado
-                    Log::info('SolicitudFondoController@update - Descargo Enviado GRTE procesado. Nuevo estado:', ['new_state' => $newState]);
+                    $responseMessage = 'Descargo enviado exitosamente a Gerencia General.';
                     break;
                 case 'Rechazada Final':
-                    if (!($user->hasRole('jefe_administracion') || $user->hasRole('gerente_general') || $user->hasRole('super_admin'))) {
+                    if (!in_array($userRoleName, ['jefe_administracion', 'gerente_general', 'super_admin'])) {
                         DB::rollBack();
-                        return response()->json(['message' => 'Acceso denegado. Solo el Jefe de Administración o Gerente General pueden rechazar solicitudes.'], 403);
+                        return response()->json(['message' => 'Acceso denegado. Solo roles autorizados pueden rechazar solicitudes.'], 403);
                     }
-                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Observada ADM', 'Descargo Enviado ADM', 'Aprobada ADM', 'Pendiente Aprobación GRTE', 'Observada GRTE', 'Descargo Enviado GRTE','Pendiente Re-evaluacion'])) {
+                    if (!in_array($oldState, ['Pendiente Aprobación ADM', 'Observada ADM', 'Descargo Enviado ADM', 'Aprobada ADM', 'Pendiente Aprobación GRTE', 'Observada GRTE', 'Descargo Enviado GRTE', 'Pendiente Re-evaluacion', 'Pendiente Re-evaluacion GRTE'])) {
                         DB::rollBack();
                         return response()->json(['message' => 'La solicitud no está en un estado que permita ser rechazada finalmente.'], 400);
                     }
@@ -616,20 +641,19 @@ class SolicitudFondoController extends Controller
                         DB::rollBack();
                         return response()->json(['message' => 'No puedes rechazar tu propia solicitud de Decremento/Cierre. Solo el Gerente General puede hacerlo.'], 403);
                     }
-
                     if (empty($request->motivo_rechazo_final)) {
                         throw ValidationException::withMessages(['motivo_rechazo_final' => 'El motivo del rechazo final es obligatorio.']);
                     }
                     $solicitud->motivo_rechazo_final = $request->motivo_rechazo_final;
-                    if ($user->hasRole('jefe_administracion')) {
+                    if ($userRoleName === 'jefe_administracion') {
                         $solicitud->id_revisor_adm = $user->id;
-                    } elseif ($user->hasRole('gerente_general')) {
+                    } elseif ($userRoleName === 'gerente_general') {
                         $solicitud->id_aprobador_gerente = $user->id;
                     }
                     $historialState = 'Rechazada Final';
                     $observacionesHistorial = 'Solicitud rechazada finalmente: ' . $request->motivo_rechazo_final;
                     $newState = 'Rechazada Final';
-                    $responseMessage = 'Solicitud rechazada definitivamente.'; // Mensaje personalizado
+                    $responseMessage = 'Solicitud rechazada definitivamente.';
                     break;
 
                 default:
@@ -639,7 +663,6 @@ class SolicitudFondoController extends Controller
             if ($solicitud->estado !== $newState) {
                 $solicitud->estado = $newState;
                 $solicitud->save();
-                Log::info('SolicitudFondoController@update - Estado de solicitud principal actualizado en DB.', ['solicitud_id' => $solicitud->id, 'new_estado_principal' => $solicitud->estado]);
             }
 
             HistorialEstadoSolicitud::create([
@@ -655,11 +678,10 @@ class SolicitudFondoController extends Controller
             DB::commit();
             Log::info('SolicitudFondoController@update - Transacción de DB confirmada exitosamente.');
 
-
             return response()->json([
                 'message' => $responseMessage,
                 'solicitud' => $solicitud->load([
-                    'detallesGastosProyectados',
+                    'gastosProyectados',
                     'historialEstados' => function ($q) {
                         $q->orderBy('created_at', 'asc')
                             ->with('usuarioAccion:id,name,last_name');
@@ -669,6 +691,8 @@ class SolicitudFondoController extends Controller
                     'solicitante.area',
                     'solicitante.role',
                     'area',
+                    'gastosProyectados',
+                    'proyecto',
                     'solicitudOriginal:id,codigo_solicitud,id_solicitante,id_area,tipo_solicitud,motivo_detalle,monto_solicitado,prioridad,estado,motivo_observacion,motivo_descargo,motivo_rechazo_final,id_revisor_adm,id_aprobador_gerente,id_solicitud_original,created_at,updated_at',
                     'solicitudOriginal.fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado,estado,id_responsable,id_area,id_solicitud_apertura',
                     'solicitudOriginal.fondoEfectivo.responsable:id,name,last_name,email,cargo',
@@ -718,9 +742,27 @@ class SolicitudFondoController extends Controller
     public function editarSolicitudPendiente(Request $request, SolicitudFondo $solicitud)
     {
         $user = Auth::user();
+        $user->loadMissing('role'); // Asegurar que el rol del usuario esté cargado
+        $userRoleName = $user->role->name;
 
-        // 1. Autorización: ¿Puede el usuario editar esta solicitud ahora?
-        if ($user->id !== $solicitud->id_solicitante || $solicitud->estado !== 'Pendiente Aprobación ADM') {
+        // 1. Autorización: El usuario debe ser el solicitante.
+        if ($user->id !== $solicitud->id_solicitante) {
+            return response()->json(['message' => 'No eres el solicitante de esta solicitud.'], 403);
+        }
+
+        // --- CAMBIO CLAVE: Lógica de autorización por rol y estado ---
+        $canEdit = false;
+        // Solicitantes regulares (Jefe de Área, Colaborador) pueden editar solo ANTES de la revisión de ADM.
+        if (in_array($userRoleName, ['jefe_area', 'colaborador']) && $solicitud->estado === 'Pendiente Aprobación ADM') {
+            $canEdit = true;
+        }
+        // Solicitantes de alto nivel (ADM, Super Admin) pueden editar solo ANTES de la revisión de GRTE.
+        // Esto soluciona el error de la imagen 2.
+        if (in_array($userRoleName, ['jefe_administracion', 'super_admin']) && $solicitud->estado === 'Pendiente Aprobación GRTE') {
+            $canEdit = true;
+        }
+
+        if (!$canEdit) {
             return response()->json(['message' => 'Esta solicitud no puede ser editada en su estado actual.'], 403);
         }
         // 2. Validación del formulario completo
@@ -728,52 +770,49 @@ class SolicitudFondoController extends Controller
             'motivo_detalle' => 'required|string|max:1000',
             'monto_solicitado' => 'required|numeric|min:0',
             'prioridad' => 'required_if:tipo_solicitud,Incremento,Decremento,Cierre|in:Baja,Media,Alta,Urgente',
+            'tipo_fondo_solicitado' => 'required|in:Regular,Excepcional,Proyecto',
+            'id_proyecto' => 'nullable|exists:proyectos,id_proyecto',
             'gastos_proyectados' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|array|min:1',
-            'gastos_proyectados.*.descripcion_gasto' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|string|max:255',
+            'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|numeric|min:0.01',
         ]);
-        $originalData = $solicitud->only(['motivo_detalle', 'monto_solicitado', 'prioridad']);
-        $estadoAnterior = $solicitud->estado;
+
         DB::beginTransaction();
         try {
+            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto');
+            $clonedOriginal = clone $originalSolicitud;
             // 3. Actualizar la solicitud principal con los datos validados.
             $solicitud->update($validatedData);
-            // 4. Sincronizar los gastos proyectados.
-            // Primero, eliminamos todos los gastos proyectados antiguos asociados a esta solicitud
-            // para asegurar que no queden registros huérfanos.
-            $solicitud->detallesGastosProyectados()->delete();
-            // Luego, creamos los nuevos registros de gastos proyectados a partir de los datos
-            // que vienen en la petición.
-            if (!empty($validatedData['gastos_proyectados'])) {
-                $solicitud->detallesGastosProyectados()->createMany($validatedData['gastos_proyectados']);
+            // 4. Sincronizar los gastos proyectados usando sync()
+            $solicitud->update($validatedData);
+            if (isset($validatedData['gastos_proyectados'])) {
+                $gastosParaSincronizar = [];
+                foreach ($validatedData['gastos_proyectados'] as $gasto) {
+                    $gastosParaSincronizar[$gasto['gasto_proyectado_id']] = ['monto_estimado' => $gasto['monto_estimado']];
+                }
+                $solicitud->gastosProyectados()->sync($gastosParaSincronizar);
             }
             // 5. Registrar los cambios en el historial.
             // Llamamos a nuestra función de ayuda para mantener el código limpio.
             $this->trackChangesAndUpdateHistory(
-                $solicitud,
-                $originalData,
+                $solicitud->fresh(),
+                $clonedOriginal,
+                $validatedData,
                 $user,
                 "Edición Proactiva", // Tipo de acción
                 "Solicitud editada por el solicitante antes de la primera revisión.", // Detalle
-                $estadoAnterior,
-                $estadoAnterior
+                $clonedOriginal->estado,
+                $clonedOriginal->estado
             );
             // Si todo sale bien, confirmamos los cambios en la base de datos.
             DB::commit();
             // Devolvemos una respuesta exitosa con la solicitud actualizada y sus relaciones.
             return response()->json([
                 'message' => 'Solicitud actualizada con éxito.',
-                'solicitud' => $solicitud->fresh()->load([
-                    'solicitante.area',
-                    'area',
-                    'detallesGastosProyectados',
-                    'historialEstados.usuarioAccion'
-                ])
+                'solicitud' => $solicitud->fresh()->load(['solicitante.area', 'area', 'gastosProyectados', 'historialEstados.usuarioAccion'])
             ]);
         } catch (\Exception $e) {
-            // Si algo sale mal, revertimos todos los cambios.
             DB::rollBack();
-            // Registramos el error y devolvemos una respuesta de error.
             Log::error("Error al editar solicitud pendiente [{$solicitud->id}]: " . $e->getMessage());
             return response()->json(['message' => 'Error al actualizar la solicitud.', 'error' => $e->getMessage()], 500);
         }
@@ -789,47 +828,57 @@ class SolicitudFondoController extends Controller
         $validatedData = $request->validate([
             'motivo_detalle' => 'required|string|max:1000',
             'monto_solicitado' => 'required|numeric|min:0',
-            'prioridad' => 'required_if:tipo_solicitud,Incremento,Decremento,Cierre|in:Baja,Media,Alta,Urgente',
+            'prioridad' => 'nullable|in:Baja,Media,Alta,Urgente',
+            'tipo_fondo_solicitado' => 'required|in:Regular,Excepcional,Proyecto',
+            'id_proyecto' => 'nullable|exists:proyectos,id_proyecto',
             'comentario_descargo' => 'nullable|string|max:1000',
             'gastos_proyectados' => 'present|array',
-            'gastos_proyectados.*.descripcion_gasto' => 'required|string|max:255',
+            'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required|numeric|min:0.01',
         ]);
 
-        $originalData = $solicitud->only(['motivo_detalle', 'monto_solicitado', 'prioridad']);
-        $estadoAnterior = $solicitud->estado;
-
         DB::beginTransaction();
         try {
-            // 3. Actualizar la solicitud y sus detalles.
+            // 3. Capturar el estado completo ANTES de la actualización.
+            // Se cargan las relaciones para asegurar que el clon tenga toda la información para comparar.
+            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto');
+            $clonedOriginal = clone $originalSolicitud;
+            $estadoAnterior = $clonedOriginal->estado; // Guardar el estado principal original.
+
+            // 4. Actualizar la solicitud y sus detalles.
             $solicitud->update(Arr::except($validatedData, ['comentario_descargo', 'gastos_proyectados']));
             $solicitud->motivo_descargo = $request->comentario_descargo ?: 'Corrección de datos aplicada.';
+
             // Sincronizar gastos proyectados
-            $solicitud->detallesGastosProyectados()->delete();
-            if (!empty($validatedData['gastos_proyectados'])) {
-                $solicitud->detallesGastosProyectados()->createMany($validatedData['gastos_proyectados']);
+            if (isset($validatedData['gastos_proyectados'])) {
+                $gastosParaSincronizar = [];
+                foreach ($validatedData['gastos_proyectados'] as $gasto) {
+                    $gastosParaSincronizar[$gasto['gasto_proyectado_id']] = ['monto_estimado' => $gasto['monto_estimado']];
+                }
+                $solicitud->gastosProyectados()->sync($gastosParaSincronizar);
             }
-            // 4. Mover la máquina de estados según quién hizo la observación.
+
+            // 5. Mover la máquina de estados según quién hizo la observación original.
             $nuevoEstadoPrincipal = '';
             $estadoHistorial = '';
             if ($estadoAnterior === 'Observada ADM') {
-                // Si observó ADM, vuelve a ADM.
                 $nuevoEstadoPrincipal = 'Pendiente Re-evaluacion';
                 $estadoHistorial = 'Descargo Enviado ADM';
             } else if ($estadoAnterior === 'Observada GRTE') {
-                // Si observó GRTE, vuelve directamente a GRTE.
-                $nuevoEstadoPrincipal = 'Pendiente Aprobación GRTE';
+                $nuevoEstadoPrincipal = 'Pendiente Re-evaluacion GRTE';
                 $estadoHistorial = 'Descargo Enviado GRTE';
             }
             $solicitud->estado = $nuevoEstadoPrincipal;
-            // 5. Registrar la acción en el historial.
-            $detalleHistorial = "Solicitud editada para subsanar observación. " . $solicitud->motivo_descargo;
+            $solicitud->save();
+            // 6. Registrar la acción en el historial usando la función centralizada.
+            $detalleBase = "Solicitud editada para subsanar observación";
             $this->trackChangesAndUpdateHistory(
-                $solicitud,
-                $originalData,
+                $solicitud->fresh(), // La solicitud actualizada para reflejar todos los cambios.
+                $clonedOriginal,    // La "foto" de la solicitud antes de los cambios.
+                $validatedData,     // Los nuevos datos del request para la comparación.
                 $user,
                 "Edición por Observación",
-                $detalleHistorial,
+                $detalleBase,
                 $estadoAnterior,
                 $estadoHistorial
             );
@@ -839,7 +888,7 @@ class SolicitudFondoController extends Controller
                 'solicitud' => $solicitud->fresh()->load([
                     'solicitante.area',
                     'area',
-                    'detallesGastosProyectados',
+                    'gastosProyectados',
                     'historialEstados.usuarioAccion'
                 ])
             ]);
@@ -854,47 +903,128 @@ class SolicitudFondoController extends Controller
      */
     private function trackChangesAndUpdateHistory(
         SolicitudFondo $solicitud,
-        array $originalData,
+        SolicitudFondo $originalSolicitud,
+        array $newData,
         \App\Models\User $user,
         string $tipoAccion,
-        string $detalle,
+        string $detalleBase,
         ?string $estadoAnterior = null,
         ?string $estadoHistorial = null
     ) {
-        // 1. Incrementar el contador de edición.
+        $observationParts = [];
+
+        // Parte 1: Motivo de la acción (siempre se muestra)
+        $observationParts[] = "<strong>Motivo de cambio:</strong> " . e($detalleBase);
+
+        // Parte 2: Comentario de descargo del usuario (si existe y no está ya en detalleBase)
+        $comentarioDescargo = $newData['detalle_descargo'] ?? $newData['comentario_descargo'] ?? null;
+        if (!empty($comentarioDescargo) && !str_contains($detalleBase, $comentarioDescargo)) {
+            $observationParts[] = "<strong>Comentario del solicitante:</strong> " . e($comentarioDescargo);
+        }
+
+        // Parte 3: Lista de cambios detectados por el sistema
+        $formattedChanges = $this->formatChangesForHistory($originalSolicitud, $newData);
+        if (!empty($formattedChanges)) {
+            $changesList = '<div style="margin: 5px 0;">';
+            foreach ($formattedChanges as $change) {
+                $changesList .= '<div style="margin-bottom: 2px;">' . $change . '</div>';
+            }
+            $changesList .= '</div>';
+            $observationParts[] = "<strong>Detalle de Cambios:</strong><br>" . $changesList;
+        }
+
+        // Unir todas las partes con un salto de línea simple para mejor legibilidad
+        $observacionFinal = implode('<br>', $observationParts);
+
+        // Incrementar contador y guardar historial JSON (lógica original preservada).
         $solicitud->increment('edit_count');
-        // 2. CORRECCIÓN: Detectar los campos que realmente cambiaron.
-        // Comparamos los datos originales solo con los campos que se actualizaron.
-        $datosActualizados = $solicitud->only(array_keys($originalData));
-        $cambios = array_diff_assoc($datosActualizados, $originalData);
-        // 3. Guardar un registro JSON de los cambios en la propia solicitud.
+        $rawChanges = array_diff_assoc($solicitud->getAttributes(), $originalSolicitud->getAttributes());
         $historialCambios = $solicitud->historial_cambios ?? [];
         $historialCambios['edicion_' . $solicitud->edit_count] = [
             'usuario' => $user->name,
             'fecha' => now()->toDateTimeString(),
             'tipo' => $tipoAccion,
-            'cambios' => $cambios
+            'cambios' => $rawChanges
         ];
         $solicitud->historial_cambios = $historialCambios;
-        // Guardamos los cambios en el contador y en el historial JSON.
-        // Usamos saveQuietly() para no disparar otros eventos de modelo si los tuvieras.
         $solicitud->saveQuietly();
-        // 4. Construir las observaciones para el historial principal.
-        // Se añade la lista de campos modificados solo si hubo cambios.
-        $observacionFinal = $detalle;
-        if (!empty($cambios)) {
-            $observacionFinal .= " Campos modificados: " . implode(', ', array_keys($cambios)) . ".";
-        }
-        // 5. CORRECCIÓN: Registrar la entrada en la tabla de historial con los estados correctos.
-        // Se usan los parámetros explícitos para evitar ambigüedades.
+
+        // Crear la entrada en la tabla de historial con la observación formateada.
         HistorialEstadoSolicitud::create([
             'id_solicitud_fondo' => $solicitud->id,
-            'estado_anterior' => $estadoAnterior, // El estado real ANTES de toda la operación.
-            'estado_nuevo' => $estadoHistorial, // El estado específico del evento para la bitácora.
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $estadoHistorial,
             'observaciones' => $observacionFinal,
             'id_usuario_accion' => $user->id,
             'fecha_cambio' => now(),
         ]);
+    }
+    /**
+     * Función auxiliar para formatear los cambios y devolver un ARRAY de strings.
+     */
+    private function formatChangesForHistory(SolicitudFondo $originalSolicitud, array $newData)
+    {
+        $changes = [];
+        $friendlyNames = [
+            'motivo_detalle' => 'Motivo de la Solicitud',
+            'monto_solicitado' => 'Monto Solicitado',
+            'prioridad' => 'Prioridad',
+            'tipo_fondo_solicitado' => 'Tipo de Fondo',
+            'id_proyecto' => 'Proyecto'
+        ];
+        $originalAttributes = $originalSolicitud->getAttributes();
+        foreach ($friendlyNames as $field => $name) {
+            if (array_key_exists($field, $newData) && $originalAttributes[$field] != $newData[$field]) {
+                $oldValue = $originalAttributes[$field] ?? 'vacío';
+                $newValue = $newData[$field] ?? 'vacío';
+                if ($field === 'id_proyecto') {
+                    $oldProjectName = $originalSolicitud->proyecto->nombre_proyecto ?? 'Ninguno';
+                    $newProject = Proyecto::find($newValue);
+                    $newProjectName = $newProject ? $newProject->nombre_proyecto : 'Ninguno';
+                    if ($oldProjectName !== $newProjectName) {
+                        $changes[] = "<strong>{$name}</strong> cambió de '{$oldProjectName}' a '{$newProjectName}'";
+                    }
+                } elseif ($field === 'monto_solicitado') {
+                    // CORREGIDO: Formatear montos con símbolo de soles
+                    $oldValueFormatted = is_numeric($oldValue) ? 'S/ ' . number_format($oldValue, 2) : $oldValue;
+                    $newValueFormatted = is_numeric($newValue) ? 'S/ ' . number_format($newValue, 2) : $newValue;
+                    $changes[] = "<strong>{$name}</strong> cambió de '{$oldValueFormatted}' a '{$newValueFormatted}'";
+                } else {
+                    $changes[] = "<strong>{$name}</strong> cambió de '{$oldValue}' a '{$newValue}'";
+                }
+            }
+        }
+        // CORREGIDO: Mejorar el manejo de gastos proyectados
+        $originalGastos = $originalSolicitud->gastosProyectados->pluck('pivot.monto_estimado', 'id_gasto_proyectado')->all();
+        $newGastosData = collect($newData['gastos_proyectados'] ?? []);
+        $newGastos = $newGastosData->pluck('monto_estimado', 'gasto_proyectado_id')->all();
+        $gastoChanges = [];
+        $allGastoIds = array_unique(array_merge(array_keys($originalGastos), array_keys($newGastos)));
+
+        if (count($allGastoIds) > 0) {
+            $gastoModels = GastoProyectado::whereIn('id_gasto_proyectado', $allGastoIds)->pluck('descripcion', 'id_gasto_proyectado');
+            foreach ($allGastoIds as $id) {
+                $gastoNombre = $gastoModels->get($id, "ID {$id}");
+                $oldMonto = $originalGastos[$id] ?? null;
+                $newMonto = $newGastos[$id] ?? null;
+
+                if ($oldMonto === null && $newMonto !== null) {
+                    $gastoChanges[] = "Se añadió <strong>{$gastoNombre}</strong> (S/ " . number_format($newMonto, 2) . ")";
+                } elseif ($oldMonto !== null && $newMonto === null) {
+                    $gastoChanges[] = "Se eliminó <strong>{$gastoNombre}</strong> (antes S/ " . number_format($oldMonto, 2) . ")";
+                } elseif ((float)$oldMonto != (float)$newMonto) {
+                    $gastoChanges[] = "<strong>{$gastoNombre}</strong> cambió de S/ " . number_format($oldMonto, 2) . " a S/ " . number_format($newMonto, 2);
+                }
+            }
+        }
+        // CORREGIDO: Mostrar cada cambio de gasto en líneas separadas
+        if (!empty($gastoChanges)) {
+            $changes[] = "<strong>Gastos Proyectados:</strong>";
+            foreach ($gastoChanges as $gastoChange) {
+                $changes[] = "• " . $gastoChange;
+            }
+        }
+        return $changes;
     }
     /**
      * Elimina una solicitud de fondo.
@@ -908,24 +1038,25 @@ class SolicitudFondoController extends Controller
         try {
             $solicitud = SolicitudFondo::findOrFail($id);
             $user = Auth::user();
-            // CAMBIO (Parte 2): La condición se simplifica para permitir la eliminación solo si el usuario tiene el rol 'super_admin'.
-            // Esto cumple con el requisito de que ningún otro usuario (incluido el solicitante) pueda eliminar.
-            if ($user->hasRole('super_admin')) {
+            $user->loadMissing('role'); // Cargar la relación del rol
+
+            // CORRECCIÓN: Se cambia hasRole() por la verificación directa
+            if ($user->role->name === 'super_admin') {
                 DB::beginTransaction();
-                // Eliminar detalles de gastos proyectados asociados
-                $solicitud->detallesGastosProyectados()->delete();
+
+                // CORRECCIÓN: Se usa sync([]) para limpiar la tabla pivote de la relación muchos-a-muchos
+                $solicitud->gastosProyectados()->sync([]);
                 // Eliminar historial de estados asociado
                 $solicitud->historialEstados()->delete();
                 // Eliminar la solicitud principal
                 $solicitud->delete();
+
                 DB::commit();
                 return response()->json(['message' => 'Solicitud de fondo eliminada exitosamente.'], 200);
             } else {
-                // Si el usuario no es un super_admin, se deniega el acceso.
                 return response()->json(['message' => 'Acceso denegado. Solo un Super Administrador puede eliminar solicitudes.'], 403);
             }
         } catch (ModelNotFoundException $e) {
-            DB::rollBack();
             return response()->json(['message' => 'Solicitud de fondo no encontrada.'], 404);
         } catch (\Exception $e) {
             DB::rollBack();

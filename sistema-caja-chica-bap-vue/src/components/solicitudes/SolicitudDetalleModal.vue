@@ -1,6 +1,5 @@
 <script setup>
 import { defineProps, defineEmits, computed } from 'vue';
-
 const props = defineProps({
     mostrar: {
         type: Boolean,
@@ -15,15 +14,29 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 // Propiedad computada para los detalles de gastos, asegurando que sea un array
-const detallesDeGastos = computed(() => {
-    // Accede a la relación por el nombre que Laravel envía en el JSON (snake_case)
-    // Si la relación existe y es un array, úsala; de lo contrario, devuelve un array vacío.
-    if (props.solicitud && Array.isArray(props.solicitud.detalles_gastos_proyectados)) {
-        return props.solicitud.detalles_gastos_proyectados;
+const gastosProyectados = computed(() => {
+    // La relación correcta es 'gastos_proyectados'.
+    if (props.solicitud && Array.isArray(props.solicitud.gastos_proyectados)) {
+        return props.solicitud.gastos_proyectados;
     }
-    return []; // Devuelve un array vacío si no hay detalles_gastos_proyectados o no es un array
+    return []; // Devuelve un array vacío como fallback seguro.
 });
 
+const nombreRevisorAdm = computed(() => {
+    if (!props.solicitud?.revisor_adm) return 'N/A';
+    if (props.solicitud.revisor_adm.id === props.solicitud.id_solicitante) {
+        return 'No Aplica (Automático)';
+    }
+    return `${props.solicitud.revisor_adm.name || ''} ${props.solicitud.revisor_adm.last_name || ''}`;
+});
+
+const nombreAprobadorGrte = computed(() => {
+    if (!props.solicitud?.aprobador_gerente) return 'N/A';
+    if (props.solicitud.aprobador_gerente.id === props.solicitud.id_solicitante) {
+        return 'No Aplica (Automático)';
+    }
+    return `${props.solicitud.aprobador_gerente.name || ''} ${props.solicitud.aprobador_gerente.last_name || ''}`;
+});
 // Función para formatear la fecha
 const formatearFecha = (fechaString) => {
     if (!fechaString) return 'N/A';
@@ -51,7 +64,8 @@ const cerrarModal = () => {
                             </h3>
                             <button @click="cerrarModal"
                                 class="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-xl transition-all duration-300 hover:scale-110">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -60,24 +74,32 @@ const cerrarModal = () => {
 
                     <div
                         class="p-6 max-h-[70vh] overflow-y-auto scroll-modal bg-gradient-to-br from-white/95 to-verde-bap-extralight/50">
-                        <div class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                        <div
+                            class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Información General</h4>
-                            <p class="text-sm text-gray-600"><strong>Tipo de Solicitud:</strong> {{ solicitud?.tipo_solicitud || 'N/A'
-                                }}</p>
-                            <p class="text-sm text-gray-600"><strong>Monto Solicitado:</strong> S/. {{ solicitud?.monto_solicitado ?
-                                parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Prioridad:</strong> {{ solicitud?.prioridad || 'N/A' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ solicitud?.estado || 'N/A' }}</p>
+                            <p class="text-sm text-gray-600"><strong>Tipo de Solicitud:</strong> {{
+                                solicitud?.tipo_solicitud || 'N/A'
+                            }}</p>
+                            <p class="text-sm text-gray-600"><strong>Monto Solicitado:</strong> S/. {{
+                                solicitud?.monto_solicitado ?
+                                    parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</p>
+                            <p v-if="solicitud.tipo_solicitud !== 'Apertura'">
+                                <strong>Prioridad:</strong> {{ solicitud.prioridad || 'N/A' }}
+                            </p>
+                            <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ solicitud?.estado ||
+                                'N/A' }}</p>
                             <!-- NUEVA SECCIÓN: Código de Fondo Asignado para solicitudes de Apertura Aprobadas -->
                             <p v-if="solicitud?.tipo_solicitud === 'Apertura' && solicitud?.estado === 'Aprobada' && solicitud?.fondo_efectivo?.codigo_fondo"
-                                class="text-sm text-gray-600" >
-                                <strong>Código de Fondo Asignado:</strong> <span class="text-sm">{{ solicitud.fondo_efectivo.codigo_fondo }}</span>
+                                class="text-sm text-gray-600">
+                                <strong>Código de Fondo Asignado:</strong> <span class="text-sm">{{
+                                    solicitud.fondo_efectivo.codigo_fondo }}</span>
                             </p>
                             <p class="text-sm text-gray-600"><strong>Fecha de Creación:</strong> {{
                                 formatearFecha(solicitud?.created_at) }}</p>
                             <p class="text-sm text-gray-600">
                                 <strong>Solicitante:</strong>
-                                {{ solicitud?.solicitante?.name || 'N/A' }} {{ solicitud?.solicitante?.last_name || '' }}
+                                {{ solicitud?.solicitante?.name || 'N/A' }} {{ solicitud?.solicitante?.last_name || ''
+                                }}
                             </p>
                             <p class="text-sm text-gray-600"><strong>Rol del Solicitante:</strong> {{
                                 solicitud?.solicitante?.role?.display_name || 'N/A' }}</p>
@@ -92,7 +114,8 @@ const cerrarModal = () => {
                                 solicitud.solicitud_original.fondo_efectivo.codigo_fondo || 'N/A' }}</p>
                             <p class="text-sm text-gray-600"><strong>Monto Aprobado del Fondo:</strong> S/. {{
                                 solicitud.solicitud_original.fondo_efectivo.monto_aprobado ?
-                                    parseFloat(solicitud.solicitud_original.fondo_efectivo.monto_aprobado).toFixed(2) : '0.00' }}</p>
+                                    parseFloat(solicitud.solicitud_original.fondo_efectivo.monto_aprobado).toFixed(2) :
+                                    '0.00' }}</p>
                             <p class="text-sm text-gray-600"><strong>Estado del Fondo:</strong> {{
                                 solicitud.solicitud_original.fondo_efectivo.estado || 'N/A' }}</p>
                             <p class="text-sm text-gray-600"><strong>Responsable del Fondo:</strong> {{
@@ -104,54 +127,59 @@ const cerrarModal = () => {
                                 solicitud.solicitud_original.fondo_efectivo.area?.name || 'N/A' }}</p>
                         </div>
 
-                        <div class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                        <div
+                            class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Notas de Proceso</h4>
-                            <p v-if="solicitud?.motivo_detalle" class="text-sm text-gray-600"><strong>Motivo Detalle:</strong> {{
-                                solicitud.motivo_detalle }}</p>
-                            <p v-if="solicitud?.motivo_observacion" class="text-sm text-gray-600"><strong>Motivo Observación:</strong>
+                            <p v-if="solicitud?.motivo_detalle" class="text-sm text-gray-600"><strong>Motivo
+                                    Detalle:</strong> {{
+                                        solicitud.motivo_detalle }}</p>
+                            <p v-if="solicitud?.motivo_observacion" class="text-sm text-gray-600"><strong>Motivo
+                                    Observación:</strong>
                                 {{ solicitud.motivo_observacion }}</p>
-                            <p v-if="solicitud?.motivo_descargo" class="text-sm text-gray-600"><strong>Motivo Descargo:</strong> {{
-                                solicitud.motivo_descargo }}</p>
-                            <p v-if="solicitud?.motivo_rechazo_final" class="text-sm text-gray-600"><strong>Motivo Rechazo
+                            <p v-if="solicitud?.motivo_descargo" class="text-sm text-gray-600"><strong>Motivo
+                                    Descargo:</strong> {{
+                                        solicitud.motivo_descargo }}</p>
+                            <p v-if="solicitud?.motivo_rechazo_final" class="text-sm text-gray-600"><strong>Motivo
+                                    Rechazo
                                     Final:</strong> {{ solicitud.motivo_rechazo_final }}</p>
                             <p v-if="!solicitud?.motivo_detalle && !solicitud?.motivo_observacion && !solicitud?.motivo_descargo && !solicitud?.motivo_rechazo_final"
                                 class="text-sm text-gray-500">No hay notas de proceso adicionales.</p>
                         </div>
 
-                        <div class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                        <div
+                            class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Aprobadores</h4>
-                            <p class="text-sm text-gray-600"><strong>Revisor ADM:</strong> {{ solicitud?.revisor_adm?.name || 'N/A' }}
-                                {{ solicitud?.revisor_adm?.last_name || '' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ solicitud?.aprobador_gerente?.name
-                                || 'N/A' }} {{ solicitud?.aprobador_gerente?.last_name || '' }}</p>
+                            <p class="text-sm text-gray-600"><strong>Revisor ADM:</strong> {{ nombreRevisorAdm }}</p>
+                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ nombreAprobadorGrte }}</p>
                         </div>
 
                         <div class="p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Detalles de Gastos Proyectados</h4>
-                            <div v-if="detallesDeGastos.length > 0" class="space-y-2">
-                                <div v-for="(detalle, idx) in detallesDeGastos" :key="idx"
-                                    class="border-b border-gray-200 pb-2 last:border-b-0">
-                                    <p class="text-sm text-gray-600"><strong>Descripción:</strong> {{ detalle.descripcion_gasto || 'N/A'
-                                        }}</p>
-                                    <p class="text-sm text-gray-600"><strong>Monto Estimado:</strong> S/. {{ detalle.monto_estimado ?
-                                        parseFloat(detalle.monto_estimado).toFixed(2) : '0.00' }}</p>
+                            <div v-if="gastosProyectados.length > 0" class="space-y-2">
+                                <div v-for="gasto in gastosProyectados" :key="gasto.id_gasto_proyectado"
+                                    class="flex justify-between items-center text-sm">
+                                    <span class="text-gray-700 text-sm">{{ gasto.descripcion }}</span>
+                                    <span class="font-semibold text-gray-800">S/. {{
+                                        parseFloat(gasto.pivot.monto_estimado).toFixed(2) }}</span>
                                 </div>
                             </div>
                             <div v-else class="text-sm text-gray-500">
-                                No hay detalles de gastos proyectados.
+                                No se especificaron gastos proyectados.
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-gradient-to-r from-gray-50 to-verde-bap-extralight/30 px-6 py-4 border-t border-gray-200/50">
+                    <div
+                        class="bg-gradient-to-r from-gray-50 to-verde-bap-extralight/30 px-6 py-4 border-t border-gray-200/50">
                         <div class="flex justify-end">
                             <button @click="cerrarModal"
                                 class="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-verde-bap to-verde-bap-dark text-white font-semibold rounded-xl shadow-soft hover:shadow-glow-verde transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-verde-bap/30">
                                 <span class="relative z-10 flex items-center space-x-2">
                                     <span>Cerrar</span>
-                                    <svg class="h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                    <svg class="h-4 w-4 group-hover:translate-x-1 transition-transform duration-300"
+                                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                     </svg>
                                 </span>
                                 <div

@@ -33,7 +33,9 @@
                         </p>
                     </div>
 
-                    <div v-if="showJefeAdmActions" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+                    <!-- Cambio: Usar showAccionesAdministracion en lugar de showJefeAdmActions -->
+                    <div v-if="showAccionesAdministracion"
+                        class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Administración</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarADM')"
@@ -63,7 +65,9 @@
                         </div>
                     </div>
 
-                    <div v-if="showGerenteGeneralActions" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+                    <!-- Cambio: Usar showAccionesGerenteGeneral en lugar de showGerenteGeneralActions -->
+                    <div v-if="showAccionesGerenteGeneral"
+                        class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Gerencia General</h4>
                         <div class="flex flex-wrap gap-3">
                             <button @click="ejecutarAccionSinMotivo('aprobarGRTE')"
@@ -93,8 +97,8 @@
                         </div>
                     </div>
 
-                    <div v-if="showSolicitanteDescargoAction"
-                        class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+                    <!-- Cambio: Usar showAccionesSolicitante en lugar de showSolicitanteDescargoAction -->
+                    <div v-if="showAccionesSolicitante" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Solicitante</h4>
                         <p class="text-sm text-gray-600 mb-4">La solicitud ha sido observada. Puedes presentar un
                             descargo simple o editar la solicitud completa.</p>
@@ -139,7 +143,8 @@
                         </div>
                     </div>
 
-                    <div v-if="!showJefeAdmActions && !showGerenteGeneralActions && !showSolicitanteDescargoAction && !showMotivoInput"
+                    <!-- Cambio: Actualizar las referencias en la condición de no hay acciones -->
+                    <div v-if="!showAccionesAdministracion && !showAccionesGerenteGeneral && !showAccionesSolicitante && !showMotivoInput"
                         class="text-center text-gray-500 py-4">
                         No hay acciones disponibles para esta solicitud o su rol actual.
                     </div>
@@ -196,52 +201,55 @@ const ROLES = {
 
 // Determina si las acciones para Jefe de Administración deben ser visibles.
 // Se ocultan si el usuario actual es el solicitante y es ADM/SuperAdmin en una solicitud de Decremento/Cierre.
-const showJefeAdmActions = computed(() => {
-    if (!props.solicitud || !props.usuarioActual || !props.usuarioActual.role) return false;
+const rolUsuario = computed(() => props.usuarioActual?.role?.name);
+const esSolicitante = computed(() => props.usuarioActual?.id === props.solicitud?.id_solicitante);
+const esDecrementoCierre = computed(() => ['Decremento', 'Cierre'].includes(props.solicitud?.tipo_solicitud));
 
-    const estado = props.solicitud.estado;
-    const rolActual = props.usuarioActual.role.name;
-    const isSolicitanteAdminOrSuperAdmin = props.usuarioActual.id === props.solicitud.id_solicitante &&
-        [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(rolActual);
-    const isDecrementoCierre = ['Decremento', 'Cierre'].includes(props.solicitud.tipo_solicitud);
+// Muestra la sección "Acciones de Solicitante"
+const showAccionesSolicitante = computed(() => {
+    if (!props.solicitud || !esSolicitante.value) return false; // Debe ser el solicitante.
 
-    // Si el usuario actual es Jefe ADM o Super Admin Y la solicitud está en un estado gestionable por ADM
-    const canActAsAdm = (rolActual === ROLES.JEFE_ADM || rolActual === ROLES.SUPER_ADMIN) &&
-        (estado === 'Pendiente Aprobación ADM' || estado === 'Descargo Enviado ADM' || estado === 'Pendiente Re-evaluacion');
-
-    // Restricción: Si el solicitante es un ADM/SuperAdmin y es una solicitud de Decremento/Cierre,
-    // el ADM no puede "gestionar" su propia solicitud de esta forma (aprobar/observar/rechazar).
-    // Esta restricción está manejada en el backend también, pero es bueno ocultar la UI.
-    if (canActAsAdm && isSolicitanteAdminOrSuperAdmin && isDecrementoCierre) {
-        return false;
-    }
-
-    return canActAsAdm;
+    // La única acción que un solicitante puede hacer desde este modal es responder a una observación.
+    return ['Observada ADM', 'Observada GRTE'].includes(props.solicitud.estado);
 });
 
-// Determina si las acciones para Gerente General deben ser visibles.
-// Se ocultan si el usuario actual es el solicitante y es GRTE/SuperAdmin en una solicitud de Decremento/Cierre.
-const showGerenteGeneralActions = computed(() => {
-    if (!props.solicitud || !props.usuarioActual || !props.usuarioActual.role) return false;
+// Muestra la sección "Acciones de Administración"
+const showAccionesAdministracion = computed(() => {
+    if (!props.solicitud) return false;
 
-    const estado = props.solicitud.estado;
-    const rolActual = props.usuarioActual.role.name;
-    const isSolicitanteGrteOrSuperAdmin = props.usuarioActual.id === props.solicitud.id_solicitante &&
-        [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolActual);
-    const isDecrementoCierre = ['Decremento', 'Cierre'].includes(props.solicitud.tipo_solicitud);
+    const esRolAprobadorAdm = [ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(rolUsuario.value);
+    const esEstadoParaAdm = ['Pendiente Aprobación ADM', 'Pendiente Re-evaluacion'].includes(props.solicitud.estado);
+    // Un aprobador no puede gestionar su propia solicitud.
+    // Se añade la lógica específica para Decremento/Cierre.
+    if (esSolicitante.value) {
+        // Si el usuario es el solicitante Y es una solicitud de Decremento/Cierre, no puede gestionarla aquí.
+        // La gestión de su propio descargo se maneja en 'showAccionesSolicitante'.
+        if (esDecrementoCierre.value) {
+            return false;
+        }
+        // Para otros tipos de solicitud, un aprobador no debe ver botones de aprobación para sus propias solicitudes.
+        return false;
+    }
+    return esRolAprobadorAdm && esEstadoParaAdm;
+});
 
-    // Si el usuario actual es Gerente General o Super Admin Y la solicitud está en un estado gestionable por GRTE
-    const canActAsGrte = (rolActual === ROLES.GERENTE_GENERAL || rolActual === ROLES.SUPER_ADMIN) &&
-        (estado === 'Pendiente Aprobación GRTE' || estado === 'Descargo Enviado GRTE');
+// Muestra la sección "Acciones de Gerencia General"
+const showAccionesGerenteGeneral = computed(() => {
+    if (!props.solicitud) return false;
 
-    // Restricción: Si el solicitante es un GRTE/SuperAdmin y es una solicitud de Decremento/Cierre,
-    // el GRTE no puede "gestionar" su propia solicitud de esta forma (aprobar/observar/rechazar).
-    // Esto se alinea con la regla de que "Solo el Gerente General (otro usuario) puede hacerlo".
-    if (canActAsGrte && isSolicitanteGrteOrSuperAdmin && isDecrementoCierre) {
+    const esRolAprobadorGrte = [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolUsuario.value);
+    const esEstadoParaGrte = ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'].includes(props.solicitud.estado);
+
+    // Un aprobador no puede gestionar su propia solicitud.
+    // Se añade la lógica específica para Decremento/Cierre.
+    if (esSolicitante.value) {
+        if (esDecrementoCierre.value) {
+            return false;
+        }
         return false;
     }
 
-    return canActAsGrte;
+    return esRolAprobadorGrte && esEstadoParaGrte;
 });
 
 // Determina si se debe mostrar el botón de "Presentar Descargo" para el solicitante.
