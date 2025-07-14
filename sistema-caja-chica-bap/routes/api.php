@@ -2,6 +2,12 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::get('/health', function (Request $request) {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'Conexión con el backend del SGFE-BAP exitosa!'
+    ]);
+});
 /*
 |--------------------------------------------------------------------------
 | Cargador de Rutas de la API del SGFE-BAP
@@ -15,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('auth')->group(base_path('routes/api/auth.php'));
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () { 
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     require base_path('routes/api/solicitudes.php');
     require base_path('routes/api/fondos.php');
     require base_path('routes/api/gastos.php');
@@ -24,5 +30,4 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     require base_path('routes/api/proyectos.php');
     require base_path('routes/api/gastos_proyectados.php');
     require base_path('routes/api/areas.php');
-
 });

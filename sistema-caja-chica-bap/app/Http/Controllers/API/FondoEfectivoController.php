@@ -37,6 +37,7 @@ class FondoEfectivoController extends Controller
         $query->with([
             'responsable:id,name,last_name,email,cargo',
             'area:id,name',
+            'proyecto:id_proyecto,nombre_proyecto',
             'solicitudApertura' => function ($q) {
                 // Se asegura de seleccionar los campos necesarios, incluyendo las claves foráneas para las relaciones anidadas.
                 $q->select('id', 'codigo_solicitud', 'id_solicitante', 'id_revisor_adm', 'id_aprobador_gerente')
@@ -45,16 +46,18 @@ class FondoEfectivoController extends Controller
         ]);
 
         // Lógica de visibilidad por rol
-        if ($user->role->name === 'super_admin' || $user->role->name === 'gerente_general' || $user->role->name === 'jefe_administracion') {
-            // Acceso total para roles de administración.
-        } elseif ($user->role->name === 'jefe_area' || $user->role->name === 'colaborador') {
-            // Un usuario regular solo ve los fondos de su área o de los que es responsable.
-            $query->where(function ($q) use ($user) {
-                $q->where('id_area', $user->area_id)
-                    ->orWhere('id_responsable', $user->id);
-            });
+        if ($user->hasAnyRole(['super_admin', 'gerente_general', 'jefe_administracion'])) {
+            // Acceso total para roles de administración, no se aplica ningún filtro de visibilidad.
         } else {
-            return response()->json(['message' => 'Acceso denegado. Rol no reconocido.'], 403);
+            // Para cualquier otro rol (jefe_area, colaborador, etc.)
+            // Un usuario ve los fondos si cumple CUALQUIERA de estas condiciones:
+            $proyectoIdsDelArea = $user->area->proyectos()->pluck('proyectos.id_proyecto');
+
+            $query->where(function ($q) use ($user, $proyectoIdsDelArea) {
+                $q->where('id_responsable', $user->id) // 1. Es el responsable directo del fondo.
+                    ->orWhere('id_area', $user->area_id) // 2. El fondo pertenece a su área (para fondos Regulares/Excepcionales).
+                    ->orWhereIn('id_proyecto', $proyectoIdsDelArea); // 3. El fondo es de un proyecto en el que su área participa.
+            });
         }
 
         // Aplicar filtros adicionales de la request
@@ -77,39 +80,28 @@ class FondoEfectivoController extends Controller
                     ->orWhere(DB::raw('LOWER(last_name)'), 'like', '%' . $searchTerm . '%');
             });
         }
-        if (($user->role->name === 'super_admin' || $user->role->name === 'gerente_general' || $user->role->name === 'jefe_administracion') && $request->filled('area_id')) {
+        if ($user->hasAnyRole(['super_admin', 'gerente_general', 'jefe_administracion']) && $request->filled('area_id')) {
             $query->where('id_area', $request->area_id);
         }
 
         // Ordenamiento por código de fondo para mostrar los más recientes primero.
         $fondos = $query->orderBy('codigo_fondo', 'desc')->get();
-
         return response()->json([
             'message' => 'Fondos de efectivo obtenidos exitosamente.',
             'fondos' => $fondos,
         ]);
     }
-    public function getProyeccionesPendientes(FondoEfectivo $fondo)
+    public function getGastosParaDeclarar(FondoEfectivo $fondo)
     {
-        $user = Auth::user();
-
-        // 1. VALIDACIÓN DE PERMISOS
-        if ($user->area_id !== $fondo->id_area && !$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
-            // Excepción para fondos de proyecto
-            if ($fondo->tipo_fondo !== 'Proyecto' || !$fondo->proyecto->areas->contains($user->area_id)) {
-                return response()->json(['message' => 'No tienes permiso para acceder a las proyecciones de este fondo.'], 403);
-            }
-        }
-
-        // 2. OBTENER PROYECCIONES CON CÁLCULO DE GASTOS
+        // 1. Cargar la solicitud de apertura y la relación con el catálogo de Gastos Proyectados.
         $fondo->load('solicitudApertura.gastosProyectados');
 
         if (!$fondo->solicitudApertura) {
-            return response()->json([]);
+            return response()->json([], 404); // No hay solicitud, no hay nada que declarar.
         }
 
-        // 3. OBTENER GASTOS YA DECLARADOS
-        // Suma todos los gastos que ya se han hecho contra este fondo, agrupados por el gasto proyectado.
+        // 2. Obtener la suma de todos los gastos ya declarados y no rechazados para este fondo,
+        // agrupados por el id del gasto proyectado. Esto es muy eficiente.
         $gastosRealizados = Gasto::where('id_fondo_efectivo', $fondo->id_fondo)
             ->where('estado', '!=', 'Rechazado')
             ->select('id_gasto_proyectado', DB::raw('SUM(monto_total) as total_gastado'))
@@ -117,25 +109,26 @@ class FondoEfectivoController extends Controller
             ->get()
             ->keyBy('id_gasto_proyectado');
 
-        // 4. CALCULAR SALDO RESTANTE Y FILTRAR
-        $proyeccionesPendientes = $fondo->solicitudApertura->gastosProyectados->map(function ($proyeccion) use ($gastosRealizados) {
-            $montoEstimado = $proyeccion->pivot->monto_estimado;
-            $totalGastado = $gastosRealizados->get($proyeccion->id_gasto_proyectado)['total_gastado'] ?? 0;
-            $saldoRestante = $montoEstimado - $totalGastado;
+        // 3. Mapear los gastos proyectados de la solicitud original para calcular su saldo.
+        $gastosParaDeclarar = $fondo->solicitudApertura->gastosProyectados->map(function ($proyeccion) use ($gastosRealizados) {
+            $montoAprobado = $proyeccion->pivot->monto_estimado;
+            $totalGastado = $gastosRealizados->get($proyeccion->id_gasto_proyectado)->total_gastado ?? 0;
+            $saldoRestante = $montoAprobado - $totalGastado;
 
-            // Devolvemos la proyección solo si todavía tiene saldo.
-            if ($saldoRestante > 0.005) {
-                return [
-                    'id' => $proyeccion->id_gasto_proyectado,
-                    'descripcion_gasto' => $proyeccion->descripcion,
-                    'monto_proyectado' => (float) $montoEstimado,
-                    'saldo_restante' => (float) $saldoRestante,
-                ];
-            }
-            return null;
-        })->filter(); // filter() sin argumentos elimina los valores nulos
+            // Devolver un objeto limpio y estructurado para el frontend.
+            return [
+                'id_gasto_proyectado' => $proyeccion->id_gasto_proyectado,
+                'descripcion' => $proyeccion->descripcion,
+                'id_cuenta_contable' => $proyeccion->id_cuenta_contable, // Se envía la cuenta contable para mostrarla en el frontend.
+                'monto_aprobado' => (float) $montoAprobado,
+                'saldo_restante' => (float) $saldoRestante,
+            ];
+        })->filter(function ($proyeccion) {
+            // Filtrar para devolver solo aquellos que aún tienen saldo.
+            return $proyeccion['saldo_restante'] > 0.005; // Usar un umbral pequeño para evitar errores de punto flotante.
+        });
 
-        return response()->json($proyeccionesPendientes->values()->all());
+        return response()->json($gastosParaDeclarar->values()->all());
     }
 
     /**
@@ -149,21 +142,24 @@ class FondoEfectivoController extends Controller
             return response()->json(['message' => 'No autenticado.'], 401);
         }
 
-        // 1. Obtener los IDs de los proyectos en los que participa el área del usuario.
-        $proyectosDelAreaIds = DB::table('area_proyecto')
+        // --- LÓGICA CORREGIDA ---
+
+        // 1. Obtener los IDs de los proyectos en los que el área del usuario participa,
+        // usando la tabla pivote correcta: 'area_proyecto'.
+        $proyectoIdsDelArea = DB::table('area_proyecto')
             ->where('id_area', $user->area_id)
             ->pluck('id_proyecto');
-
-        // 2. Construir la consulta principal.
+        // 2. Obtener los IDs de las solicitudes de apertura que corresponden a esos proyectos.
+        $solicitudesDeProyectosParticipantes = SolicitudFondo::where('tipo_fondo_solicitado', 'Proyecto')
+            ->whereIn('id_proyecto', $proyectoIdsDelArea)
+            ->pluck('id');
+        // 3. Construir la consulta principal para obtener los fondos.
         $fondos = FondoEfectivo::where('estado', 'Activo')
-            ->where(function ($query) use ($user, $proyectosDelAreaIds) {
-                // Condición 1: El fondo pertenece directamente al área del usuario (Regular o Excepcional).
-                $query->where('id_area', $user->area_id);
-                // Condición 2: O el fondo es de tipo 'Proyecto' y el área del usuario participa en ese proyecto.
-                $query->orWhere(function ($subQuery) use ($proyectosDelAreaIds) {
-                    $subQuery->where('tipo_fondo', 'Proyecto')
-                        ->whereIn('id_proyecto', $proyectosDelAreaIds);
-                });
+            ->where(function ($query) use ($user, $solicitudesDeProyectosParticipantes) {
+                // Condición A: El fondo pertenece directamente al área del usuario (para fondos Regulares y Excepcionales).
+                $query->where('id_area', $user->area_id)
+                    // Condición B: O, el fondo fue creado por una solicitud de proyecto en la que el área del usuario participa.
+                    ->orWhereIn('id_solicitud_apertura', $solicitudesDeProyectosParticipantes);
             })
             ->select('id_fondo', 'codigo_fondo', 'monto_disponible', 'monto_aprobado', 'tipo_fondo')
             ->get();
@@ -475,38 +471,28 @@ class FondoEfectivoController extends Controller
                 'message' => "El fondo no puede ser repuesto. Tiene {$gastosPendientes} gasto(s) en proceso de aprobación o validación."
             ], 409);
         }
-        // Se utiliza la misma lógica de getProyeccionesPendientes para verificar si hay saldos restantes.
-        $proyeccionesConSaldo = $fondo->solicitudApertura->detallesGastosProyectados()
-            ->withSum(['gastoDeclarado as gastos_declarados_sum' => function ($query) {
-                $query->where('estado', '!=', 'Rechazado');
-            }], 'monto_total')
-            ->get()
-            ->filter(function ($proyeccion) {
-                $gastosSum = $proyeccion->gastos_declarados_sum ?? 0;
-                $saldoRestante = $proyeccion->monto_estimado - $gastosSum;
-                return $saldoRestante > 0.005;
-            });
-
-        if ($proyeccionesConSaldo->isNotEmpty()) {
+        // 4. Se utiliza la misma lógica de getProyeccionesPendientes para verificar si hay saldos restantes.
+        $proyeccionesConSaldo = $this->getGastosParaDeclarar($fondo)->getData();
+        if (!empty($proyeccionesConSaldo)) {
             return response()->json([
-                'message' => "El fondo no puede ser repuesto porque aún tiene {$proyeccionesConSaldo->count()} concepto(s) proyectado(s) pendientes de liquidar."
-            ], 409); // 409 Conflict
+                'message' => "El fondo no puede ser repuesto porque aún tiene " . count($proyeccionesConSaldo) . " concepto(s) proyectado(s) con saldo pendiente de liquidar."
+            ], 409);
         }
 
-        // 4. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
+        // 5. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
         $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
         if ($montoAReponer <= 0) {
             return response()->json(['message' => 'No hay monto para reponer. Asegúrate de que los gastos hayan sido marcados como "Contabilizado".'], 409);
         }
 
-        // 5. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
+        // 6. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
         if ($fondo->monto_disponible < 0) {
             Log::warning("Intento de reposición sobre fondo con saldo negativo.", ['fondo_id' => $fondo->id_fondo, 'saldo' => $fondo->monto_disponible]);
             return response()->json([
                 'message' => "Error de Integridad de Datos: El saldo disponible del fondo es negativo. Por favor, contacte a soporte."
             ], 500);
         }
-        // 6. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
+        // 7. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
         return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request) {
             $saldoAnterior = $fondo->monto_disponible;
             //tambien puede ir logica para generar acta de entrega pdf.
@@ -524,7 +510,7 @@ class FondoEfectivoController extends Controller
                 'fecha_reposicion' => now(),
             ]);
 
-            // 7. ACTUALIZACIÓN DE GASTOS: Los gastos usados en esta reposición se marcan como "Repuesto".
+            // 8. ACTUALIZACIÓN DE GASTOS: Los gastos usados en esta reposición se marcan como "Repuesto".
             $fondo->gastos()->where('estado', 'Contabilizado')->update(['estado' => 'Repuesto']);
 
             Log::info("Reposición de Fondo: El usuario {$user->name} ha repuesto S/. {$montoAReponer} al fondo '{$fondo->codigo_fondo}'.");

@@ -94,7 +94,7 @@ class SolicitudFondo extends Model
     {
         return $this->belongsTo(Proyecto::class, 'id_proyecto', 'id_proyecto');
     }
-
+    
     /**
      * Relación: Una solicitud puede ser revisada por un Jefe de Administración (Usuario).
      */

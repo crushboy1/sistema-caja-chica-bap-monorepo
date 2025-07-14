@@ -13,6 +13,20 @@ const props = defineProps({
         required: true
     }
 });
+// --- LÓGICA DE PERMISOS ---
+const hasPermission = (permissionName) => {
+    if (!props.usuarioActual?.role?.permissions) {
+        return false;
+    }
+    return props.usuarioActual.role.permissions.some(p => p.name === permissionName);
+};
+
+// --- PROPIEDADES COMPUTADAS ---
+
+// [NUEVO] Propiedades computadas para controlar la visibilidad de los botones de acción.
+const canFinalizeGasto = computed(() => hasPermission('declaraciones.approve.adm'));
+const canObserveGastoAdm = computed(() => hasPermission('declaraciones.approve.adm'));
+const canRejectGastoAdm = computed(() => hasPermission('declaraciones.approve.adm'));
 
 const gastos = ref([]);
 const areas = ref([]);
@@ -446,7 +460,7 @@ onMounted(() => {
                     <thead class="bg-gray-100">
                         <tr class="text-gray-700 uppercase text-xs leading-normal">
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Cód. Gasto</th>
-                            <th class="py-3 px-4 text-left font-semibold">Proyección Original</th>
+                            <th class="py-3 px-4 text-center font-semibold">Proyección Original</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Monto</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Registrador</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Área</th>
@@ -459,15 +473,15 @@ onMounted(() => {
                     <tbody class="text-gray-600 text-sm">
                         <tr v-for="gasto in gastosPaginados" :key="gasto.id"
                             class="hover:bg-gray-50 transition-colors text-center">
-                            <td class="py-4 px-6 font-medium whitespace-nowrap">{{ gasto.codigo_gasto }}</td>
-                            <td class="py-4 px-4 text-left text-gray-500 whitespace-nowrap">{{
-                                gasto.detalle_proyectado?.descripcion_gasto }}</td>
-                            <td class="py-4 px-6 font-semibold whitespace-nowrap">S/. {{
+                            <td class="py-3 px-2 font-medium whitespace-nowrap">{{ gasto.codigo_gasto }}</td>
+                            <td class="py-3 px-2 text-xs text-left text-gray-500 whitespace-nowrap">{{
+                                gasto.gasto_proyectado?.descripcion || 'N/A' }}</td>
+                            <td class="py-3 px-2 font-semibold whitespace-nowrap">S/. {{
                                 parseFloat(gasto.monto_total).toFixed(2) }}</td>
-                            <td class="py-4 px-4">{{ gasto.registrador.name }} {{ gasto.registrador.last_name }}</td>
-                            <td class="py-4 px-4">{{ gasto.registrador.area?.name || 'N/A' }}</td>
-                            <td class="py-4 px-4">{{ gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}</td>
-                            <td class="py-4 px-6 whitespace-normal">
+                            <td class="py-3 px-2">{{ gasto.registrador.name }} {{ gasto.registrador.last_name }}</td>
+                            <td class="py-3 px-2">{{ gasto.registrador.area?.name || 'N/A' }}</td>
+                            <td class="py-3 px-2">{{ gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}</td>
+                            <td class="py-3 px-2 whitespace-normal">
                                 <span :class="getClassesForAuditoriaBadge(gasto.estado)">
                                     {{ gasto.estado }}
                                 </span>
@@ -475,53 +489,47 @@ onMounted(() => {
                             <td class="py-4 px-4 text-gray-500">{{ new
                                 Date(gasto.created_at).toLocaleDateString('es-PE') }}</td>
                             <td class="py-4 px-4">
-                                <div class="flex flex-col items-center justify-center space-y-2">
-                                    
-                                    <div class="flex items-center space-x-2">
-                                        <button @click="verDetalles(gasto)"
-                                            class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
-                                            title="Ver Detalles y Evidencia">
+                                <!-- [CORRECCIÓN] Se utiliza un grid para agrupar los botones de 2 en 2 -->
+                                <div class="grid grid-cols-2 gap-2 w-20 mx-auto">
+                                    <!-- Botón Ver Detalles (siempre visible) -->
+                                    <button @click="verDetalles(gasto)"
+                                        class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
+                                        title="Ver Detalles y Evidencia">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+
+                                    <!-- Botones de acción condicionales -->
+                                    <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
+                                        <button v-if="canFinalizeGasto"
+                                            @click="gestionarAccionAdm(gasto, 'finalizeAsAccounted')"
+                                            title="Contabilizar Gasto"
+                                            class="w-8 h-8 rounded-full bg-verde-bap-light hover:bg-verde-bap text-verde-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    d="M5 13l4 4L19 7" />
                                             </svg>
                                         </button>
-                                        <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
-                                            <button @click="gestionarAccionAdm(gasto, 'finalizeAsAccounted')"
-                                                title="Contabilizar Gasto"
-                                                class="w-8 h-8 rounded-full bg-verde-bap-light hover:bg-verde-bap text-verde-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </button>
-                                        </template>
-                                    </div>
-
-                                    <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
-                                        <div class="flex items-center space-x-2">
-                                            <button @click="gestionarAccionAdm(gasto, 'observe')" title="Observar Gasto"
-                                                class="w-8 h-8 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                                </svg>
-                                            </button>
-                                            <button @click="gestionarAccionAdm(gasto, 'rejectFinal')"
-                                                title="Rechazar Gasto"
-                                                class="w-8 h-8 rounded-full bg-rojo-bap-light hover:bg-rojo-bap text-rojo-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </div>
+                                        <button v-if="canObserveGastoAdm" @click="gestionarAccionAdm(gasto, 'observe')"
+                                            title="Observar Gasto"
+                                            class="w-8 h-8 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                            </svg>
+                                        </button>
+                                        <button v-if="canRejectGastoAdm"
+                                            @click="gestionarAccionAdm(gasto, 'rejectFinal')" title="Rechazar Gasto"
+                                            class="w-8 h-8 rounded-full bg-rojo-bap-light hover:bg-rojo-bap text-rojo-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
                                     </template>
                                 </div>
                             </td>

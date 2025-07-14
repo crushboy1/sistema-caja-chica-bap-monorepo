@@ -15,7 +15,6 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         // Define los roles a insertar
-        // Define los roles a insertar
         $roles = [
             ['name' => 'super_admin', 'display_name' => 'Administrador del Sistema', 'description' => 'Acceso completo al sistema y gestión de usuarios/roles.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'gerente_general', 'display_name' => 'Gerente General', 'description' => 'Aprueba fondos de efectivo y variaciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],

@@ -7,7 +7,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fondos-efectivo', FondoEfectivoController::class)->parameters(['fondos-efectivo' => 'fondo']);
     
     Route::get('/fondos-activos-usuario', [FondoEfectivoController::class, 'getFondosActivosParaUsuario']);
-    Route::get('fondos-efectivo/{fondo}/proyecciones-pendientes', [FondoEfectivoController::class, 'getProyeccionesPendientes']);
+    Route::get('fondos-efectivo/{fondo}/gastos-para-declarar', [FondoEfectivoController::class, 'getGastosParaDeclarar']);
     
     Route::prefix('fondos-efectivo/{fondo}')->group(function () {
         Route::get('/timeline', [FondoEfectivoController::class, 'getTimeline']);

@@ -25,7 +25,7 @@ const handleLogin = async () => {
     isLoading.value = false;
     return;
   }
-  
+
   try {
     // ¡YA NO ES NECESARIO HACER api.get('/sanctum/csrf-cookie') AQUÍ!
     // El interceptor en plugins/axios.js se encargará automáticamente.
@@ -46,7 +46,7 @@ const handleLogin = async () => {
 
     if (error.response) {
       const status = error.response.status;
-      
+
       if (status === 422) {
         // Errores de validación
         const errors = error.response.data.errors;
@@ -83,10 +83,14 @@ const testConnection = async () => {
   try {
     const response = await api.get('/health');
     console.log('Conexión exitosa:', response.data);
-    alert('✅ Conexión con el backend exitosa!');
+    alert(`✅ ${response.data.message}`);
   } catch (error) {
     console.error('Error de conexión:', error);
-    alert('❌ Error de conexión con el backend');
+    let errorMessage = '❌ Error de conexión con el backend.';
+    if (error.request) {
+      errorMessage += ' No se pudo recibir respuesta del servidor. ¿Está encendido y accesible?';
+    }
+    alert(errorMessage);
   }
 };
 </script>
@@ -107,17 +111,9 @@ const testConnection = async () => {
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-4">
-          <BaseInput 
-            type="email" 
-            v-model="email" 
-            placeholder="correo@ejemplo.com" 
-            autocomplete="email"
-            :disabled="isLoading" 
-          />
-          <PasswordInput 
-            v-model="password"
-            :disabled="isLoading" 
-          />
+          <BaseInput type="email" v-model="email" placeholder="correo@ejemplo.com" autocomplete="email"
+            :disabled="isLoading" />
+          <PasswordInput v-model="password" :disabled="isLoading" />
           <SubmitButton :disabled="isLoading" class="mt-2">
             <span v-if="isLoading">Ingresando...</span>
             <span v-else>Iniciar sesión</span>
@@ -126,11 +122,8 @@ const testConnection = async () => {
 
         <!-- Botón de prueba de conexión (puedes quitarlo en producción) -->
         <div class="mt-4">
-          <button 
-            @click="testConnection"
-            type="button"
-            class="w-full py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
+          <button @click="testConnection" type="button"
+            class="w-full py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
             🔧 Probar conexión con backend
           </button>
         </div>

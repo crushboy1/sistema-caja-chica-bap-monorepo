@@ -271,8 +271,6 @@ class SolicitudFondoController extends Controller
                 'id_revisor_adm' => $revisorAdmId,
                 'id_aprobador_gerente' => $aprobadorGerenteId,
             ]);
-
-
             // Guardar los detalles de gastos proyectados (solo si se proporcionan y son relevantes para el tipo de solicitud)
             // CAMBIO 4: Lógica para no guardar gastos proyectados si es tipo Cierre
             if ($request->has('gastos_proyectados') && in_array($request->tipo_solicitud, ['Apertura', 'Incremento', 'Decremento'])) {

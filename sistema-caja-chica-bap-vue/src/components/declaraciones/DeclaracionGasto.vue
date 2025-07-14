@@ -33,9 +33,10 @@
                     <select id="fondo" v-model="fondoSeleccionadoId"
                         class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                         required>
-                        <option disabled value="">Selecciona un fondo</option>
+                        <option :value="null" disabled>-- Seleccione un fondo --</option>
                         <option v-for="fondo in fondosActivos" :key="fondo.id_fondo" :value="fondo.id_fondo">
-                            {{ fondo.codigo_fondo }} (Aprobado: S/. {{ parseFloat(fondo.monto_aprobado).toFixed(2) }})
+                            {{ fondo.codigo_fondo }} - (Saldo Disp: {{ currencyFormatter.format(fondo.monto_disponible)
+                            }})
                         </option>
                     </select>
                     <transition name="fade-in">
@@ -50,18 +51,20 @@
 
             <!-- Estado de carga de proyecciones -->
             <transition name="fade" mode="out-in">
-                <div v-if="cargandoProyecciones" class="text-center py-6">
+                <div v-if="cargandoGastosProyectados" class="text-center py-6">
                     <div class="animate-pulse flex items-center justify-center text-gray-500">
-                        <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24"></svg>
-                        Cargando proyecciones disponibles...
+                        <svg class="animate-spin h-5 w-5 mr-3 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 4V2A10 10 0 002 12h2a8 8 0 018-8z"></path>
+                        </svg>
+                        Cargando gastos autorizados para el fondo...
                     </div>
                 </div>
             </transition>
 
             <!-- PASO 2: GASTOS A DECLARAR -->
-            <div v-if="fondoSeleccionadoId && !cargandoProyecciones" class="space-y-4">
+            <div v-if="fondoSeleccionadoId && !cargandoGastosProyectados" class="space-y-4">
                 <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                    2. Gastos a Declarar
+                    2. Detalle de Gastos a Declarar
                 </h3>
 
                 <!-- Lista de gastos con transiciones -->
@@ -83,25 +86,24 @@
                                     </div>
                                     <div class="flex-1">
                                         <p class="text-gray-800 font-medium">
-                                            {{gasto.detalle_gasto_proyectado_id ?
-                                                proyeccionesPendientes.find(p => p.id ===
-                                                    gasto.detalle_gasto_proyectado_id)?.descripcion_gasto :
-                                                'Gasto sin asignar'}}
+                                            <!-- Muestra la descripción del gasto proyectado seleccionado, o "Nuevo Gasto" si aún no se ha seleccionado -->
+                                            {{gasto.id_gasto_proyectado ? gastosProyectadosDisponibles.find(p =>
+                                                p.id_gasto_proyectado === gasto.id_gasto_proyectado)?.descripcion : 'Nuevo Gasto' }}
                                         </p>
                                         <p class="text-sm text-gray-500 mt-1">
                                             Monto: <span class="font-semibold text-verde-bap-dark">{{
                                                 currencyFormatter.format(gasto.monto_total || 0) }}</span>
                                             <span v-if="gasto.tipo_documento" class="ml-2">• {{ gasto.tipo_documento
-                                                }}</span>
+                                            }}</span>
                                         </p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <!-- Indicador de completitud -->
                                     <div class="flex items-center">
-                                        <div v-if="gasto.detalle_gasto_proyectado_id && gasto.monto_total && gasto.tipo_documento && gasto.id_cuenta_contable && gasto.evidencia"
-                                            class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                        <div v-else class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                        <div v-if="gasto.id_gasto_proyectado && gasto.monto_total && gasto.tipo_documento && gasto.glosa && gasto.evidencia"
+                                            class="w-3 h-3 bg-green-500 rounded-full" title="Completo"></div>
+                                        <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
                                     </div>
                                     <button type="button"
                                         class="text-verde-bap hover:text-verde-bap-dark transition-colors duration-200 text-sm font-medium px-3 py-1 rounded-md hover:bg-verde-bap hover:bg-opacity-10">
@@ -127,7 +129,7 @@
                                             {{ index + 1 }}
                                         </span>
                                         <h3 class="text-xl font-semibold text-gray-800">Detalle del Gasto #{{ index + 1
-                                            }}</h3>
+                                        }}</h3>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <button type="button" @click="minimizarGasto(index)"
@@ -167,24 +169,19 @@
                                         <!-- Gasto Proyectado -->
                                         <div>
                                             <label :for="'proyeccion_' + index"
-                                                class="block text-sm font-medium text-gray-700 mb-2">
-                                                Gasto Proyectado <span class="text-rojo-bap">*</span>
-                                            </label>
-                                            <select :id="'proyeccion_' + index"
-                                                v-model="gasto.detalle_gasto_proyectado_id"
-                                                :disabled="cargandoProyecciones"
-                                                class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                class="block text-sm font-medium text-gray-700">Gasto Proyectado <span
+                                                    class="text-rojo-bap">*</span></label>
+                                            <select :id="'proyeccion_' + index" v-model="gasto.id_gasto_proyectado"
+                                                class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
                                                 required>
-                                                <option disabled value="">{{ cargandoProyecciones ? 'Cargando...' :
-                                                    'Selecciona una proyección' }}</option>
-                                                <option v-if="!cargandoProyecciones && !proyeccionesPendientes.length"
-                                                    value="" disabled>
-                                                    No hay proyecciones pendientes
-                                                </option>
-                                                <option v-for="p in proyeccionesDisponibles(index)" :key="p.id"
-                                                    :value="p.id">
-                                                    {{ p.descripcion_gasto }} (Disponible: {{
-                                                        currencyFormatter.format(p.saldo_a_mostrar) }})
+                                                <option :value="null" disabled>Seleccione un Gasto Proyectado</option>
+                                                <option v-for="proyeccion in gastosProyectadosDisponibles"
+                                                    :key="proyeccion.id_gasto_proyectado"
+                                                    :value="proyeccion.id_gasto_proyectado"
+                                                    :disabled="esOpcionDeshabilitada(proyeccion, gasto)">
+                                                    {{ proyeccion.descripcion }} (Saldo: {{
+                                                        currencyFormatter.format(getSaldoMaximoParaGasto(proyeccion.id_gasto_proyectado,
+                                                            index)) }})
                                                 </option>
                                             </select>
                                         </div>
@@ -219,9 +216,7 @@
                                                         <option disabled value="">Selecciona un tipo</option>
                                                         <option>Boleta de Venta</option>
                                                         <option>Factura</option>
-                                                        <option>Recibo por Honorarios</option>
                                                         <option>Declaración Jurada</option>
-                                                        <option>Otro</option>
                                                     </select>
                                                 </div>
 
@@ -247,17 +242,17 @@
                                                     </label>
                                                     <input type="number" :id="'monto_total_' + index"
                                                         v-model.number="gasto.monto_total"
-                                                        :max="getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, index)"
+                                                        :max="getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index)"
                                                         :class="getMontoInputClasses(gasto, index)" step="0.01"
                                                         min="0.01" @input="validarMontoEnTiempoReal(gasto, index)"
                                                         placeholder="0.00" required />
                                                     <!-- Mensaje de saldo disponible -->
                                                     <transition name="fade" mode="out-in">
-                                                        <div v-if="gasto.detalle_gasto_proyectado_id" class="mt-2">
+                                                        <div v-if="gasto.id_gasto_proyectado" class="mt-2">
                                                             <p
                                                                 class="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
                                                                 💰 Saldo disponible: <strong>{{
-                                                                    currencyFormatter.format(getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id,
+                                                                    currencyFormatter.format(getSaldoMaximoParaGasto(gasto.id_gasto_proyectado,
                                                                         index)) }}</strong>
                                                             </p>
                                                             <!-- Mensaje de error para monto excedido -->
@@ -316,42 +311,25 @@
                                             </h4>
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <!-- Glosa para el asiento -->
-                                                <div>
+                                                <div class="md:col-span-2">
                                                     <label :for="'glosa_' + index"
-                                                        class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Glosa / Descripción del Gasto <span
-                                                            class="text-rojo-bap">*</span>
-                                                    </label>
-                                                    <!-- Se convierte en un select -->
-                                                    <select :id="'glosa_' + index" v-model="gasto.id_glosa"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                        required>
-                                                        <option disabled value="">Selecciona una glosa</option>
-                                                        <option v-for="glosa in glosas" :key="glosa.id_glosa"
-                                                            :value="glosa.id_glosa">
-                                                            {{ glosa.descripcion }}
-                                                        </option>
-                                                    </select>
+                                                        class="block text-sm font-medium text-gray-700">Glosa /
+                                                        Descripción del Gasto <span
+                                                            class="text-rojo-bap">*</span></label>
+                                                    <input type="text" :id="'glosa_' + index" v-model="gasto.glosa"
+                                                        class="mt-1 block w-full p-3 border-gray-300 rounded-md"
+                                                        placeholder="Ej: Movilidad para reunión con cliente" required />
                                                 </div>
 
                                                 <!-- Cuenta Contable -->
                                                 <div>
-                                                    <label :for="'id_cuenta_contable_' + index"
-                                                        class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Cuenta Contable
-                                                    </label>
-                                                    <!-- Se hace no editable (disabled) -->
-                                                    <select :id="'id_cuenta_contable_' + index"
-                                                        v-model="gasto.id_cuenta_contable"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                                                        disabled>
-                                                        <option value="">Se asigna automáticamente</option>
-                                                        <!-- Se sigue mostrando la lista para que el v-model funcione -->
-                                                        <option v-for="cuenta in cuentasContables" :key="cuenta.id"
-                                                            :value="cuenta.id">
-                                                            {{ cuenta.codigo_cuenta }} - {{ cuenta.descripcion }}
-                                                        </option>
-                                                    </select>
+                                                    <label :for="'cuenta_contable_' + index"
+                                                        class="block text-sm font-medium text-gray-700">Cuenta
+                                                        Contable</label>
+                                                    <input type="text" :id="'cuenta_contable_' + index"
+                                                        :value="getCuentaContableInfo(gasto.id_gasto_proyectado)"
+                                                        class="mt-1 block w-full p-3 border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                                                        disabled />
                                                 </div>
                                             </div>
                                         </div>
@@ -372,17 +350,6 @@
                                                 Información Adicional
                                             </h4>
                                             <div class="space-y-4">
-                                                <!-- Checkbox Proyecto -->
-                                                <div class="flex items-center">
-                                                    <input :id="'pertenece_proyecto_' + index" type="checkbox"
-                                                        v-model="gasto.pertenece_proyecto"
-                                                        class="h-4 w-4 text-verde-bap rounded border-gray-300 focus:ring-verde-bap transition-colors duration-200">
-                                                    <label :for="'pertenece_proyecto_' + index"
-                                                        class="ml-3 block text-sm text-gray-900">
-                                                        ¿Pertenece a un Proyecto?
-                                                    </label>
-                                                </div>
-
                                                 <!-- Comentario -->
                                                 <div>
                                                     <label :for="'comentario_' + index"
@@ -398,6 +365,7 @@
                                         </div>
                                     </transition>
 
+                                    <!-- ====== CATEGORÍA 5: EVIDENCIA Y SUSTENTO ====== -->
                                     <transition name="slide-down" mode="out-in">
                                         <div v-if="seccionesVisibles(gasto).evidencia"
                                             class="border-l-4 border-red-400 pl-4 bg-red-50 bg-opacity-30 p-4 rounded-r-lg">
@@ -534,19 +502,18 @@
                                             </div>
                                         </div>
                                     </transition>
+                                </div>
 
-                                    <!-- Botón para minimizar y pasar al siguiente gasto -->
-                                    <div class="flex justify-center pt-4 border-t">
-                                        <button type="button" @click="minimizarYContinuar(index)"
-                                            class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md flex items-center">
-                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M5 15l7-7 7 7"></path>
-                                            </svg>
-                                            Guardar y Continuar
-                                        </button>
-                                    </div>
+                                <!-- Botón para minimizar y pasar al siguiente gasto -->
+                                <div class="flex justify-center pt-4 border-t mt-6">
+                                    <button type="button" @click="minimizarYContinuar(index)"
+                                        class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-md flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Guardar y Continuar
+                                    </button>
                                 </div>
                             </div>
                         </transition>
@@ -574,7 +541,7 @@
                 </button>
                 <button type="submit" :disabled="enviando || hayErroresValidacion"
                     :class="getClassesForActionButton('exito')"
-                    class="font-bold py-3 px-8 rounded-full min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200">
+                    class="font-bold py-3 px-8 rounded-full min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center">
                     <span v-if="enviando" class="flex items-center">
                         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
                             fill="none" viewBox="0 0 24 24">
@@ -603,23 +570,24 @@ const emit = defineEmits(['close', 'gastoCreado']);
 const gastosADeclarar = ref([]);
 const usuarioActual = ref(null);
 const fondosActivos = ref([]);
-const fondoSeleccionadoId = ref(''); // ID del fondo que el usuario selecciona
-const proyeccionesPendientes = ref([]); // Lista de proyecciones para el fondo seleccionado
+const fondoSeleccionadoId = ref(null);
+const gastosProyectadosDisponibles = ref([]);
 const cuentasContables = ref([]);
-const glosas = ref([]);
 const cargandoInicial = ref(true);
-const cargandoProyecciones = ref(false);
+const cargandoGastosProyectados = ref(false);
 const enviando = ref(false);
 const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 const gastoActivoIndex = ref(0);
+
+
 // --- LÓGICA DE CARGA DE DATOS ---
 onMounted(async () => {
     cargandoInicial.value = true;
     await Promise.all([
         obtenerUsuarioLogueado(),
         obtenerFondosActivos(),
-        obtenerCuentasContables(),
-        obtenerGlosas()
+        obtenerCuentasContables()
+
     ]);
     cargandoInicial.value = false;
 });
@@ -638,10 +606,6 @@ const obtenerFondosActivos = async () => {
     try {
         const response = await api.get('/v1/fondos-activos-usuario');
         fondosActivos.value = response.data;
-        // Si solo hay un fondo, se pre-selecciona automáticamente.
-        //if (fondosActivos.value.length === 1) {
-        //  fondoSeleccionadoId.value = fondosActivos.value[0].id_fondo;
-        // }
     } catch (error) {
         console.error("Error al obtener fondos activos:", error);
         Swal.fire('Error', 'No se pudieron cargar tus fondos activos.', 'error');
@@ -650,29 +614,29 @@ const obtenerFondosActivos = async () => {
 const obtenerCuentasContables = async () => {
     try {
         const response = await api.get('/v1/cuentas-contables');
-        cuentasContables.value = response.data;
+        // [CORRECCIÓN] Se verifica la estructura exacta de la respuesta de la API.
+        if (response.data && Array.isArray(response.data.cuentas_contables)) {
+            cuentasContables.value = response.data.cuentas_contables;
+        } else if (Array.isArray(response.data)) {
+            // Fallback por si la API cambia y devuelve un array directo.
+            cuentasContables.value = response.data;
+        } else {
+            console.error("La respuesta de la API de cuentas contables no tiene el formato esperado:", response.data);
+            cuentasContables.value = []; // Asignar array vacío para prevenir errores.
+        }
     } catch (error) {
         console.error("Error al obtener cuentas contables:", error);
-        Swal.fire('Error', 'No se pudieron cargar las cuentas contables.', 'error');
-    }
-};
-const obtenerGlosas = async () => {
-    try {
-        const response = await api.get('/v1/glosas');
-        glosas.value = response.data.glosas;
-    } catch (error) {
-        console.error("Error al obtener glosas:", error);
-        Swal.fire('Error', 'No se pudieron cargar las glosas disponibles.', 'error');
+        cuentasContables.value = []; // Asegurarse de que sea un array en caso de error.
     }
 };
 // --- COMPUTED PROPERTIES ---
 // Determina qué secciones son visibles para un gasto específico
 const seccionesVisibles = (gasto) => {
     return {
-        documento: !!gasto.detalle_gasto_proyectado_id,
-        clasificacion: !!gasto.tipo_documento && !!gasto.monto_total,
-        adicional: !!gasto.id_cuenta_contable,
-        evidencia: !!gasto.id_cuenta_contable, // Se muestra junto con clasificación
+        documento: !!gasto.id_gasto_proyectado,
+        clasificacion: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento,
+        adicional: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
+        evidencia: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
     };
 };
 const minimizarGasto = (index) => {
@@ -691,73 +655,72 @@ const minimizarYContinuar = (index) => {
 const maximizarGasto = (index) => {
     gastoActivoIndex.value = index; // Abre la sección de gasto en la que se hizo clic
 };
-// Función para obtener proyecciones disponibles para un gasto específico
-const proyeccionesDisponibles = (indexGastoActual) => {
-    const proyeccionSeleccionadaActual = gastosADeclarar.value[indexGastoActual]?.detalle_gasto_proyectado_id;
-    return proyeccionesPendientes.value
-        .map(p => ({
-            ...p,
-            // Mostramos el saldo que viene de la API para la lista. La validación usará el cálculo en tiempo real.
-            saldo_a_mostrar: p.saldo_restante
-        }))
-        .filter(p => {
-            // El filtro ahora es más robusto: se muestra si es la proyección ya seleccionada en la fila actual,
-            // O si el saldo real calculado (considerando otras filas del form) es mayor a cero.
-            const saldoRealParaEstaFila = getSaldoMaximoParaGasto(p.id, -1); // -1 para no excluir ninguna fila
-            return p.id === proyeccionSeleccionadaActual || saldoRealParaEstaFila > 0.005;
-        });
-};
+
 // Propiedad computada para obtener el objeto completo del fondo seleccionado
 const fondoSeleccionado = computed(() => {
     return fondosActivos.value.find(f => f.id_fondo === fondoSeleccionadoId.value);
 });
 // Computed para verificar si hay errores de validación
 const hayErroresValidacion = computed(() => {
-    return gastosADeclarar.value.some(gasto => {
-        // Verificar campos obligatorios
-        if (!gasto.detalle_gasto_proyectado_id || !gasto.monto_total || !gasto.tipo_documento || !gasto.id_cuenta_contable || !gasto.evidencia) {
-            return true;
-        }
-        // Verificar si el monto excede el saldo disponible
-        const saldoMaximo = getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, gastosADeclarar.value.indexOf(gasto));
-        if (gasto.monto_total > saldoMaximo) {
-            return true;
-        }
-        return false;
+    // Si no hay gastos, el formulario no es válido para enviar.
+    if (gastosADeclarar.value.length === 0) {
+        return true;
+    }
+    // `some` se detiene en cuanto encuentra el PRIMER gasto que no es válido.
+    return gastosADeclarar.value.some((gasto, index) => {
+        // 1. Validar campos obligatorios. Se incluye la glosa, que era un campo faltante.
+        const camposIncompletos = !gasto.id_gasto_proyectado || !gasto.tipo_documento || !gasto.fecha_documento || !gasto.monto_total || !gasto.glosa || !gasto.evidencia;
+        // 2. Validar que el monto no exceda el saldo.
+        const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
+        const montoExcedido = gasto.monto_total > saldoMaximo;
+
+        // El gasto es inválido si los campos están incompletos O si el monto se excede.
+        return camposIncompletos || montoExcedido;
     });
 });
 // --- WATCHERS ---
 // Observa cambios en el fondo seleccionado para cargar sus proyecciones
 watch(fondoSeleccionadoId, async (newFondoId) => {
-    proyeccionesPendientes.value = [];
-    gastosADeclarar.value = []; // Limpia los gastos anteriores
+    gastosProyectadosDisponibles.value = [];
+    gastosADeclarar.value = [];
+
     if (newFondoId) {
-        cargandoProyecciones.value = true;
+        cargandoGastosProyectados.value = true;
         try {
-            const response = await api.get(`/v1/fondos-efectivo/${newFondoId}/proyecciones-pendientes`);
-            proyeccionesPendientes.value = response.data;
-            // Solo después de cargar las proyecciones, se añade el primer gasto.
+            const response = await api.get(`/v1/fondos-efectivo/${newFondoId}/gastos-para-declarar`);
+            gastosProyectadosDisponibles.value = response.data;
             agregarGasto();
         } catch (error) {
-            console.error("Error al obtener proyecciones pendientes:", error);
-            Swal.fire('Error', 'No se pudieron cargar los gastos proyectados para este fondo.', 'error');
+            console.error("Error al obtener gastos proyectados para el fondo:", error);
+            Swal.fire('Error', 'No se pudieron cargar los gastos autorizados para este fondo.', 'error');
         } finally {
-            cargandoProyecciones.value = false;
+            cargandoGastosProyectados.value = false;
         }
     }
 });
-// Observa cambios en los gastos para autocompletar campos
-watch(gastosADeclarar, (nuevosGastos) => {
-    nuevosGastos.forEach(gasto => {
-        // Autocompletar Cuenta Contable basada en la Glosa seleccionada
-        if (gasto.id_glosa) {
-            const glosaSeleccionada = glosas.value.find(g => g.id_glosa === gasto.id_glosa);
-            if (glosaSeleccionada && glosaSeleccionada.id_cuenta_contable) {
-                gasto.id_cuenta_contable = glosaSeleccionada.id_cuenta_contable;
+watch(() => gastosADeclarar.value.map(g => g.id_gasto_proyectado), (nuevosIds, viejosIds) => {
+    nuevosIds.forEach((id, index) => {
+        // Si el ID del gasto proyectado en una fila ha cambiado...
+        if (id !== viejosIds[index]) {
+            const gasto = gastosADeclarar.value[index];
+            if (id) {
+                const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === id);
+                // Asigna el ID de la cuenta contable al modelo del gasto.
+                gasto.id_cuenta_contable = proyeccion ? proyeccion.id_cuenta_contable : null;
+            } else {
+                gasto.id_cuenta_contable = null;
             }
         }
     });
-}, { deep: true });
+});
+
+const getCuentaContableInfo = (gastoProyectadoId) => {
+    if (!gastoProyectadoId) return 'Se asigna automáticamente';
+    const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gastoProyectadoId);
+    if (!proyeccion || !proyeccion.id_cuenta_contable) return 'Cuenta no asignada a la proyección';
+    const cuenta = cuentasContables.value.find(c => c.id === proyeccion.id_cuenta_contable);
+    return cuenta ? `${cuenta.codigo_cuenta} - ${cuenta.descripcion}` : 'Buscando...';
+};
 // --- MÉTODOS DE GESTIÓN DE GASTOS ---
 // Función para añadir una nueva fila de gasto
 const agregarGasto = async () => {
@@ -765,7 +728,9 @@ const agregarGasto = async () => {
     gastoActivoIndex.value = gastosADeclarar.value.length;
     gastosADeclarar.value.push({
         id: Date.now(),
-        detalle_gasto_proyectado_id: '',
+        id_gasto_proyectado: null,
+        id_cuenta_contable: null,
+        glosa: '',
         fecha_documento: '',
         fecha_registro: new Date().toISOString().slice(0, 10),
         moneda: 'PEN',
@@ -773,16 +738,14 @@ const agregarGasto = async () => {
         serie_documento: '',
         correlativo_documento: '',
         monto_total: null,
-        id_cuenta_contable: '',
-        id_glosa: '',
         responsable_gasto: usuarioActual.value?.fullName || '',
-        pertenece_proyecto: false,
         comentario: '',
         evidencia: null,
         es_declaracion_jurada: false,
     });
     // Esperar a que el DOM se actualice y luego hacer focus
     await nextTick();
+    maximizarGasto(gastoActivoIndex);
     const el = document.getElementById(`proyeccion_${gastoActivoIndex.value}`);
     if (el) el.focus();
 };
@@ -800,19 +763,15 @@ const removerGasto = (index) => {
 };
 // --- MÉTODOS DE VALIDACIÓN Y CÁLCULO ---
 // Obtener el saldo máximo disponible para un gasto específico
-const getSaldoMaximoParaGasto = (proyeccionId, indexGastoActual) => {
-    if (!proyeccionId) return 0;
-    // 1. Encuentra la proyección original en la lista que vino de la API.
-    // Esta contiene el `saldo_restante` real calculado por el backend.
-    const proyeccionOriginal = proyeccionesPendientes.value.find(p => p.id === proyeccionId);
-    if (!proyeccionOriginal) return 0;
-    // 2. Este es nuestro punto de partida: el saldo real que nos dio el backend.
-    let saldoDisponible = parseFloat(proyeccionOriginal.saldo_restante) || 0;
-    // 3. Ahora, solo restamos los montos de OTRAS filas de gasto que están en el formulario
-    // para obtener el saldo en tiempo real para la fila actual.
+const getSaldoMaximoParaGasto = (gastoProyectadoId, indexFilaActual) => {
+    if (!gastoProyectadoId) return 0;
+    const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gastoProyectadoId);
+    if (!proyeccion) return 0;
+    // Saldo inicial es el que nos devolvió el backend.
+    let saldoDisponible = parseFloat(proyeccion.saldo_restante) || 0;
+    // Restamos los montos de OTRAS filas que usen la misma proyección.
     gastosADeclarar.value.forEach((gasto, index) => {
-        // Se descuenta el monto de las otras filas que usen la misma proyección.
-        if (index !== indexGastoActual && gasto.detalle_gasto_proyectado_id === proyeccionId) {
+        if (index !== indexFilaActual && gasto.id_gasto_proyectado === gastoProyectadoId) {
             saldoDisponible -= parseFloat(gasto.monto_total) || 0;
         }
     });
@@ -820,16 +779,16 @@ const getSaldoMaximoParaGasto = (proyeccionId, indexGastoActual) => {
 };
 // Validar monto en tiempo real
 const validarMontoEnTiempoReal = (gasto, index) => {
-    if (!gasto.detalle_gasto_proyectado_id || !gasto.monto_total) return;
-    const saldoMaximo = getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, index);
+    if (!gasto.id_gasto_proyectado || !gasto.monto_total) return;
+    const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
     if (parseFloat(gasto.monto_total) > saldoMaximo) {
-        const proyeccion = proyeccionesPendientes.value.find(p => p.id === gasto.detalle_gasto_proyectado_id);
+        const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
         Swal.fire({
             icon: 'warning',
             title: 'Monto Excede el Saldo Disponible',
             html: `
                 <div class="text-left p-2 border-t border-b">
-                    <p class="mb-2"><strong>Proyección:</strong> ${proyeccion?.descripcion_gasto}</p>
+                    <p class="mb-2"><strong>Proyección:</strong> ${proyeccion?.descripcion}</p>
                     <div class="flex justify-between text-sm">
                         <span>Saldo Disponible:</span>
                         <span class="font-medium">${currencyFormatter.format(saldoMaximo)}</span>
@@ -846,21 +805,18 @@ const validarMontoEnTiempoReal = (gasto, index) => {
                 </div>
             `,
             confirmButtonText: 'Entendido',
-            // Se usan los colores personalizados de tu configuración de Tailwind.
-            confirmButtonColor: '#DB3D47', // Corresponde a 'rojo-bap'
+            confirmButtonColor: '#DB3D47',
         });
     }
 };
 // Obtener clases CSS para el input de monto
 const getMontoInputClasses = (gasto, index) => {
-    // Clases base y de foco
     const baseClasses = 'mt-1 block w-full p-3 border rounded-lg focus:ring-1';
-    if (!gasto.detalle_gasto_proyectado_id || !gasto.monto_total) {
+    if (!gasto.id_gasto_proyectado || !gasto.monto_total) {
         return `${baseClasses} border-gray-300 focus:border-verde-bap focus:ring-verde-bap`;
     }
-    const saldoMaximo = getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, index);
+    const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
     const montoExcedido = parseFloat(gasto.monto_total) > saldoMaximo;
-    // Se aplican las clases de borde y foco según el estado de validación.
     const themeClasses = montoExcedido
         ? 'border-rojo-bap focus:border-rojo-bap-dark focus:ring-rojo-bap'
         : 'border-verde-bap focus:border-verde-bap-dark focus:ring-verde-bap';
@@ -868,14 +824,17 @@ const getMontoInputClasses = (gasto, index) => {
 };
 // Obtener mensaje de error para monto excedido
 const getErrorMontoExcedido = (gasto, index) => {
-    if (!gasto.detalle_gasto_proyectado_id || !gasto.monto_total) return '';
-    const saldoMaximo = getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, index);
+    if (!gasto.id_gasto_proyectado || !gasto.monto_total) return '';
+    const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
     const montoExcedido = parseFloat(gasto.monto_total) > saldoMaximo;
     if (montoExcedido) {
         const exceso = parseFloat(gasto.monto_total) - saldoMaximo;
         return `Excede el saldo disponible en S/. ${exceso.toFixed(2)}`;
     }
     return '';
+};
+const esOpcionDeshabilitada = () => {
+    return false;
 };
 // --- MÉTODOS DE EVENTOS ---
 // Manejar cambio en tipo de documento
@@ -946,53 +905,32 @@ const generarYDescargarDJ = async (gasto) => {
 // --- MÉTODOS DE ENVÍO ---
 // Confirmar envío del formulario
 const confirmarEnvio = () => {
-    // Validar cada gasto
-    for (const [index, gasto] of gastosADeclarar.value.entries()) {
-        // Validar campos obligatorios
-        if (!gasto.detalle_gasto_proyectado_id || !gasto.monto_total || !gasto.tipo_documento || !gasto.id_cuenta_contable || !gasto.evidencia) {
-            Swal.fire('Campos incompletos', `Por favor, complete todos los campos requeridos (*) para el Gasto #${index + 1}.`, 'warning');
-            return;
-        }
-        // Validar que el monto no exceda el saldo disponible
-        const saldoMaximo = getSaldoMaximoParaGasto(gasto.detalle_gasto_proyectado_id, index);
-        if (parseFloat(gasto.monto_total) > saldoMaximo) {
-            const proyeccion = proyeccionesPendientes.value.find(p => p.id === gasto.detalle_gasto_proyectado_id);
-            Swal.fire({
-                icon: 'error',
-                title: 'Monto Excedido',
-                html: `
-                    <div class="text-left">
-                        <p><strong>Gasto #${index + 1}</strong></p>
-                        <p><strong>Proyección:</strong> ${proyeccion?.descripcion_gasto}</p>
-                        <p><strong>Saldo disponible:</strong> S/. ${saldoMaximo.toFixed(2)}</p>
-                        <p><strong>Monto ingresado:</strong> S/. ${parseFloat(gasto.monto_total).toFixed(2)}</p>
-                        <p class="text-red-600 mt-2">Por favor, ajuste el monto para continuar.</p>
-                    </div>
-                `
-            });
-            return;
-        }
+    if (hayErroresValidacion.value) {
+        Swal.fire('Formulario Incompleto', 'Por favor, revise todos los gastos. Asegúrese de que todos los campos obligatorios (*) estén completos y que los montos no excedan los saldos disponibles.', 'warning');
+        return;
     }
-    // Construir resumen para confirmación
+
+    const totalGeneral = gastosADeclarar.value.reduce((total, gasto) => total + (parseFloat(gasto.monto_total) || 0), 0);
     const resumenHtml = `
         <div class="text-left text-sm space-y-3 p-2 bg-gray-50 rounded-lg border">
-            <h4 class="font-bold text-center">Resumen de Gastos a Declarar</h4>
+            <h4 class="font-bold text-center text-base">Resumen de Gastos a Declarar</h4>
             ${gastosADeclarar.value.map((gasto, index) => {
-        const proyeccion = proyeccionesPendientes.value.find(p => p.id === gasto.detalle_gasto_proyectado_id);
-        return `<div class="border-t pt-2 mt-2">
-                    <div class="flex justify-between"><strong>Gasto #${index + 1}:</strong><span class="text-right pl-2">${proyeccion?.descripcion_gasto || 'N/A'}</span></div>
-                    <div class="flex justify-between"><strong>Tipo Documento:</strong><span>${gasto.tipo_documento}</span></div>
-                    <div class="flex justify-between font-semibold"><strong>Monto:</strong><span>S/. ${parseFloat(gasto.monto_total || 0).toFixed(2)}</span></div>
-                </div>`;
-    }).join('')}
-            <div class="border-t pt-2 mt-2 font-bold">
-                <div class="flex justify-between"><strong>Total:</strong><span>S/. ${gastosADeclarar.value.reduce((total, gasto) => total + (parseFloat(gasto.monto_total) || 0), 0).toFixed(2)}</span></div>
+                const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
+                return `<div class="border-t pt-2 mt-2">
+                            <div class="flex justify-between"><strong>Gasto #${index + 1}:</strong><span class="text-right pl-2">${proyeccion?.descripcion || 'N/A'}</span></div>
+                            <div class="flex justify-between"><strong>Documento:</strong><span>${gasto.tipo_documento}</span></div>
+                            <div class="flex justify-between font-semibold"><strong>Monto:</strong><span>${currencyFormatter.format(gasto.monto_total || 0)}</span></div>
+                        </div>`;
+            }).join('')}
+            <div class="border-t pt-2 mt-2 font-bold text-base">
+                <div class="flex justify-between"><strong>Total a Declarar:</strong><span>${currencyFormatter.format(totalGeneral)}</span></div>
             </div>
         </div>
         <p class="mt-4 text-gray-700">¿Desea registrar esta declaración con ${gastosADeclarar.value.length} gasto(s)?</p>
     `;
+
     Swal.fire({
-        title: 'Revisar y Confirmar Declaración',
+        title: 'Revisar y Confirmar',
         html: resumenHtml,
         icon: 'question',
         showCancelButton: true,
@@ -1008,23 +946,31 @@ const confirmarEnvio = () => {
 };
 // Enviar formulario al backend
 const enviarFormulario = async () => {
+    for (const [index, gasto] of gastosADeclarar.value.entries()) {
+        if (!gasto.id_gasto_proyectado || !gasto.glosa || !gasto.monto_total || !gasto.tipo_documento || !gasto.evidencia) {
+            Swal.fire('Campos Incompletos', `Por favor, complete todos los campos requeridos (*) para el Gasto #${index + 1}.`, 'warning');
+            return;
+        }
+        const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
+        if (parseFloat(gasto.monto_total) > saldoMaximo) {
+            Swal.fire('Monto Excedido', `El monto del Gasto #${index + 1} excede el saldo disponible para esa categoría.`, 'error');
+            return;
+        }
+    }
+
     enviando.value = true;
     const formDataPayload = new FormData();
     formDataPayload.append('id_fondo_efectivo', fondoSeleccionadoId.value);
-    // Agregar cada gasto al FormData
+
     gastosADeclarar.value.forEach((gasto, index) => {
-        const { id, ...gastoData } = gasto; // Omitir ID temporal
-        for (const key in gastoData) {
-            if (gastoData[key] !== null && gastoData[key] !== '') {
-                // Convertir booleanos a 1 o 0 para el backend
-                if (typeof gastoData[key] === 'boolean') {
-                    formDataPayload.append(`gastos[${index}][${key}]`, gastoData[key] ? 1 : 0);
-                } else {
-                    formDataPayload.append(`gastos[${index}][${key}]`, gastoData[key]);
-                }
+        Object.keys(gasto).forEach(key => {
+            if (key !== 'id' && gasto[key] !== null && gasto[key] !== '') {
+                const value = typeof gasto[key] === 'boolean' ? (gasto[key] ? 1 : 0) : gasto[key];
+                formDataPayload.append(`gastos[${index}][${key}]`, value);
             }
-        }
+        });
     });
+
     try {
         const response = await api.post('/v1/gastos', formDataPayload, {
             headers: { 'Content-Type': 'multipart/form-data' }
@@ -1040,7 +986,7 @@ const enviarFormulario = async () => {
         console.error("Error al registrar la declaración:", error);
         const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
         const errors = error.response?.data?.errors;
-        let htmlError = errorMessage;
+        let htmlError = `<p>${errorMessage}</p>`;
         if (errors) {
             htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
             for (const key in errors) {
@@ -1100,5 +1046,14 @@ const enviarFormulario = async () => {
 .fade-in-enter-from,
 .fade-in-leave-to {
     opacity: 0;
+}
+.shake-enter-active {
+  animation: shake 0.5s;
+}
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 </style>

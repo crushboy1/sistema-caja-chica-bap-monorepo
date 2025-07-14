@@ -86,3 +86,44 @@ a,
 
 /* Eliminamos la regla que establece display: flex y place-items: center en body */
 /* También eliminamos la configuración de grid-template-columns en el #app */
+@layer components {
+  /* Estilos generales para inputs y labels del formulario */
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .form-input {
+    @apply mt-1 block w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-verde-bap focus:border-verde-bap transition-all duration-200;
+  }
+
+  /* Estilos para la cabecera de la tabla */
+  .table-header {
+    @apply px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  /*
+    NOTA: Las clases .gasto-row y .table-cell se eliminaron de aquí
+    porque contenían variantes responsivas (lg:), lo que causaba
+    un error de dependencia circular. Estos estilos ahora se aplican
+    directamente en el template del componente.
+  */
+
+  /* Estilos para los inputs dentro de la tabla */
+  .form-input-table {
+    @apply w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-1 focus:ring-verde-bap focus:border-verde-bap text-sm transition-colors duration-200;
+  }
+
+  /* Estilos para el input de archivo */
+  .form-input-file {
+    @apply block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-verde-bap-extralight file:text-verde-bap-dark hover:file:bg-verde-bap-light cursor-pointer;
+  }
+
+  /* Estilos para el botón de eliminar fila */
+  .action-button-delete {
+    @apply inline-flex items-center p-2 text-rojo-bap hover:text-rojo-bap-dark hover:bg-rojo-bap-light rounded-full transition-colors duration-200;
+  }
+
+  /* Estilos para los "pasos" del formulario */
+  .step-number {
+    @apply flex items-center justify-center w-10 h-10 bg-verde-bap-light rounded-full text-verde-bap-dark font-bold text-lg;
+  }
+}

@@ -85,7 +85,10 @@ class AuthController extends Controller
    public function user(Request $request) 
 {
     $user = $request->user();
-    
+    // Si no hay un usuario autenticado (sesión expirada), devuelve null.
+        if (!$user) {
+            return response()->json(null, 401); // 401 No Autorizado
+        }
     // Cargar tanto 'area' como 'role.permissions'
     $user->load(['area', 'role.permissions']);
     

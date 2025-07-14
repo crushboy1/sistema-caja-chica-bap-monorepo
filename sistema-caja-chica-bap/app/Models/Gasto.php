@@ -37,9 +37,10 @@ class Gasto extends Model
         'serie_documento',
         'correlativo_documento',
         'monto_total',
+        'monto_proyectado_original',
         'moneda',                 
+        'id_gasto_proyectado',
         'glosa',                  
-        'pertenece_proyecto',
         'comentario',
         'ruta_evidencia',
         'es_declaracion_jurada',
@@ -56,7 +57,6 @@ class Gasto extends Model
     protected $casts = [
         'fecha_documento' => 'date',
         'monto_total' => 'decimal:2',
-        'pertenece_proyecto' => 'boolean',
         'es_declaracion_jurada' => 'boolean',
     ];
 
@@ -99,17 +99,14 @@ class Gasto extends Model
     | RELACIONES DE ELOQUENT
     |--------------------------------------------------------------------------
     */
-
+    
     /**
-     * NUEVA RELACIÓN: Un gasto pertenece a un detalle de gasto proyectado.
-     * Esto nos permite acceder al detalle original desde un gasto.
-     * Por ejemplo: $gasto->detalleProyectado->descripcion_gasto
+     * Un gasto pertenece a un tipo de Gasto Proyectado del catálogo.
      */
-    public function detalleProyectado(): BelongsTo
+    public function gastoProyectado(): BelongsTo
     {
-        return $this->belongsTo(DetalleGastoProyectado::class, 'detalle_gasto_proyectado_id');
+        return $this->belongsTo(GastoProyectado::class, 'id_gasto_proyectado', 'id_gasto_proyectado');
     }
-
     public function fondoEfectivo(): BelongsTo
     {
         // Se asegura que los nombres de las claves sean explícitos para evitar ambigüedades.

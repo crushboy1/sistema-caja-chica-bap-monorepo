@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Gasto;
 use App\Models\FondoEfectivo;
+use App\Models\SolicitudFondo;
 use App\Models\HistorialAprobacionGasto;
-use App\Models\User;
+use App\Models\GastoProyectado;
+use App\Rules\UniqueComprobante;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +37,8 @@ class GastoController extends Controller
             'validadorAdm:id,name,last_name',
             'cuentaContable:id,codigo_cuenta,descripcion',
             'fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado',
-            'detalleProyectado:id,descripcion_gasto',
+            'gastoProyectado:id_gasto_proyectado,descripcion',
+
         ]);
 
         // --- LÓGICA DE VISUALIZACIÓN POR ROL Y SCOPE ---
@@ -120,34 +123,63 @@ class GastoController extends Controller
     public function store(Request $request)
     {
         // 1. VALIDACIÓN
-        // Se actualiza la validación para esperar un array 'gastos'.
         // El asterisco (*) aplica las reglas a cada elemento del array.
-        $validatedData = $request->validate([
+        $rules = [
             'id_fondo_efectivo' => ['required', 'integer', 'exists:fondo_efectivo,id_fondo'],
             'gastos' => 'required|array|min:1',
-            'gastos.*.detalle_gasto_proyectado_id' => 'required|exists:detalle_gastos_proyectados,id',
-            'gastos.*.fecha_documento' => 'required|date',
+            'gastos.*.id_gasto_proyectado' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
+            'gastos.*.fecha_documento' => 'required|date|before_or_equal:today',
             'gastos.*.monto_total' => 'required|numeric|min:0.01',
-            'gastos.*.id_cuenta_contable' => 'required|exists:cuentas_contables,id',
             'gastos.*.glosa' => 'required|string|max:1000',
             'gastos.*.evidencia' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240', // 10MB Max
             'gastos.*.es_declaracion_jurada' => 'required|boolean',
             'gastos.*.tipo_documento' => 'required_if:gastos.*.es_declaracion_jurada,false|string|max:100',
-            'gastos.*.serie_documento' => 'nullable|string|max:20',
-            'gastos.*.correlativo_documento' => 'nullable|string|max:50',
+            'gastos.*.serie_documento' => 'nullable|required_if:gastos.*.es_declaracion_jurada,false|string|max:20',
+            'gastos.*.correlativo_documento' => 'nullable|required_if:gastos.*.es_declaracion_jurada,false|string|max:50',
             'gastos.*.comentario' => 'nullable|string|max:2000',
-            'gastos.*.pertenece_proyecto' => 'required|boolean',
             'gastos.*.moneda' => 'sometimes|in:PEN,USD',
-        ]);
+            'gastos.*' => [new UniqueComprobante],
+        ];
+        $messages = [
+            'required' => 'Este campo es obligatorio.',
+            'gastos.*.fecha_documento.before_or_equal' => 'La fecha del documento no puede ser una fecha futura.',
+            'gastos.*.monto_total.min' => 'El monto debe ser mayor que cero.',
+            'gastos.*.evidencia.mimes' => 'El archivo de evidencia debe ser una imagen (jpg, png) o un PDF.',
+            'gastos.*.evidencia.max' => 'El archivo de evidencia no debe superar los 10MB.',
+        ];
+
+        // 3. EJECUTAR LA VALIDACIÓN
+        // 2.1. Validación de Duplicados en la rule
+        $validatedData = $request->validate($rules, $messages);
+
 
         $user = Auth::user();
         $fondo = FondoEfectivo::findOrFail($validatedData['id_fondo_efectivo']);
         $gastosParaCrear = $validatedData['gastos'];
+        $comprobantesEnviados = []; // Un array temporal para rastrear los comprobantes de esta solicitud
+        foreach ($gastosParaCrear as $gastoData) {
+            // Si no es una declaración jurada, creamos una clave única para el comprobante
+            if (
+                isset($gastoData['es_declaracion_jurada']) && !$gastoData['es_declaracion_jurada'] &&
+                !empty($gastoData['serie_documento']) && !empty($gastoData['correlativo_documento'])
+            ) {
+                $claveUnica = $gastoData['tipo_documento'] . '-' . $gastoData['serie_documento'] . '-' . $gastoData['correlativo_documento'];
 
-        // 2. LÓGICA DE SALDO
-        // Se mantiene tu lógica, pero ahora se calcula la suma de todos los gastos que se están enviando.
+                // Verificamos si esta clave ya la hemos visto en esta misma solicitud
+                if (isset($comprobantesEnviados[$claveUnica])) {
+                    // Si ya existe, lanzamos un error de validación y detenemos el proceso
+                    throw ValidationException::withMessages([
+                        'gastos' => 'No puedes usar el mismo comprobante (' . $claveUnica . ') para más de un gasto en la misma declaración.'
+                    ]);
+                }
+
+                // Si no la hemos visto, la añadimos a nuestro rastreador
+                $comprobantesEnviados[$claveUnica] = true;
+            }
+        }
+
+        // 2.2. Validación de Saldo del Fondo
         $montoTotalDeclarado = collect($gastosParaCrear)->sum('monto_total');
-
         $gastosEnProceso = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])->sum('monto_total');
         $saldoOperativo = $fondo->monto_disponible - $gastosEnProceso;
 
@@ -160,18 +192,50 @@ class GastoController extends Controller
         // 3. TRANSACCIÓN
         // Se envuelve toda la lógica en una transacción para garantizar la integridad de los datos.
         return DB::transaction(function () use ($request, $gastosParaCrear, $user, $fondo) {
+            // Se cargan los gastos proyectados de esa solicitud para tener acceso a la tabla pivote.
+            $solicitudOriginal = SolicitudFondo::with('gastosProyectados')->find($fondo->id_solicitud_apertura);
 
-            $gastosCreados = [];
-
+            // Se crea un mapa para buscar fácilmente el monto estimado por ID de gasto proyectado.
+            $montosProyectadosOriginales = $solicitudOriginal
+                ? $solicitudOriginal->gastosProyectados->keyBy('id_gasto_proyectado')
+                : collect();
+            // Se obtienen todos los gastos proyectados necesarios en una sola consulta para eficiencia.
+            $idsProyectados = collect($gastosParaCrear)->pluck('id_gasto_proyectado')->unique();
+            $catalogoGastos = GastoProyectado::whereIn('id_gasto_proyectado', $idsProyectados)->get()->keyBy('id_gasto_proyectado');
             // Se itera sobre el array de gastos para crear cada uno.
             foreach ($gastosParaCrear as $index => $gastoData) {
                 // Se busca el archivo de evidencia correspondiente por su índice.
                 $evidenciaFile = $request->file("gastos.{$index}.evidencia");
                 $path = $evidenciaFile->store('evidencias_gastos', 'public');
 
-                // Se mantiene tu lógica para determinar el estado inicial.
-                $estadoInicial = $user->hasRole('jefe_area') ? 'Pendiente de Validación Contable' : 'Pendiente de Aprobación';
+                //Lógica de estado y aprobación inicial basada en roles.
+                $estadoInicial = 'Pendiente de Aprobación';
+                $idJefeAprobador = null;
+                $idValidadorAdm = null;
+                $descontarSaldo = false;
+                if ($user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+                    // Jefe de ADM se auto-aprueba ambos niveles. Pasa directo a Contabilizado.
+                    // NOTA: Esto implica que el Jefe de ADM es el validador final de sus propios gastos.
+                    $estadoInicial = 'Contabilizado';
+                    $idJefeAprobador = $user->id;
+                    $idValidadorAdm = $user->id;
+                    $descontarSaldo = true; // El saldo se descuenta al ser contabilizado.
+                } elseif ($user->hasAnyRole(['gerente_general', 'jefe_area'])) {
+                    // Gerente y Jefe de Área auto-aprueban el primer nivel. Pasan a validación contable.
+                    $estadoInicial = 'Pendiente de Validación Contable';
+                    $idJefeAprobador = $user->id;
+                }
 
+
+                // Se obtiene la cuenta contable desde el catálogo precargado.
+                $gastoProyectadoDelCatalogo = $catalogoGastos->get($gastoData['id_gasto_proyectado']);
+                if (!$gastoProyectadoDelCatalogo) {
+                    // Esta validación es una salvaguarda por si algo falla.
+                    throw new \Exception("No se encontró el gasto proyectado con ID {$gastoData['id_gasto_proyectado']} en el catálogo.");
+                }
+                $idCuentaContable = $gastoProyectadoDelCatalogo->id_cuenta_contable;
+                // Se busca el monto estimado original en el mapa que creamos.
+                $montoOriginal = $montosProyectadosOriginales->get($gastoData['id_gasto_proyectado'])->pivot->monto_estimado ?? 0;
                 // Se crea el registro del gasto.
                 $gasto = Gasto::create(array_merge($gastoData, [
                     'id_fondo_efectivo' => $fondo->id_fondo,
@@ -179,11 +243,17 @@ class GastoController extends Controller
                     'ruta_evidencia' => $path,
                     'estado' => $estadoInicial,
                     'moneda' => 'PEN', // Se asume PEN según los requerimientos.
-                    'id_jefe_aprobador' => $user->hasRole('jefe_area') ? $user->id : null,
+                    'id_jefe_aprobador' => $idJefeAprobador,
+                    'id_validador_adm' => $idValidadorAdm,
+                    'id_cuenta_contable' => $idCuentaContable,
+                    'monto_proyectado_original' => $montoOriginal,
                 ]));
-
+                // Si el gasto se contabilizó de inmediato, se descuenta el saldo del fondo.
+                if ($descontarSaldo) {
+                    $fondo->decrement('monto_disponible', $gasto->monto_total);
+                }
                 // Se registra el evento en el historial de cada gasto individual.
-                $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado.');
+                $this->registrarHistorial($gasto, 'Creado', $gasto->estado, $user->id, 'Gasto registrado en el sistema.');
                 $gastosCreados[] = $gasto->load('registrador');
             }
 
@@ -438,7 +508,7 @@ class GastoController extends Controller
      */
     public function show(Gasto $gasto)
     {
-        return response()->json($gasto->load(['registrador.role', 'registrador.area', 'jefeAprobador', 'validadorAdm', 'cuentaContable', 'detalleProyectado', 'historial.usuarioAccion']));
+        return response()->json($gasto->load(['registrador.role', 'registrador.area', 'jefeAprobador', 'validadorAdm', 'cuentaContable', 'gastoProyectado', 'historial.usuarioAccion']));
     }
 
     /**

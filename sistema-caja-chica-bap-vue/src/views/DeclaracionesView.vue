@@ -15,19 +15,19 @@
         </div>
       </div>
 
+      <!--La visibilidad de las cards ahora se basa en permisos -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
         <!-- Card 1: Declaración de Gasto -->
-        <div v-if="esJefeDeArea || esColaborador" @click="cambiarTab('declaracion')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                     bg-gradient-to-br from-verde-bap to-verde-bap-dark
-                     transition-all duration-500 ease-out
-                     transform hover:scale-105 hover:-translate-y-3
-                     shadow-soft hover:shadow-glow-verde
-                     focus:outline-none focus:ring-4 focus:ring-verde-bap/30
-                     animate-fade-in-up border-2 border-transparent
-                     hover:border-verde-bap-light/50" :class="getCardClasses('declaracion')"
-          style="animation-delay: 0.1s" tabindex="0" @keydown.enter="handleCardClick('declaracion')"
-          @keydown.space.prevent="handleCardClick('declaracion')">
+        <div v-if="canCreateDeclaracion" @click="cambiarTab('declaracion')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+                          bg-gradient-to-br from-verde-bap to-verde-bap-dark
+                          transition-all duration-500 ease-out
+                          transform hover:scale-105 hover:-translate-y-3
+                          shadow-soft hover:shadow-glow-verde
+                          focus:outline-none focus:ring-4 focus:ring-verde-bap/30
+                          animate-fade-in-up border-2 border-transparent
+                          hover:border-verde-bap-light/50" :class="getCardClasses('declaracion')"
+          style="animation-delay: 0.1s" tabindex="0">
           <div
             class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out">
           </div>
@@ -50,16 +50,15 @@
         </div>
 
         <!-- Card 2: Aprobaciones -->
-        <div v-if="esJefeDeArea || esColaborador" @click="cambiarTab('aprobaciones')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                    bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
-                    transition-all duration-500 ease-out
-                    transform hover:scale-105 hover:-translate-y-3
-                    shadow-soft hover:shadow-glow-amarillo
-                    focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
-                    animate-fade-in-up border-2 border-transparent
-                  hover:border-amarillo-bap-light/50" :class="getCardClasses('aprobaciones')"
-           style="animation-delay: 0.2s" tabindex="0" @keydown.enter="handleCardClick('aprobaciones')"
-          @keydown.space.prevent="handleCardClick('aprobaciones')">
+        <div v-if="canViewAprobaciones" @click="cambiarTab('aprobaciones')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+                       bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
+                       transition-all duration-500 ease-out
+                       transform hover:scale-105 hover:-translate-y-3
+                       shadow-soft hover:shadow-glow-amarillo
+                       focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
+                       animate-fade-in-up border-2 border-transparent
+                     hover:border-amarillo-bap-light/50" :class="getCardClasses('aprobaciones')"
+          style="animation-delay: 0.2s" tabindex="0">
           <div
             class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out">
           </div>
@@ -75,22 +74,21 @@
             </div>
             <h3 class="text-base md:text-lg font-bold mb-2 group-hover:text-gray-900 transition-all duration-300">
               APROBACIONES DE GASTOS</h3>
-            <p class="text-xs text-gray-700 group-hover:text-gray-800 transition-all duration-300">Validar gastos de tu
-              equipo</p>
+            <p class="text-xs text-gray-700 group-hover:text-gray-800 transition-all duration-300">Validar gastos y dar
+              seguimiento</p>
           </div>
         </div>
 
         <!-- Card 3: Auditoría y Reportes -->
-        <div v-if="esAdmin" @click="cambiarTab('auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                     bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
-                     transition-all duration-500 ease-out
-                     transform hover:scale-105 hover:-translate-y-3
-                     shadow-soft hover:shadow-glow-rojo
-                     focus:outline-none focus:ring-4 focus:ring-rojo-bap/30
-                     animate-fade-in-up border-2 border-transparent
-                     hover:border-rojo-bap-light/50" :class="getCardClasses('auditoria')" style="animation-delay: 0.3s"
-          tabindex="0" @keydown.enter="handleCardClick('auditoria')"
-          @keydown.space.prevent="handleCardClick('auditoria')">
+        <div v-if="canAudit" @click="cambiarTab('auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer
+                           bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
+                           transition-all duration-500 ease-out
+                           transform hover:scale-105 hover:-translate-y-3
+                           shadow-soft hover:shadow-glow-rojo
+                           focus:outline-none focus:ring-4 focus:ring-rojo-bap/30
+                           animate-fade-in-up border-2 border-transparent
+                           hover:border-rojo-bap-light/50" :class="getCardClasses('auditoria')"
+          style="animation-delay: 0.3s" tabindex="0">
           <div
             class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out">
           </div>
@@ -120,7 +118,7 @@
       <!-- Contenedor del Componente Activo -->
       <div v-if="activeTab" class="mt-12">
         <div class="bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-8 shadow-strong">
-          <component :is="activeComponent" :usuarioActual="usuarioActual" @close="activeTab = ''" />
+          <component :is="activeComponent" :usuarioActual="props.user" @close="activeTab = ''" />
         </div>
       </div>
 
@@ -153,46 +151,57 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, shallowRef } from 'vue';
-import api from '@/plugins/axios';
+import { ref, computed, shallowRef, defineProps } from 'vue';
 
 // Importar los componentes de los submódulos
 import DeclaracionGasto from '@/components/declaraciones/DeclaracionGasto.vue';
 import AprobacionGastos from '@/components/declaraciones/AprobacionGastos.vue';
 import AuditoriaGastos from '@/components/declaraciones/AuditoriaGastos.vue';
 
-// --- ESTADO ---
-const usuarioActual = ref(null);
-const cargando = ref(true);
-const activeTab = ref(''); // Pestaña activa, ej: 'declaracion'
-const activeComponent = shallowRef(null); // Contenedor para el componente dinámico
-
-// --- PROPIEDADES COMPUTADAS ---
-// Lógica de visibilidad basada en el rol del usuario.
-const esAdmin = computed(() => usuarioActual.value?.role?.name === 'jefe_administracion' || usuarioActual.value?.role?.name === 'super_admin');
-const esJefeDeArea = computed(() => usuarioActual.value?.role?.name === 'jefe_area');
-const esColaborador = computed(() => usuarioActual.value?.role?.name === 'colaborador');
-
-// --- MÉTODOS ---
-const obtenerUsuarioActual = async () => {
-  cargando.value = true;
-  try {
-    const { data } = await api.get('/auth/user');
-    usuarioActual.value = data;
-  } catch (error) {
-    console.error("Error al obtener datos del usuario:", error);
-  } finally {
-    cargando.value = false;
+// --- PROPS ---
+//  Se recibe el objeto 'user' desde el componente padre (MainLayout.vue)
+const props = defineProps({
+  user: {
+    type: Object,
+    default: () => null
   }
+});
+
+// --- ESTADO ---
+const activeTab = ref('');
+const activeComponent = shallowRef(null);
+
+// --- LÓGICA DE PERMISOS ---
+const hasPermission = (permissionName) => {
+  if (!props.user?.role?.permissions) {
+    return false;
+  }
+  return props.user.role.permissions.some(p => p.name === permissionName);
 };
 
+// --- PROPIEDADES COMPUTADAS PARA VISIBILIDAD DE CARDS ---
+// [La visibilidad ahora se basa en permisos específicos.
+
+// Card "Declaración de Gasto": Visible para cualquiera que pueda crear una declaración.
+const canCreateDeclaracion = computed(() => hasPermission('declaraciones.create'));
+
+// Card "Aprobaciones de Gastos": Visible para quienes aprueban (jefes, adm) o para quienes crean (para seguimiento).
+const canViewAprobaciones = computed(() =>
+  hasPermission('declaraciones.approve.jefe') ||
+  hasPermission('declaraciones.approve.adm') ||
+  hasPermission('declaraciones.create')
+);
+
+// Card "Auditoría y Reportes": Visible solo para quienes pueden ver todas las declaraciones.
+const canAudit = computed(() => hasPermission('declaraciones.view.all'));
+
+
+// --- MÉTODOS ---
 const cambiarTab = (tab) => {
   if (activeTab.value === tab) {
-    // Si se hace clic en la misma pestaña, se cierra.
     activeTab.value = '';
     activeComponent.value = null;
   } else {
-    // Se cambia a la nueva pestaña.
     activeTab.value = tab;
     switch (tab) {
       case 'declaracion':
@@ -210,15 +219,11 @@ const cambiarTab = (tab) => {
   }
 };
 
-// Función para aplicar estilos dinámicos a las tarjetas.
 const getCardClasses = (tab) => {
   return activeTab.value === tab
-    ? 'ring-4 ring-white/50 shadow-glow-verde' // Estilo para la tarjeta activa
-    : 'shadow-soft'; // Estilo para tarjetas inactivas
+    ? 'ring-4 ring-white/50 shadow-glow-verde'
+    : 'shadow-soft';
 };
-
-// --- LIFECYCLE HOOKS ---
-onMounted(obtenerUsuarioActual);
 </script>
 
 <style scoped>

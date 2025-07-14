@@ -30,6 +30,7 @@ return new class extends Migration
 
             // --- Lógica de Montos y Moneda (Adaptado) ---
             $table->decimal('monto_total', 10, 2);
+            $table->decimal('monto_proyectado_original', 10, 2)->nullable();
             $table->string('moneda', 3)->default('PEN');
             $table->decimal('tipo_cambio_referencial', 8, 4)->nullable();
             $table->decimal('tipo_cambio', 8, 4)->nullable();
@@ -37,8 +38,9 @@ return new class extends Migration
 
             // --- Descripción y Clasificación ---
             $table->foreignId('id_gasto_proyectado')->constrained('gastos_proyectados', 'id_gasto_proyectado');
-            $table->boolean('pertenece_proyecto')->default(false);
+            $table->text('glosa');
             $table->text('comentario')->nullable();
+            
 
             // --- Evidencia ---
             $table->string('ruta_evidencia')->nullable();

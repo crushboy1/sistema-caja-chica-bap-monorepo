@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-verde-bap-extralight p-6">
     <div class="max-w-7xl mx-auto space-y-8">
 
-      <div class="bg-verde-bap-extralight rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
         <div class="text-center">
           <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gray-700 text-shadow">
             MÓDULO DE SOLICITUDES
@@ -16,38 +16,40 @@
         </div>
       </div>
 
+      <!-- [CORRECCIÓN] La visibilidad de las cards ahora se basa en las nuevas propiedades computadas de permisos -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
-        <div v-if="showAperturaCard" @click="handleCardClick('apertura')" @mouseenter="handleMouseEnter"
+        <!-- Card 1: Apertura de Fondos -->
+        <div v-if="canCreateSolicitud" @click="handleCardClick('apertura')" @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                 bg-gradient-to-br from-verde-bap to-verde-bap-dark
-                 transition-all duration-500 ease-out
-                 transform hover:scale-105 hover:-translate-y-3
-                 shadow-soft hover:shadow-glow-verde
-                 focus:outline-none focus:ring-4 focus:ring-verde-bap/30
-                 animate-fade-in-up border-2 border-transparent
-                 hover:border-verde-bap-light/50" :class="getCardClasses('apertura')" style="animation-delay: 0.1s"
-          tabindex="0" @keydown.enter="handleCardClick('apertura')"
+                           bg-gradient-to-br from-verde-bap to-verde-bap-dark
+                           transition-all duration-500 ease-out
+                           transform hover:scale-105 hover:-translate-y-3
+                           shadow-soft hover:shadow-glow-verde
+                           focus:outline-none focus:ring-4 focus:ring-verde-bap/30
+                           animate-fade-in-up border-2 border-transparent
+                           hover:border-verde-bap-light/50" :class="getCardClasses('apertura')"
+          style="animation-delay: 0.1s" tabindex="0" @keydown.enter="handleCardClick('apertura')"
           @keydown.space.prevent="handleCardClick('apertura')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
-                       transform -skew-x-12 -translate-x-full
-                       group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+                                   transform -skew-x-12 -translate-x-full
+                                   group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
 
           <div class="absolute inset-0 opacity-10">
             <div class="absolute top-0 left-0 w-32 h-32 bg-white rounded-full
-                         transform -translate-x-16 -translate-y-16 group-hover:scale-150
-                         transition-transform duration-700"></div>
+                                     transform -translate-x-16 -translate-y-16 group-hover:scale-150
+                                     transition-transform duration-700"></div>
             <div class="absolute bottom-0 right-0 w-24 h-24 bg-white rounded-full
-                         transform translate-x-12 translate-y-12 group-hover:scale-125
-                         transition-transform duration-500 delay-200"></div>
+                                     transform translate-x-12 translate-y-12 group-hover:scale-125
+                                     transition-transform duration-500 delay-200"></div>
           </div>
 
           <div class="relative z-10 p-4 text-center text-white h-full flex flex-col justify-center">
             <div class="mb-2 flex justify-center">
               <div class="relative">
                 <div class="w-12 h-12 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center
-                             group-hover:bg-white/35 transition-all duration-500
-                             group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                     group-hover:bg-white/35 transition-all duration-500
+                                     group-hover:scale-110 group-hover:rotate-12 shadow-medium">
                   <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -55,12 +57,12 @@
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-white/30
-                             group-hover:animate-ping"></div>
+                                     group-hover:animate-ping"></div>
               </div>
             </div>
 
             <h3 class="text-base md:text-lg font-bold mb-2 group-hover:text-white/95 transition-all duration-300
-                       group-hover:tracking-wide">
+                                   group-hover:tracking-wide">
               APERTURA DE FONDOS
             </h3>
 
@@ -70,50 +72,51 @@
 
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-white/60 rounded-full group-hover:bg-white
-                           group-hover:scale-150 transition-all duration-300"
+                                   group-hover:scale-150 transition-all duration-300"
                 :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'apertura' }"></div>
               <div class="w-2 h-2 bg-white/40 rounded-full group-hover:bg-white/80
-                           group-hover:scale-125 transition-all duration-300 delay-75"></div>
+                                   group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-white/30 rounded-full group-hover:bg-white/60
-                           group-hover:scale-110 transition-all duration-300 delay-150"></div>
+                                   group-hover:scale-110 transition-all duration-300 delay-150"></div>
             </div>
           </div>
 
           <div class="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100
-                       transition-opacity duration-500 pointer-events-none
-                       bg-gradient-to-t from-verde-bap-light/20 to-transparent"></div>
+                                   transition-opacity duration-500 pointer-events-none
+                                   bg-gradient-to-t from-verde-bap-light/20 to-transparent"></div>
         </div>
 
-        <div v-if="showModificacionCard" @click="handleCardClick('modificacion')" @mouseenter="handleMouseEnter"
+        <!-- Card 2: Modificación de Fondos -->
+        <div v-if="canCreateSolicitud" @click="handleCardClick('modificacion')" @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                 bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
-                 transition-all duration-500 ease-out
-                 transform hover:scale-105 hover:-translate-y-3
-                 shadow-soft hover:shadow-glow-amarillo
-                 focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
-                 animate-fade-in-up border-2 border-transparent
-                 hover:border-amarillo-bap-light/50" :class="getCardClasses('modificacion')"
+                           bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
+                           transition-all duration-500 ease-out
+                           transform hover:scale-105 hover:-translate-y-3
+                           shadow-soft hover:shadow-glow-amarillo
+                           focus:outline-none focus:ring-4 focus:ring-amarillo-bap/30
+                           animate-fade-in-up border-2 border-transparent
+                           hover:border-amarillo-bap-light/50" :class="getCardClasses('modificacion')"
           style="animation-delay: 0.2s" tabindex="0" @keydown.enter="handleCardClick('modificacion')"
           @keydown.space.prevent="handleCardClick('modificacion')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent
-                       transform -skew-x-12 -translate-x-full
-                       group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+                                   transform -skew-x-12 -translate-x-full
+                                   group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
 
           <div class="absolute inset-0 opacity-10">
             <div class="absolute top-0 right-0 w-28 h-28 bg-white rounded-full
-                         transform translate-x-14 -translate-y-14 group-hover:scale-150
-                         transition-transform duration-600"></div>
+                                     transform translate-x-14 -translate-y-14 group-hover:scale-150
+                                     transition-transform duration-600"></div>
             <div class="absolute bottom-0 left-0 w-20 h-20 bg-white rounded-full
-                         transform -translate-x-10 translate-y-10 group-hover:scale-125
-                         transition-transform duration-400 delay-300"></div>
+                                     transform -translate-x-10 translate-y-10 group-hover:scale-125
+                                     transition-transform duration-400 delay-300"></div>
           </div>
 
           <div class="relative z-10 p-4 text-center text-gray-800 h-full flex flex-col justify-center">
             <div class="mb-2 flex justify-center">
               <div class="relative">
                 <div class="w-12 h-12 bg-white/40 backdrop-blur-sm rounded-2xl flex items-center justify-center
-                             group-hover:bg-white/50 transition-all duration-500
-                             group-hover:scale-110 group-hover:-rotate-12 shadow-medium">
+                                     group-hover:bg-white/50 transition-all duration-500
+                                     group-hover:scale-110 group-hover:-rotate-12 shadow-medium">
                   <svg class="w-6 h-6 text-amarillo-bap-dark group-hover:scale-110 transition-transform duration-300"
                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -121,12 +124,12 @@
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-gray-800/20
-                             group-hover:animate-ping"></div>
+                                     group-hover:animate-ping"></div>
               </div>
             </div>
 
             <h3 class="text-base md:text-lg font-bold mb-2 group-hover:text-gray-900 transition-all duration-300
-                       group-hover:tracking-wide">
+                                   group-hover:tracking-wide">
               MODIFICACIÓN DE FONDOS
             </h3>
 
@@ -136,43 +139,44 @@
 
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-gray-600/60 rounded-full group-hover:bg-gray-800
-                           group-hover:scale-150 transition-all duration-300"
+                                   group-hover:scale-150 transition-all duration-300"
                 :class="{ 'bg-gray-800 scale-150 animate-pulse-soft': activeSection === 'modificacion' }"></div>
               <div class="w-2 h-2 bg-gray-500/40 rounded-full group-hover:bg-gray-700
-                           group-hover:scale-125 transition-all duration-300 delay-75"></div>
+                                   group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-gray-400/30 rounded-full group-hover:bg-gray-600
-                           group-hover:scale-110 transition-all duration-300 delay-150"></div>
+                                   group-hover:scale-110 transition-all duration-300 delay-150"></div>
             </div>
           </div>
         </div>
 
-        <div v-if="showSeguimientoCard" @click="handleCardClick('seguimiento')" @mouseenter="handleMouseEnter"
+        <!-- Card 3: Seguimiento de Solicitudes -->
+        <div v-if="canViewSeguimiento" @click="handleCardClick('seguimiento')" @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                 bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
-                 transition-all duration-500 ease-out
-                 transform hover:scale-105 hover:-translate-y-3
-                 shadow-soft hover:shadow-glow-rojo
-                 focus:outline-none focus:ring-4 focus:ring-rojo-bap/30
-                 animate-fade-in-up border-2 border-transparent
-                 hover:border-rojo-bap-light/50" :class="getCardClasses('seguimiento')" style="animation-delay: 0.3s"
-          tabindex="0" @keydown.enter="handleCardClick('seguimiento')"
+                           bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
+                           transition-all duration-500 ease-out
+                           transform hover:scale-105 hover:-translate-y-3
+                           shadow-soft hover:shadow-glow-rojo
+                           focus:outline-none focus:ring-4 focus:ring-rojo-bap/30
+                           animate-fade-in-up border-2 border-transparent
+                           hover:border-rojo-bap-light/50" :class="getCardClasses('seguimiento')"
+          style="animation-delay: 0.3s" tabindex="0" @keydown.enter="handleCardClick('seguimiento')"
           @keydown.space.prevent="handleCardClick('seguimiento')">
           <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
-                       transform -skew-x-12 -translate-x-full
-                       group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+                                   transform -skew-x-12 -translate-x-full
+                                   group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
 
           <div class="absolute inset-0 opacity-10">
             <div class="absolute top-1/2 left-1/2 w-36 h-36 bg-white rounded-full
-                         transform -translate-x-1/2 -translate-y-1/2 group-hover:scale-125
-                         transition-transform duration-800"></div>
+                                     transform -translate-x-1/2 -translate-y-1/2 group-hover:scale-125
+                                     transition-transform duration-800"></div>
           </div>
 
           <div class="relative z-10 p-4 text-center text-white h-full flex flex-col justify-center">
             <div class="mb-2 flex justify-center">
               <div class="relative">
                 <div class="w-12 h-12 bg-white/25 backdrop-blur-sm rounded-2xl flex items-center justify-center
-                             group-hover:bg-white/35 transition-all duration-500
-                             group-hover:scale-110 group-hover:animate-bounce-gentle shadow-medium">
+                                     group-hover:bg-white/35 transition-all duration-500
+                                     group-hover:scale-110 group-hover:animate-bounce-gentle shadow-medium">
                   <svg class="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -180,12 +184,12 @@
                   </svg>
                 </div>
                 <div class="absolute inset-0 rounded-2xl border-2 border-white/30
-                             group-hover:animate-ping"></div>
+                                     group-hover:animate-ping"></div>
               </div>
             </div>
 
             <h3 class="text-base md:text-lg font-bold mb-2 group-hover:text-white/95 transition-all duration-300
-                       group-hover:tracking-wide">
+                                   group-hover:tracking-wide">
               SEGUIMIENTO SOLICITUDES
             </h3>
 
@@ -195,12 +199,12 @@
 
             <div class="mt-2 flex justify-center space-x-2">
               <div class="w-3 h-3 bg-white/60 rounded-full group-hover:bg-white
-                           group-hover:scale-150 transition-all duration-300"
+                                   group-hover:scale-150 transition-all duration-300"
                 :class="{ 'bg-white scale-150 animate-pulse-soft': activeSection === 'seguimiento' }"></div>
               <div class="w-2 h-2 bg-white/40 rounded-full group-hover:bg-white/80
-                           group-hover:scale-125 transition-all duration-300 delay-75"></div>
+                                   group-hover:scale-125 transition-all duration-300 delay-75"></div>
               <div class="w-1 h-1 bg-white/30 rounded-full group-hover:bg-white/60
-                           group-hover:scale-110 transition-all duration-300 delay-150"></div>
+                                   group-hover:scale-110 transition-all duration-300 delay-150"></div>
             </div>
           </div>
         </div>
@@ -226,7 +230,6 @@
           </div>
         </div>
       </Transition>
-
       <Transition enter-active-class="transition-all duration-600 ease-out delay-500"
         enter-from-class="opacity-0 transform translate-y-4" enter-to-class="opacity-100 transform translate-y-0">
         <div v-if="!activeSection" class="relative overflow-hidden rounded-2xl
@@ -267,58 +270,35 @@ import api from '@/plugins/axios'
 import AperturaFondos from '@/components/solicitudes/AperturaFondos.vue'
 import ModificacionFondos from '@/components/solicitudes/ModificacionFondos.vue'
 import SeguimientoSolicitudes from '@/components/solicitudes/SeguimientoSolicitudes.vue'
-
+// [CAMBIO] Se define la prop 'user' para recibir los datos del usuario desde el componente padre (MainLayout).
+const props = defineProps({
+  user: {
+    type: Object,
+    default: () => null
+  }
+});
 // Estado reactivo
 const activeSection = ref(null);
-const user = ref(null);
 const isLoading = ref(true);
 const cardAnimationState = ref({});
 const proyectos = ref([]);
 const gastosProyectadosCatalogo = ref([]);
 const areas = ref([]);
-// Roles definidos para mayor claridad y evitar errores de escritura
-const ROLES = {
-  JEFE_AREA: 'jefe_area',
-  JEFE_ADM: 'jefe_administracion',
-  GERENTE_GENERAL: 'gerente_general',
-  SUPER_ADMIN: 'super_admin',
-  COLABORADOR: 'colaborador'
+// Roles por permisos
+const hasPermission = (permissionName) => {
+  // Si no hay usuario, rol o permisos, devuelve falso.
+  if (!props.user?.role?.permissions) {
+    return false;
+  }
+  // Comprueba si algún permiso en el array del usuario coincide con el nombre buscado.
+  return props.user.role.permissions.some(p => p.name === permissionName);
 };
 
-// Propiedades computadas para la visibilidad de las tarjetas
-const showAperturaCard = computed(() => {
-  if (!user.value?.role?.name) return false;
-  // Visible para todas las jefaturas, Gerente y Super Admin.
-  return [
-    ROLES.JEFE_AREA,
-    ROLES.JEFE_ADM,
-    ROLES.GERENTE_GENERAL,
-    ROLES.SUPER_ADMIN
-  ].includes(user.value.role.name);
-});
+const canCreateSolicitud = computed(() => hasPermission('solicitudes.create'));
+const canViewSeguimiento = computed(() =>
+  hasPermission('solicitudes.view.area') || hasPermission('solicitudes.view.all')
+);
 
-const showModificacionCard = computed(() => {
-  if (!user.value?.role?.name) return false;
-  // Visible para todas las jefaturas, Gerente y Super Admin.
-  return [
-    ROLES.JEFE_AREA,
-    ROLES.JEFE_ADM,
-    ROLES.GERENTE_GENERAL,
-    ROLES.SUPER_ADMIN
-  ].includes(user.value.role.name);
-});
-
-const showSeguimientoCard = computed(() => {
-  if (!user.value?.role?.name) return false;
-  // CORRECCIÓN: La tarjeta de seguimiento solo es visible para roles que gestionan o crean solicitudes.
-  // Un colaborador no verá datos en la tabla, por lo que se le oculta la tarjeta.
-  return [
-    ROLES.JEFE_AREA,
-    ROLES.JEFE_ADM,
-    ROLES.GERENTE_GENERAL,
-    ROLES.SUPER_ADMIN
-  ].includes(user.value.role.name);
-});
 
 // Métodos mejorados
 const handleCardClick = async (section) => {
@@ -412,39 +392,30 @@ const showSuccessNotification = (message) => {
 onMounted(async () => {
   isLoading.value = true;
   try {
-    // Se ejecutan todas las llamadas a la API necesarias en paralelo para máxima eficiencia.
-    // Esto asegura que solo se haga una petición por cada recurso cuando la vista se carga.
-    const [userResponse, proyectosResponse, gastosProyectadosResponse, areasResponse] = await Promise.all([
-      api.get('/auth/user'),
+    // [CAMBIO] Se elimina la llamada a /auth/user. Ahora solo se cargan los catálogos
+    // necesarios para los sub-componentes de esta vista.
+    const [proyectosResponse, gastosProyectadosResponse, areasResponse] = await Promise.all([
       api.get('/v1/proyectos'),
       api.get('/v1/gastos-proyectados'),
       api.get('/v1/areas')
     ]);
 
-    // Se asignan los datos obtenidos a las variables reactivas del padre.
-    user.value = userResponse.data;
     proyectos.value = proyectosResponse.data.proyectos;
     gastosProyectadosCatalogo.value = gastosProyectadosResponse.data.gastos_proyectados;
     areas.value = areasResponse.data.areas;
   } catch (error) {
     console.error('Error al cargar datos iniciales para SolicitudFondoView:', error);
-    // Aquí se podría mostrar un error general al usuario.
   } finally {
     isLoading.value = false;
   }
-
-  // Se mantiene tu listener para la tecla Escape.
   document.addEventListener('keydown', handleKeyNavigation);
 });
-
 // Manejo de teclado para accesibilidad
 const handleKeyNavigation = (event) => {
   if (event.key === 'Escape' && activeSection.value) {
     activeSection.value = null
   }
 }
-
-
 // Limpiar listener
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyNavigation)

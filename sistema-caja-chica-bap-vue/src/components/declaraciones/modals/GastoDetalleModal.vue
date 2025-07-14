@@ -8,7 +8,7 @@ const props = defineProps({
     },
     gasto: {
         type: Object,
-        default: null
+        default: () => null
     }
 });
 
@@ -16,19 +16,33 @@ const emit = defineEmits(['close']);
 
 // Propiedad computada para obtener la URL de la evidencia de forma segura
 const evidenciaUrl = computed(() => {
-    return props.gasto?.evidencia_url || null;
+    if (!props.gasto?.ruta_evidencia) return null;
+    // Asume que tu storage está linkeado y es accesible desde /storage/
+    return `/storage/${props.gasto.ruta_evidencia}`;
 });
 // Detecta si la evidencia es un PDF
 const esPdf = computed(() => {
     return evidenciaUrl.value && evidenciaUrl.value.toLowerCase().endsWith('.pdf');
 });
-
+//Propiedades computadas para acceder a datos anidados de forma segura y limpia.
+const registradorNombre = computed(() => `${props.gasto?.registrador?.name || ''} ${props.gasto?.registrador?.last_name || ''}`.trim() || 'N/A');
+const registradorRol = computed(() => props.gasto?.registrador?.role?.display_name || 'N/A');
+const registradorArea = computed(() => props.gasto?.registrador?.area?.name || 'N/A');
+const fondoCodigo = computed(() => props.gasto?.fondo_efectivo?.codigo_fondo || 'N/A');
+const fondoMontoOriginal = computed(() => parseFloat(props.gasto?.fondo_efectivo?.monto_aprobado || 0).toFixed(2));
+const proyeccionMontoOriginal = computed(() => parseFloat(props.gasto?.monto_proyectado_original || 0).toFixed(2));
+const proyeccionDescripcion = computed(() => props.gasto?.gasto_proyectado?.descripcion || 'No especificada');
+const cuentaContableInfo = computed(() => {
+    if (!props.gasto?.cuenta_contable) return 'N/A';
+    return `${props.gasto.cuenta_contable.codigo_cuenta} - ${props.gasto.cuenta_contable.descripcion}`;
+});
 // Detecta si la evidencia es una imagen
 const esImagen = computed(() => {
     if (!evidenciaUrl.value) return false;
     const extension = evidenciaUrl.value.split('.').pop().toLowerCase();
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
 });
+//METODOS
 // Función para formatear la fecha con hora y minutos
 const formatearFecha = (fechaString) => {
     if (!fechaString) return 'N/A';
@@ -86,7 +100,7 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Monto Total:</strong> S/. {{ gasto?.monto_total ?
                                 parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</p>
                             <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ gasto?.estado || 'N/A'
-                                }}</p>
+                            }}</p>
                             <p class="text-sm text-gray-600"><strong>Fecha de Registro:</strong> {{
                                 formatearFecha(gasto?.created_at) }}</p>
                             <p class="text-sm text-gray-600"><strong>Glosa:</strong> {{ gasto?.glosa || 'No especificada' }}</p>
@@ -96,10 +110,10 @@ const cerrarModal = () => {
                                 gasto?.tipo_documento || 'N/A' }}</p>
                             <!-- Lógica para mostrar Serie y Correlativo -->
                             <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
-                                <p class="text-sm text-gray-600"><strong>Serie:</strong> {{ gasto?.serie_documento ||
-                                    'N/A' }}</p>
-                                <p class="text-sm text-gray-600"><strong>Correlativo:</strong> {{
-                                    gasto?.correlativo_documento || 'N/A' }}</p>
+                                <p v-if="!gasto?.es_declaracion_jurada" class="text-sm text-gray-600">
+                                    <strong>Comprobante:</strong> {{ gasto?.serie_documento || 'S/S' }} - {{
+                                        gasto?.correlativo_documento || 'S/C' }}
+                                </p>
                             </template>
                             <template v-else>
                                 <p class="text-sm text-gray-600"><strong>Serie:</strong> N/A</p>
@@ -118,14 +132,9 @@ const cerrarModal = () => {
                                 </svg>
                                 Registrador del Gasto
                             </h4>
-                            <p class="text-sm text-gray-600">
-                                <strong>Nombre:</strong>
-                                {{ gasto?.registrador?.name || 'N/A' }} {{ gasto?.registrador?.last_name || '' }}
-                            </p>
-                            <p class="text-sm text-gray-600"><strong>Rol:</strong> {{
-                                gasto?.registrador?.role?.display_name || 'N/A' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Área:</strong> {{ gasto?.registrador?.area?.name ||
-                                'N/A' }}</p>
+                            <p class="text-sm text-gray-600"><strong>Nombre:</strong> {{ registradorNombre }}</p>
+                            <p class="text-sm text-gray-600"><strong>Rol:</strong> {{ registradorRol }}</p>
+                            <p class="text-sm text-gray-600"><strong>Área:</strong> {{ registradorArea }}</p>
                         </div>
 
                         <!-- Tarjeta de Detalles Contables y de Fondo -->
@@ -140,27 +149,15 @@ const cerrarModal = () => {
                                 </svg>
                                 Detalles Contables y de Fondo
                             </h4>
-                            <p class="text-sm text-gray-600"><strong>Fondo Afectado:</strong> {{
-                                gasto?.fondo_efectivo?.codigo_fondo || 'N/A' }}
-                            </p>
+                            <p class="text-sm text-gray-600"><strong>Fondo Afectado:</strong> {{ fondoCodigo }}</p>
                             <p class="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200/80"><strong>Proyección
                                     Original:</strong> {{
-                                        gasto?.detalle_proyectado?.descripcion_gasto || 'No especificada' }}</p>
+                                        proyeccionDescripcion }}</p>
                             <p class="text-sm text-gray-600"><strong>Monto Proyectado:</strong> S/. {{
-                                gasto?.detalle_proyectado?.monto_estimado
-                                    ? parseFloat(gasto.detalle_proyectado.monto_estimado).toFixed(2) : '0.00' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Pertenece a Proyecto:</strong> {{
-                                gasto?.pertenece_proyecto ? 'Sí' : 'No'
-                                }}</p>
-
+                                proyeccionMontoOriginal }}</p>
                             <p class="text-sm text-gray-600"><strong>Monto Original del Fondo:</strong> S/. {{
-                                gasto?.fondo_efectivo?.monto_aprobado ?
-                                    parseFloat(gasto.fondo_efectivo.monto_aprobado).toFixed(2) : '0.00' }}
-                            </p>
-                            <p class="text-sm text-gray-600"><strong>Cuenta Contable:</strong>
-                                <span v-if="gasto?.cuenta_contable">{{ gasto.cuenta_contable.codigo_cuenta }} - {{
-                                    gasto.cuenta_contable.descripcion }}</span>
-                                <span v-else>N/A</span>
+                                fondoMontoOriginal }}</p>
+                            <p class="text-sm text-gray-600"><strong>Cuenta Contable:</strong> {{ cuentaContableInfo }}
                             </p>
                         </div>
 

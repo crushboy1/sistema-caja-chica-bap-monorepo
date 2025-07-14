@@ -1,81 +1,100 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'; // Importar 'computed'
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '@/plugins/axios'; // Importa tu instancia de Axios configurada
+import api from '@/plugins/axios';
 
 const user = ref(null);
 const isLoadingUser = ref(true);
-
+const showMobileMenu = ref(false);
 const router = useRouter();
 
-// --- Roles de Usuario Definidos (para referencia) ---
-const ROLES = {
-  JEFE_AREA: 'jefe_area',
-  JEFE_ADM: 'jefe_administracion',
-  GERENTE_GENERAL: 'gerente_general',
-  SUPER_ADMIN: 'super_admin',
-  COLABORADOR: 'colaborador'
-};
-// Lógica para determinar si se debe mostrar el enlace de "Fondos"
-const showFondosLink = computed(() => {
-  if (!user.value || !user.value.role) return false;
-  // El enlace es visible para Jefe de Área y roles superiores
-  const rolesPermitidos = [ROLES.JEFE_AREA, ROLES.JEFE_ADM, ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN];
-  return rolesPermitidos.includes(user.value.role.name);
-});
-// --- Propiedades Computadas para el Usuario ---
-const rolUsuario = computed(() => {
-  const roleName = user.value?.role?.name || null;
-  console.log('DEBUG MainLayout: rolUsuario computed ->', roleName);
-  return roleName;
-});
+// --- Lógica de Permisos y Roles ---
 
-const userPermissions = computed(() => {
-  const permissions = user.value?.role?.permissions || [];
-  console.log('DEBUG MainLayout: userPermissions computed ->', permissions);
-  return permissions;
-});
-
-// --- Función de Ayuda para Verificar Permisos ---
+/**
+ * Función de ayuda para verificar si el usuario tiene un permiso específico.
+ * @param {string} permissionName - El nombre del permiso a verificar (ej. 'solicitudes.navigate').
+ * @returns {boolean} - True si el usuario tiene el permiso, de lo contrario false.
+ */
 const hasPermission = (permissionName) => {
-  if (!user.value || !user.value.role || !user.value.role.permissions) {
-    console.log(`DEBUG MainLayout: hasPermission('${permissionName}') -> false (user, role o permissions no definidos)`);
+  // Si no hay usuario o permisos definidos, no tiene permiso.
+  if (!user.value?.role?.permissions) {
     return false;
   }
-  const permissionNames = user.value.role.permissions.map(p => p.name);
-  const hasPerm = permissionNames.includes(permissionName);
-  console.log(`DEBUG MainLayout: hasPermission('${permissionName}') -> ${hasPerm}. Permisos disponibles:`, permissionNames);
-  return hasPerm;
+  // Comprueba si algún permiso en el array del usuario coincide con el nombre buscado.
+  return user.value.role.permissions.some(p => p.name === permissionName);
 };
 
+// --- Propiedades Computadas para la Visibilidad de los Enlaces de Navegación ---
+
+// Determina si se debe mostrar el enlace a "Solicitudes".
+const canNavigateSolicitudes = computed(() => {
+  return hasPermission('navigate.solicitudes');
+});
+
+// Determina si se debe mostrar el enlace a "Declaraciones".
+const canNavigateDeclaraciones = computed(() => {
+  return hasPermission('navigate.declaraciones');
+});
+
+// Determina si se debe mostrar el enlace a "Fondos".
+const canNavigateFondos = computed(() => {
+  return hasPermission('navigate.fondos');
+});
+
+// Determina si se debe mostrar el enlace a "Gestión de Usuarios".
+const canNavigateGestionUsuarios = computed(() => {
+  return hasPermission('navigate.gestion.usuarios');
+});
+
+// --- Propiedades Computadas para Información del Usuario ---
+
+// Propiedad para obtener el nombre completo del usuario.
+const userFullName = computed(() => {
+  if (!user.value) return 'Invitado';
+  return `${user.value.name || ''} ${user.value.last_name || ''}`.trim();
+});
+
+//  Propiedad para obtener el área del usuario.
+const userArea = computed(() => user.value?.area?.name || 'Área no asignada');
+
+// Propiedad para obtener el cargo del usuario.
+const userCargo = computed(() => user.value?.cargo || 'Cargo no asignado');
+
+// --- Lógica del Componente ---
 
 // Función para obtener los datos del usuario autenticado
 const fetchAuthenticatedUser = async () => {
+  isLoadingUser.value = true;
   try {
     const response = await api.get('/auth/user');
-    console.log('DEBUG: Respuesta completa de /user:', response.data);
-    console.log('DEBUG: Solo user de /user:', response.data.user);
-    console.log('DEBUG: Role desde /user:', response.data.user?.role);
-    console.log('DEBUG: Permissions desde /user:', response.data?.role?.permissions);
-
     user.value = response.data;
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error al obtener datos del usuario. Redirigiendo al login.', error);
+    router.push('/login');
   } finally {
     isLoadingUser.value = false;
   }
 };
 
-// Función para manejar el logout
+// Función para manejar el logout del usuario.
 const handleLogout = async () => {
   try {
     await api.post('/auth/logout');
-    console.log('Logout exitoso.');
-    router.push('/login');
   } catch (error) {
-    console.error('Error durante el logout:', error);
-    router.push('/login'); // Redirigir al login incluso si hay un error en el logout
+    console.error('Error durante el logout (se redirigirá de todas formas):', error);
+  } finally {
+    user.value = null; // Limpiar el usuario del estado.
+    router.push('/login'); // Redirigir al login.
   }
+};
+
+// Funciones para el menú móvil
+const toggleMobileMenu = () => {
+  showMobileMenu.value = !showMobileMenu.value;
+};
+
+const closeMobileMenu = () => {
+  showMobileMenu.value = false;
 };
 
 onMounted(() => {
@@ -85,51 +104,110 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-verde-bap-light flex flex-col">
-    <nav class="glass shadow-soft p-6 flex justify-between items-center backdrop-blur-sm">
-      <div class="flex items-center">
-        <img src="/src/assets/images/logo-wt.svg" alt="Logo BAP" class="h-10 mr-4" />
-        <span class="text-xl font-semibold text-gray-800">Sistema Gestión de Fondos</span>
-      </div>
-
-      <div class="flex space-x-6 ">
-        <router-link to="/dashboard" class="text-gray-600 font-medium nav-link-item"
-          active-class="router-link-exact-active">
-          Dashboard
-        </router-link>
-        <router-link to="/dashboard/solicitudes" class="text-gray-600 font-medium nav-link-item"
-          style="--underline-color: var(--color-rojo-bap);">
-          Solicitudes
-        </router-link>
-        <router-link to="/dashboard/declaraciones" class="text-gray-600 font-medium nav-link-item"
-          style="--underline-color: var(--color-amarillo-bap);">
-          Declaraciones
-        </router-link>
-        <router-link v-if="showFondosLink" to="/dashboard/fondos" class="text-gray-600 font-medium nav-link-item"
-          style="--underline-color: var(--color-verde-bap);">
-          Fondos
-        </router-link>
-        <router-link to="/dashboard/gestion-usuarios" class="text-gray-600 font-medium nav-link-item"
-        style="--underline-color: var(--color-rojo-bap);">
-          Gestión de Usuarios
-        </router-link>
-      </div>
-
-      <div class="flex items-center space-x-4">
-        <div v-if="isLoadingUser" class="text-gray-500">Cargando...</div>
-        <div v-else class="text-gray-700 font-medium">
-          <h2>Bienvenido!</h2>{{ user ? user.name : 'Invitado' }}
+    <nav class="glass shadow-soft p-4 backdrop-blur-sm sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <!-- Logo y Título - Sección Izquierda -->
+        <div class="flex items-center flex-shrink-0 min-w-0">
+          <img src="/src/assets/images/logo-wt.svg" alt="Logo BAP" class="h-10 mr-3 flex-shrink-0" />
+          <span class="text-lg xl:text-xl font-semibold text-gray-800 truncate">Sistema Gestión de Fondos</span>
         </div>
 
-        <button @click="handleLogout"
-          class="bg-rojo-bap hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-full transition-colors">
-          Cerrar Sesión
-        </button>
+        <!-- Enlaces de Navegación - Sección Central -->
+        <div class="hidden lg:flex items-center justify-center flex-1 mx-8">
+          <div class="flex space-x-6 xl:space-x-8">
+            <router-link to="/dashboard" class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
+              active-class="router-link-exact-active">
+              Dashboard
+            </router-link>
+            <router-link v-if="canNavigateSolicitudes" to="/dashboard/solicitudes"
+              class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
+              style="--underline-color: var(--color-rojo-bap);">
+              Solicitudes
+            </router-link>
+            <router-link v-if="canNavigateDeclaraciones" to="/dashboard/declaraciones"
+              class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
+              style="--underline-color: var(--color-amarillo-bap);">
+              Declaraciones
+            </router-link>
+            <router-link v-if="canNavigateFondos" to="/dashboard/fondos"
+              class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
+              style="--underline-color: var(--color-verde-bap);">
+              Fondos
+            </router-link>
+            <router-link v-if="canNavigateGestionUsuarios" to="/dashboard/gestion-usuarios"
+              class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
+              style="--underline-color: var(--color-rojo-bap);">
+              Gestión de Usuarios
+            </router-link>
+          </div>
+        </div>
+
+        <!-- Menú hamburguesa para pantallas medianas -->
+        <div class="lg:hidden flex items-center">
+          <button @click="toggleMobileMenu" class="text-gray-600 hover:text-gray-800 p-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Información de Usuario y Logout - Sección Derecha -->
+        <div class="flex items-center space-x-3 xl:space-x-4 flex-shrink-0">
+          <div v-if="isLoadingUser" class="text-sm text-gray-500">Cargando...</div>
+          <div v-else class="flex items-center space-x-2 xl:space-x-3 bg-white/50 p-2 rounded-full">
+            <div class="p-2 bg-verde-bap-extralight rounded-full border border-verde-bap-light">
+              <svg class="w-5 h-5 xl:w-6 xl:h-6 text-verde-bap-dark" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </div>
+            <div class="text-right pr-1 xl:pr-2 min-w-0">
+              <p class="font-bold text-gray-800 text-xs xl:text-sm leading-tight truncate">{{ userFullName }}</p>
+              <p class="text-xs text-gray-600 leading-tight truncate">{{ userArea }} / {{ userCargo }}</p>
+            </div>
+          </div>
+          <button @click="handleLogout"
+            class="bg-rojo-bap hover:bg-rojo-bap-hover text-white font-semibold py-2 px-3 xl:px-4 rounded-full transition-colors text-xs xl:text-sm whitespace-nowrap">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+
+      <!-- Menú móvil desplegable -->
+      <div v-if="showMobileMenu" class="lg:hidden mt-4 pt-4 border-t border-gray-200">
+        <div class="flex flex-col space-y-2">
+          <router-link to="/dashboard" class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
+            active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
+            Dashboard
+          </router-link>
+          <router-link v-if="canNavigateSolicitudes" to="/dashboard/solicitudes"
+            class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
+            active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
+            Solicitudes
+          </router-link>
+          <router-link v-if="canNavigateDeclaraciones" to="/dashboard/declaraciones"
+            class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
+            active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
+            Declaraciones
+          </router-link>
+          <router-link v-if="canNavigateFondos" to="/dashboard/fondos"
+            class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
+            active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
+            Fondos
+          </router-link>
+          <router-link v-if="canNavigateGestionUsuarios" to="/dashboard/gestion-usuarios"
+            class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
+            active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
+            Gestión de Usuarios
+          </router-link>
+        </div>
       </div>
     </nav>
 
     <main class="bg-verde-bap-light flex-grow p-8">
       <div class="max-w-7xl mx-auto glass rounded-2xl shadow-soft p-8 animate-fade-in-up">
-        <router-view></router-view>
+        <router-view :user="user" />
       </div>
     </main>
 

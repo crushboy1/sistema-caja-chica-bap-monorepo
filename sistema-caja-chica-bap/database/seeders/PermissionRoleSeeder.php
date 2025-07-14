@@ -27,41 +27,71 @@ class PermissionRoleSeeder extends Seeder
             'super_admin' => array_keys($permissions->toArray()), // El Super Admin tiene todos los permisos.
 
             'gerente_general' => [
-                'view_dashboard',
-                'solicitud_view_all',
-                'solicitud_approve_grte', // Aprueba/Observa solicitudes de fondo.
+                // Navegación
+                'navigate.dashboard',
+                'navigate.solicitudes',
+                'navigate.declaraciones',
+                'navigate.fondos',
+                // Solicitudes
+                'solicitudes.view.all',
+                'solicitudes.create', // Puede crear sus propias solicitudes
+                'solicitudes.approve.grte',
+                'solicitudes.submit.descargo',
+                // Declaraciones
+                'declaraciones.view.all',
+                'declaraciones.create', // Puede declarar sus propios gastos
+                'declaraciones.resubmit',
             ],
 
             'jefe_administracion' => [
-                'view_dashboard',
-                'manage_accounting_codes', // NUEVO: Puede gestionar el catálogo de cuentas/glosas.
-                'solicitud_view_all',
-                'solicitud_approve_adm', // Aprueba/Observa solicitudes hacia Gerencia.
-                'gasto_view_all',
-                'gasto_finalize_by_adm', // Contabiliza el gasto (acción final).
-                'gasto_observe_by_adm',  // Observa cualquier gasto.
-                'gasto_reject_by_adm',   // Rechaza cualquier gasto.
-                'fund_reposition',       // Ejecuta la reposición.
+                // Navegación
+                'navigate.dashboard',
+                'navigate.solicitudes',
+                'navigate.declaraciones',
+                'navigate.fondos',
+                'navigate.gestion.usuarios',
+                // Administración
+                'admin.users.manage',
+                'admin.catalogos.manage',
+                'admin.system.settings',
+                // Solicitudes
+                'solicitudes.view.all',
+                'solicitudes.create', // Puede crear sus propias solicitudes
+                'solicitudes.approve.adm',
+                'solicitudes.submit.descargo',
+                // Declaraciones
+                'declaraciones.view.all',
+                'declaraciones.create', // Puede declarar sus propios gastos
+                'declaraciones.approve.adm',
+                'declaraciones.resubmit',
+                'declaraciones.reposition',
             ],
 
             'jefe_area' => [
-                'view_dashboard',
-                'solicitud_view_own_area',
-                'solicitud_create',
-                'solicitud_submit_descargo',
-                'gasto_view_own_area',
-                'gasto_create',
-                'gasto_approve_by_jefe',      // Aprueba gastos de su equipo.
-                'gasto_observe_by_jefe',      // NUEVO: Puede observar gastos de su equipo.
-                'gasto_reject_by_jefe',       // Rechaza gastos de su equipo.
-                'gasto_resubmit_observed',    // Puede corregir sus propios gastos observados.
+                // Navegación
+                'navigate.dashboard',
+                'navigate.solicitudes',
+                'navigate.declaraciones',
+                'navigate.fondos',
+                // Solicitudes
+                'solicitudes.view.area',
+                'solicitudes.create',
+                'solicitudes.submit.descargo',
+                // Declaraciones
+                'declaraciones.view.area',
+                'declaraciones.create',
+                'declaraciones.approve.jefe',
+                'declaraciones.resubmit',
             ],
 
             'colaborador' => [
-                'view_dashboard',
-                'gasto_view_own',
-                'gasto_create',
-                'gasto_resubmit_observed', // Puede corregir sus propios gastos observados.
+                // Navegación
+                'navigate.dashboard',
+                'navigate.declaraciones',
+                // Declaraciones
+                'declaraciones.view.own',
+                'declaraciones.create',
+                'declaraciones.resubmit',
             ],
         ];
 
