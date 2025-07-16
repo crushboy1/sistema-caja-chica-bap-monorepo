@@ -37,27 +37,35 @@ class FondoEfectivoController extends Controller
         $query->with([
             'responsable:id,name,last_name,email,cargo',
             'area:id,name',
-            'proyecto:id_proyecto,nombre_proyecto',
+            'proyecto:id_proyecto,nombre',
             'solicitudApertura' => function ($q) {
                 // Se asegura de seleccionar los campos necesarios, incluyendo las claves foráneas para las relaciones anidadas.
                 $q->select('id', 'codigo_solicitud', 'id_solicitante', 'id_revisor_adm', 'id_aprobador_gerente')
-                    ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name', 'gastosProyectados']);
+                    ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name', 'gastosProyectados', 'areasParticipantes']);
             }
         ]);
 
         // Lógica de visibilidad por rol
-        if ($user->hasAnyRole(['super_admin', 'gerente_general', 'jefe_administracion'])) {
-            // Acceso total para roles de administración, no se aplica ningún filtro de visibilidad.
-        } else {
-            // Para cualquier otro rol (jefe_area, colaborador, etc.)
-            // Un usuario ve los fondos si cumple CUALQUIERA de estas condiciones:
-            $proyectoIdsDelArea = $user->area->proyectos()->pluck('proyectos.id_proyecto');
+        if ($user->hasRole('jefe_area')) {
+            // Un jefe de área ahora puede ver fondos si cumple cualquiera de las siguientes condiciones:
+            $query->where(function ($q) use ($user) {
+                // 1. Es el responsable directo del fondo (para fondos Regulares/Excepcionales).
+                $q->where('id_responsable', $user->id);
 
-            $query->where(function ($q) use ($user, $proyectoIdsDelArea) {
-                $q->where('id_responsable', $user->id) // 1. Es el responsable directo del fondo.
-                    ->orWhere('id_area', $user->area_id) // 2. El fondo pertenece a su área (para fondos Regulares/Excepcionales).
-                    ->orWhereIn('id_proyecto', $proyectoIdsDelArea); // 3. El fondo es de un proyecto en el que su área participa.
+                // 2. O, el fondo es de tipo 'Proyecto' Y su área está listada como participante.
+                $q->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('tipo_fondo', 'Proyecto')
+                        ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
+                            // Se busca dentro de la relación para ver si el ID del área del usuario existe.
+                            $areaQuery->where('areas.id', $user->area_id);
+                        });
+                });
             });
+        } elseif ($user->hasAnyRole(['jefe_administracion', 'gerente_general', 'super_admin'])) {
+            // Los roles de alta gerencia y administración ven todos los fondos. No se aplica filtro.
+        } else {
+            // Por defecto, otros roles (como colaborador) no ven ningún fondo en esta vista.
+            $query->whereRaw('1 = 0'); // Una forma segura de no devolver resultados.
         }
 
         // Aplicar filtros adicionales de la request
@@ -136,35 +144,40 @@ class FondoEfectivoController extends Controller
      * Este método sigue siendo útil para que el usuario seleccione su fondo activo.
      */
     public function getFondosActivosParaUsuario()
-    {
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json(['message' => 'No autenticado.'], 401);
+    { {
+            $user = Auth::user();
+            $query = FondoEfectivo::query()->where('estado', 'Activo');
+
+            // Se aplica la misma lógica de visibilidad que en el método index.
+            $this->applyUserScope($query, $user);
+
+            $fondos = $query->orderBy('codigo_fondo', 'desc')->get(['id_fondo', 'codigo_fondo', 'monto_disponible']);
+
+            return response()->json($fondos);
         }
-
-        // --- LÓGICA CORREGIDA ---
-
-        // 1. Obtener los IDs de los proyectos en los que el área del usuario participa,
-        // usando la tabla pivote correcta: 'area_proyecto'.
-        $proyectoIdsDelArea = DB::table('area_proyecto')
-            ->where('id_area', $user->area_id)
-            ->pluck('id_proyecto');
-        // 2. Obtener los IDs de las solicitudes de apertura que corresponden a esos proyectos.
-        $solicitudesDeProyectosParticipantes = SolicitudFondo::where('tipo_fondo_solicitado', 'Proyecto')
-            ->whereIn('id_proyecto', $proyectoIdsDelArea)
-            ->pluck('id');
-        // 3. Construir la consulta principal para obtener los fondos.
-        $fondos = FondoEfectivo::where('estado', 'Activo')
-            ->where(function ($query) use ($user, $solicitudesDeProyectosParticipantes) {
-                // Condición A: El fondo pertenece directamente al área del usuario (para fondos Regulares y Excepcionales).
-                $query->where('id_area', $user->area_id)
-                    // Condición B: O, el fondo fue creado por una solicitud de proyecto en la que el área del usuario participa.
-                    ->orWhereIn('id_solicitud_apertura', $solicitudesDeProyectosParticipantes);
-            })
-            ->select('id_fondo', 'codigo_fondo', 'monto_disponible', 'monto_aprobado', 'tipo_fondo')
-            ->get();
-
-        return response()->json($fondos);
+    }
+    private function applyUserScope($query, $user)
+    {
+        if ($user->hasRole('jefe_area')) {
+            // Un jefe de área puede ver:
+            $query->where(function ($q) use ($user) {
+                // 1. Fondos donde es el responsable directo.
+                $q->where('id_responsable', $user->id);
+                // 2. O fondos de proyecto donde su área participa.
+                $q->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('tipo_fondo', 'Proyecto')
+                        ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
+                            $areaQuery->where('areas.id', $user->area_id);
+                        });
+                });
+            });
+        } elseif ($user->hasAnyRole(['jefe_administracion', 'gerente_general', 'super_admin'])) {
+            // Los roles de alta jerarquía ven todos los fondos. No se aplica ningún filtro de usuario.
+        } else {
+            // Por defecto, un colaborador solo ve los fondos de los que es responsable.
+            // Esta lógica también podría expandirse para incluir fondos de proyecto si fuera necesario.
+            $query->where('id_responsable', $user->id);
+        }
     }
 
     /**
@@ -221,6 +234,7 @@ class FondoEfectivoController extends Controller
                     'monto' => $reposicion->monto_repuesto,
                     'motivo' => $reposicion->comentario ?? 'Reposición de gastos contabilizados.',
                     'usuario' => $reposicion->usuarioAccion->name . ' ' . $reposicion->usuarioAccion->last_name,
+                    'ruta_comprobante' => $reposicion->ruta_comprobante,
                 ];
             });
 
@@ -417,7 +431,7 @@ class FondoEfectivoController extends Controller
     }
 
     /**
-     * NUEVO: Calcula el resumen de reposición de un fondo determinado. 
+     * Calcula el resumen de reposición de un fondo determinado. 
      * Esta es la forma más segura de determinar el importe a reponer.
      *
      * @param  \App\Models\FondoEfectivo  $fondo
@@ -426,30 +440,37 @@ class FondoEfectivoController extends Controller
     public function getReposicionSummary(FondoEfectivo $fondo)
     {
         $user = Auth::user();
-
-
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para ver el resumen de reposición.'], 403);
         }
 
-        $montoAReponer = $fondo->gastos()
+        // 1. Obtenemos la colección de gastos que están listos para ser repuestos.
+        $gastosContabilizados = $fondo->gastos()
             ->where('estado', 'Contabilizado')
-            ->sum('monto_total');
+            ->with('gastoProyectado:id_gasto_proyectado,descripcion') 
+            ->get(['id', 'glosa', 'monto_total','id_gasto_proyectado']); 
 
+        // 2. Calculamos el monto total a reponer a partir de la colección obtenida.
+        $montoAReponer = $gastosContabilizados->sum('monto_total');
+
+        // 3. Verificamos si existen gastos en estados intermedios.
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
+        $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
+
+        // 4. Devolvemos un único objeto JSON con toda la información.
         return response()->json([
-            'monto_asignado' => $fondo->monto_aprobado,
-            'saldo_disponible_actual' => $fondo->monto_disponible,
-            'monto_a_reponer' => $montoAReponer,
+            'monto_asignado' => (float) $fondo->monto_aprobado,
+            'saldo_disponible_actual' => (float) $fondo->monto_disponible,
+            'monto_a_reponer' => (float) $montoAReponer,
+            'gastos_a_reponer' => $gastosContabilizados, 
+            'tiene_gastos_pendientes' => $conteoGastosPendientes > 0,
+            'conteo_gastos_pendientes' => $conteoGastosPendientes,
+            'mensaje_estado' => $conteoGastosPendientes > 0
+                ? "Tiene {$conteoGastosPendientes} gasto(s) en proceso."
+                : ($montoAReponer > 0 ? 'Listo para reponer.' : 'Sin gastos por reponer.')
         ]);
     }
-    /**
-     * Elimina un fondo de efectivo.
-     * Esta acción debe ser muy restringida, idealmente solo para super_admin y si el fondo está "Cerrado".
-     * En un sistema real, la eliminación física de fondos activos es rara y se prefiere el cierre lógico.
-     *
-     * @param  int  $id_fondo
-     * @return \Illuminate\Http\JsonResponse
-     */
+
     public function reponer(Request $request, FondoEfectivo $fondo)
     {
         // 1. VALIDACIÓN DE PERMISOS
@@ -457,7 +478,14 @@ class FondoEfectivoController extends Controller
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para ejecutar la reposición de este fondo.'], 403);
         }
-
+        // Validación del archivo del comprobante
+        $request->validate([
+            'comprobante_reposicion' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB Max
+        ], [
+            'comprobante_reposicion.required' => 'Es obligatorio adjuntar el comprobante de reposición.',
+            'comprobante_reposicion.mimes' => 'El comprobante debe ser un archivo PDF o una imagen (JPG, PNG).',
+            'comprobante_reposicion.max' => 'El archivo del comprobante no debe superar los 10MB.',
+        ]);
         // 2. VALIDACIÓN DE ESTADO DEL FONDO: No se puede reponer un fondo que ya está cerrado.
         if ($fondo->estado !== 'Activo') {
             return response()->json(['message' => 'Solo se pueden reponer fondos que se encuentren en estado "Activo".'], 409);
@@ -471,31 +499,16 @@ class FondoEfectivoController extends Controller
                 'message' => "El fondo no puede ser repuesto. Tiene {$gastosPendientes} gasto(s) en proceso de aprobación o validación."
             ], 409);
         }
-        // 4. Se utiliza la misma lógica de getProyeccionesPendientes para verificar si hay saldos restantes.
-        $proyeccionesConSaldo = $this->getGastosParaDeclarar($fondo)->getData();
-        if (!empty($proyeccionesConSaldo)) {
-            return response()->json([
-                'message' => "El fondo no puede ser repuesto porque aún tiene " . count($proyeccionesConSaldo) . " concepto(s) proyectado(s) con saldo pendiente de liquidar."
-            ], 409);
-        }
 
-        // 5. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
+        // 4. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
         $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
         if ($montoAReponer <= 0) {
             return response()->json(['message' => 'No hay monto para reponer. Asegúrate de que los gastos hayan sido marcados como "Contabilizado".'], 409);
         }
-
-        // 6. VALIDACIÓN DE INTEGRIDAD DEL SALDO: Una salvaguarda final contra datos inconsistentes.
-        if ($fondo->monto_disponible < 0) {
-            Log::warning("Intento de reposición sobre fondo con saldo negativo.", ['fondo_id' => $fondo->id_fondo, 'saldo' => $fondo->monto_disponible]);
-            return response()->json([
-                'message' => "Error de Integridad de Datos: El saldo disponible del fondo es negativo. Por favor, contacte a soporte."
-            ], 500);
-        }
-        // 7. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
+        // 5. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
         return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request) {
             $saldoAnterior = $fondo->monto_disponible;
-            //tambien puede ir logica para generar acta de entrega pdf.
+            $pathComprobante = $request->file('comprobante_reposicion')->store('evidencias_reposicion', 'public');
             // RESTAURACIÓN DEL SALDO
             $fondo->increment('monto_disponible', $montoAReponer);
 
@@ -507,10 +520,11 @@ class FondoEfectivoController extends Controller
                 'saldo_anterior' => $saldoAnterior,
                 'saldo_nuevo' => $fondo->monto_disponible,
                 'comentario' => $request->input('comentario', 'Reposición automática del sistema.'),
+                'ruta_comprobante' => $pathComprobante,
                 'fecha_reposicion' => now(),
             ]);
 
-            // 8. ACTUALIZACIÓN DE GASTOS: Los gastos usados en esta reposición se marcan como "Repuesto".
+            // 6. Los gastos usados en esta reposición se marcan como "Repuesto".
             $fondo->gastos()->where('estado', 'Contabilizado')->update(['estado' => 'Repuesto']);
 
             Log::info("Reposición de Fondo: El usuario {$user->name} ha repuesto S/. {$montoAReponer} al fondo '{$fondo->codigo_fondo}'.");

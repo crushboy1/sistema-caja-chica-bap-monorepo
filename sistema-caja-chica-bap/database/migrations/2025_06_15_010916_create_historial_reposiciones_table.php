@@ -19,6 +19,7 @@ return new class extends Migration
             $table->decimal('saldo_anterior', 10, 2);
             $table->decimal('saldo_nuevo', 10, 2);
             $table->text('comentario')->nullable();
+            $table->string('ruta_comprobante')->nullable();
             $table->timestamp('fecha_reposicion');
             $table->timestamps();
         });

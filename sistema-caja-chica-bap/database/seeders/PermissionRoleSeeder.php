@@ -49,19 +49,18 @@ class PermissionRoleSeeder extends Seeder
                 'navigate.solicitudes',
                 'navigate.declaraciones',
                 'navigate.fondos',
-                'navigate.gestion.usuarios',
+                'navigate.administracion',
                 // Administración
-                'admin.users.manage',
                 'admin.catalogos.manage',
                 'admin.system.settings',
                 // Solicitudes
                 'solicitudes.view.all',
-                'solicitudes.create', // Puede crear sus propias solicitudes
+                'solicitudes.create', 
                 'solicitudes.approve.adm',
                 'solicitudes.submit.descargo',
                 // Declaraciones
                 'declaraciones.view.all',
-                'declaraciones.create', // Puede declarar sus propios gastos
+                'declaraciones.create',
                 'declaraciones.approve.adm',
                 'declaraciones.resubmit',
                 'declaraciones.reposition',

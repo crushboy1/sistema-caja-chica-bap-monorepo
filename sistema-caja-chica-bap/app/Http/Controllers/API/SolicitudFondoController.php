@@ -255,7 +255,7 @@ class SolicitudFondoController extends Controller
                     $revisorAdmId = $user->id;
                 }
                 // Si es jefe_area o colaborador, se mantiene el estado por defecto: 'Pendiente Aprobación ADM'
-            } // ← LLAVE FALTANTE AGREGADA AQUÍ
+            }
 
             $solicitud = SolicitudFondo::create([
                 'id_solicitante' => $user->id,
@@ -271,6 +271,11 @@ class SolicitudFondoController extends Controller
                 'id_revisor_adm' => $revisorAdmId,
                 'id_aprobador_gerente' => $aprobadorGerenteId,
             ]);
+
+            // Lógica para asociar las áreas participantes si es un fondo de proyecto.
+            if ($request->tipo_fondo_solicitado === 'Proyecto' && $request->has('areas_participantes')) {
+                $solicitud->areasParticipantes()->attach($request->input('areas_participantes'));
+            }
             // Guardar los detalles de gastos proyectados (solo si se proporcionan y son relevantes para el tipo de solicitud)
             // CAMBIO 4: Lógica para no guardar gastos proyectados si es tipo Cierre
             if ($request->has('gastos_proyectados') && in_array($request->tipo_solicitud, ['Apertura', 'Incremento', 'Decremento'])) {
@@ -325,6 +330,7 @@ class SolicitudFondoController extends Controller
                     'solicitante.role',
                     'area',
                     'gastosProyectados',
+                    'areasParticipantes',
                     'proyecto',
                     'solicitudOriginal:id,codigo_solicitud,id_solicitante,id_area,tipo_solicitud,motivo_detalle,monto_solicitado,prioridad,estado,motivo_observacion,motivo_descargo,motivo_rechazo_final,id_revisor_adm,id_aprobador_gerente,id_solicitud_original,created_at,updated_at',
                     'solicitudOriginal.fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado,estado,id_responsable,id_area,id_solicitud_apertura',
@@ -752,7 +758,7 @@ class SolicitudFondoController extends Controller
     public function editarSolicitudPendiente(Request $request, SolicitudFondo $solicitud)
     {
         $user = Auth::user();
-        $user->loadMissing('role'); // Asegurar que el rol del usuario esté cargado
+        $user->loadMissing('role');
         $userRoleName = $user->role->name;
 
         // 1. Autorización: El usuario debe ser el solicitante.
@@ -785,14 +791,15 @@ class SolicitudFondoController extends Controller
             'gastos_proyectados' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|array|min:1',
             'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required_if:tipo_solicitud,Apertura,Incremento,Decremento|numeric|min:0.01',
+            'areas_participantes' => 'nullable|array|required_if:tipo_fondo_solicitado,Proyecto',
+            'areas_participantes.*' => 'exists:areas,id',
         ]);
 
         DB::beginTransaction();
         try {
-            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto');
+            // 3.
+            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto', 'areasParticipantes');
             $clonedOriginal = clone $originalSolicitud;
-            // 3. Actualizar la solicitud principal con los datos validados.
-            $solicitud->update($validatedData);
             // 4. Sincronizar los gastos proyectados usando sync()
             $solicitud->update($validatedData);
             if (isset($validatedData['gastos_proyectados'])) {
@@ -801,6 +808,12 @@ class SolicitudFondoController extends Controller
                     $gastosParaSincronizar[$gasto['gasto_proyectado_id']] = ['monto_estimado' => $gasto['monto_estimado']];
                 }
                 $solicitud->gastosProyectados()->sync($gastosParaSincronizar);
+            }
+            if ($solicitud->tipo_fondo_solicitado === 'Proyecto' && isset($validatedData['areas_participantes'])) {
+                $solicitud->areasParticipantes()->sync($validatedData['areas_participantes']);
+            } else {
+                // Si la solicitud deja de ser de tipo "Proyecto", se eliminan las áreas asociadas.
+                $solicitud->areasParticipantes()->sync([]);
             }
             // 5. Registrar los cambios en el historial.
             // Llamamos a nuestra función de ayuda para mantener el código limpio.
@@ -819,7 +832,7 @@ class SolicitudFondoController extends Controller
             // Devolvemos una respuesta exitosa con la solicitud actualizada y sus relaciones.
             return response()->json([
                 'message' => 'Solicitud actualizada con éxito.',
-                'solicitud' => $solicitud->fresh()->load(['solicitante.area', 'area', 'gastosProyectados', 'historialEstados.usuarioAccion'])
+                'solicitud' => $solicitud->fresh()->load(['solicitante.area', 'area', 'gastosProyectados', 'areasParticipantes', 'historialEstados.usuarioAccion'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -845,21 +858,34 @@ class SolicitudFondoController extends Controller
             'gastos_proyectados' => 'present|array',
             'gastos_proyectados.*.gasto_proyectado_id' => 'required|exists:gastos_proyectados,id_gasto_proyectado',
             'gastos_proyectados.*.monto_estimado' => 'required|numeric|min:0.01',
+            'areas_participantes' => 'present|array',
+            'areas_participantes.*' => 'exists:areas,id',
         ]);
 
         DB::beginTransaction();
         try {
             // 3. Capturar el estado completo ANTES de la actualización.
             // Se cargan las relaciones para asegurar que el clon tenga toda la información para comparar.
-            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto');
+            $originalSolicitud = $solicitud->load('gastosProyectados', 'proyecto', 'areasParticipantes');
             $clonedOriginal = clone $originalSolicitud;
             $estadoAnterior = $clonedOriginal->estado; // Guardar el estado principal original.
 
             // 4. Actualizar la solicitud y sus detalles.
-            $solicitud->update(Arr::except($validatedData, ['comentario_descargo', 'gastos_proyectados']));
-            $solicitud->motivo_descargo = $request->comentario_descargo ?: 'Corrección de datos aplicada.';
+            $solicitud->fill([
+                'motivo_detalle' => $validatedData['motivo_detalle'],
+                'monto_solicitado' => $validatedData['monto_solicitado'],
+                'prioridad' => $validatedData['prioridad'],
+                'tipo_fondo_solicitado' => $validatedData['tipo_fondo_solicitado'],
+                'id_proyecto' => $validatedData['id_proyecto'],
+                'motivo_descargo' => $request->comentario_descargo ?: 'Corrección de datos aplicada.'
+            ]);
 
-            // Sincronizar gastos proyectados
+            // Sincronizar áreas y gastos
+            if ($solicitud->tipo_fondo_solicitado === 'Proyecto' && isset($validatedData['areas_participantes'])) {
+                $solicitud->areasParticipantes()->sync($validatedData['areas_participantes']);
+            } else {
+                $solicitud->areasParticipantes()->sync([]);
+            }
             if (isset($validatedData['gastos_proyectados'])) {
                 $gastosParaSincronizar = [];
                 foreach ($validatedData['gastos_proyectados'] as $gasto) {
@@ -899,6 +925,7 @@ class SolicitudFondoController extends Controller
                     'solicitante.area',
                     'area',
                     'gastosProyectados',
+                    'areasParticipantes',
                     'historialEstados.usuarioAccion'
                 ])
             ]);
@@ -988,9 +1015,9 @@ class SolicitudFondoController extends Controller
                 $oldValue = $originalAttributes[$field] ?? 'vacío';
                 $newValue = $newData[$field] ?? 'vacío';
                 if ($field === 'id_proyecto') {
-                    $oldProjectName = $originalSolicitud->proyecto->nombre_proyecto ?? 'Ninguno';
+                    $oldProjectName = $originalSolicitud->proyecto->nombre ?? 'Ninguno';
                     $newProject = Proyecto::find($newValue);
-                    $newProjectName = $newProject ? $newProject->nombre_proyecto : 'Ninguno';
+                    $newProjectName = $newProject ? $newProject->nombre : 'Ninguno';
                     if ($oldProjectName !== $newProjectName) {
                         $changes[] = "<strong>{$name}</strong> cambió de '{$oldProjectName}' a '{$newProjectName}'";
                     }

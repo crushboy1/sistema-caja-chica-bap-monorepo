@@ -1,7 +1,10 @@
 <template>
   <div class="p-6 bg-white rounded-lg shadow-md">
     <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Gestión y Seguimiento de Fondos de Caja Chica</h2>
-
+    <div class="text-center mb-6">
+      <p class="text-gray-600 mb-4">Supervisa el estado de todos los fondos de caja chica y realiza las acciones
+        necesarias.</p>
+    </div>
     <div v-if="cargandoUsuario" class="text-center text-gray-500 py-8">
       <div class="inline-flex items-center">
         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -158,7 +161,7 @@
                 <th class="py-3 px-2 text-center font-semibold w-32">Solicitud Apertura</th>
                 <th class="py-3 px-2 text-center font-semibold">Aprobador ADM</th>
                 <th class="py-3 px-2 text-center font-semibold">Aprobador GRTE</th>
-                <th class="py-3 px-2 text-center font-semibold w-4">Historial</th>
+                <th class="py-3 px-2 text-center font-semibold w-28">Acciones</th>
               </tr>
             </thead>
             <tbody class="text-gray-600 text-sm">
@@ -193,15 +196,29 @@
                   ${fondo.solicitud_apertura.aprobador_gerente.last_name}` : 'N/A' }}
                 </td>
                 <td class="py-4 px-4 text-center">
-                  <button @click="verHistorialFondo(fondo)"
-                    class="w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center text-blue-700 transition-colors duration-200"
-                    title="Ver Historial de Cambios">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      class="w-4 h-4">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
+                  <div class="flex items-center justify-center space-x-2">
+                    <button @click="verHistorialFondo(fondo)"
+                      class="w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center text-blue-700 transition-colors duration-200"
+                      title="Ver Historial de Cambios">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    <!-- Botón de Reponer, visible solo para roles autorizados -->
+                    <button
+                      v-if="usuarioActual && (usuarioActual.role.name === 'jefe_administracion' || usuarioActual.role.name === 'super_admin')"
+                      @click="abrirModalReposicion(fondo)"
+                      class="w-8 h-8 rounded-full bg-verde-bap-extralight hover:bg-verde-bap-light flex items-center justify-center text-verde-bap-dark transition-colors duration-200"
+                      title="Reponer Fondo">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                          d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"
+                          clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -259,6 +276,8 @@
     <!-- Modal para el historial de estados de la solicitud de apertura -->
     <HistorialFondoModal :mostrar="mostrarHistorialFondoModal" :fondo="fondoParaHistorial"
       @close="cerrarHistorialFondoModal" />
+    <ReposicionFondoModal :mostrar="mostrarReposicionModal" :fondo-prop="fondoParaReposicion"
+      @close="cerrarModalReposicion" @fondoRepuesto="handleFondoRepuesto" />
   </div>
 </template>
 
@@ -268,16 +287,16 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
 // Asumiendo que ya tienes este modal:
-import HistorialFondoModal from './HistorialFondoModal.vue'; 
-
+import HistorialFondoModal from './HistorialFondoModal.vue';
+import ReposicionFondoModal from './ReposicionFondoModal.vue';
 const formatearFechaSinHora = (fechaString) => {
   if (!fechaString) return '';
-  
+
   try {
     // Para fechas que vienen como "2025-07-04" sin hora
     const [año, mes, dia] = fechaString.split('-');
     const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
-    
+
     return fechaLocal.toLocaleDateString('es-PE', {
       day: '2-digit',
       month: '2-digit',
@@ -300,7 +319,9 @@ const areasDisponibles = ref([]);
 // Variables para el modal de historial
 const mostrarHistorialFondoModal = ref(false);
 const fondoParaHistorial = ref(null);
-
+//Estado para el modal de reposición
+const mostrarReposicionModal = ref(false);
+const fondoParaReposicion = ref(null);
 // --- Variables para Filtros y Búsqueda ---
 const filtro = ref({
   codigo_fondo: '',
@@ -499,19 +520,33 @@ const paginaSiguiente = () => {
 
 // --- Funciones para el Historial de Fondos ---
 const verHistorialFondo = (fondo) => {
-    // 3. La lógica se simplifica: solo se necesita pasar el objeto 'fondo' completo.
-    // La llamada a la API y la carga del historial ahora son responsabilidad del modal.
-    if (!fondo) return;
-    fondoParaHistorial.value = fondo;
-    mostrarHistorialFondoModal.value = true;
+  // 3. La lógica se simplifica: solo se necesita pasar el objeto 'fondo' completo.
+  // La llamada a la API y la carga del historial ahora son responsabilidad del modal.
+  if (!fondo) return;
+  fondoParaHistorial.value = fondo;
+  mostrarHistorialFondoModal.value = true;
 };
 
 const cerrarHistorialFondoModal = () => {
-    // 4. Se actualiza la función de cierre.
-    mostrarHistorialFondoModal.value = false;
-    fondoParaHistorial.value = null;
+  // 4. Se actualiza la función de cierre.
+  mostrarHistorialFondoModal.value = false;
+  fondoParaHistorial.value = null;
 };
 
+// Funciones para gestionar el modal de reposición
+const abrirModalReposicion = (fondo) => {
+  if (!fondo) return;
+  fondoParaReposicion.value = fondo;
+  mostrarReposicionModal.value = true;
+};
+const cerrarModalReposicion = () => {
+  mostrarReposicionModal.value = false;
+  fondoParaReposicion.value = null;
+};
+const handleFondoRepuesto = () => {
+  cerrarModalReposicion();
+  obtenerFondos();
+};
 
 // --- Watchers ---
 // Watchers para filtros de texto (debounced, con lógica de longitud mínima)

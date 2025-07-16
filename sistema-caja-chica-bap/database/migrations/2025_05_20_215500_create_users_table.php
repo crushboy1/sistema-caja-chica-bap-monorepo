@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('telefono', 12)->nullable(); // VARCHAR(12), 
             $table->string('password'); // Contraseña del usuario
             $table->rememberToken(); // Token para recordar la sesión del usuario
-            
+            $table->boolean('activo')->default(true);
 
             $table->foreignId('role_id')->nullable()->constrained('roles')->onDelete('set null'); 
             $table->foreignId('tipo_documento_identidad_id')->nullable()->constrained('tipo_documentos_identidad')->onDelete('set null');

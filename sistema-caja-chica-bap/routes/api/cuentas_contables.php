@@ -9,8 +9,7 @@ use App\Http\Controllers\API\CuentaContableController;
 |--------------------------------------------------------------------------
 */
 
-// Rutas protegidas por rol para el CRUD de Cuentas Contables.
-Route::middleware(['role:jefe_administracion|super_admin'])->group(function () {
-    // La ruta 'index' ya está definida en recursos.php, por lo que la excluimos aquí.
-    Route::apiResource('cuentas-contables', CuentaContableController::class)->except(['index']);
-});
+Route::apiResource('cuentas-contables', CuentaContableController::class)
+    ->parameters(['cuentas-contables' => 'cuentaContable'])
+    ->except(['index']);
+Route::post('cuentas-contables/{cuentaContable}/activate', [CuentaContableController::class, 'activate']);

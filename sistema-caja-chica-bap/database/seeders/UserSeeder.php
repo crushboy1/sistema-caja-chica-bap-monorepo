@@ -56,6 +56,7 @@ class UserSeeder extends Seeder
             'area_id' => $tiArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => null,
+            'activo' => true, 
         ]);
 
         // 2. Gerente General (Carlos Lopez)
@@ -72,6 +73,7 @@ class UserSeeder extends Seeder
             'area_id' => $gerenciaGeneralArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => null,
+            'activo' => true, 
         ]);
 
         // 3. Jefe de Administración (Maria Gomez)
@@ -88,6 +90,7 @@ class UserSeeder extends Seeder
             'area_id' => $administracionArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
+            'activo' => true, 
         ]);
 
         // 4. Jefe de Área de Gestión Social (Juan Perez)
@@ -104,10 +107,11 @@ class UserSeeder extends Seeder
             'area_id' => $gestionSocialArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $jefeAdmMaria->id,
+            'activo' => true, 
         ]);
 
-        // 5. NUEVO: Jefe de Área de Proyectos (Laura Torres)
-        $jefeProyectosLaura = User::create([
+        // 5. Jefe de Área de Proyectos (Laura Torres)
+        User::create([
             'numero_documento_identidad' => '20000001',
             'last_name' => 'Torres',
             'name' => 'Laura',
@@ -120,6 +124,7 @@ class UserSeeder extends Seeder
             'area_id' => $proyectosArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
+            'activo' => true, 
         ]);
 
         // 6. Colaborador (Ana Diaz) que reporta a Juan Perez
@@ -136,6 +141,7 @@ class UserSeeder extends Seeder
             'area_id' => $gestionSocialArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $jefeAreaJuan->id,
+            'activo' => true, 
         ]);
 
         // 7. Jefe de Área de Alianzas (Roberto Garcia)
@@ -152,6 +158,7 @@ class UserSeeder extends Seeder
             'area_id' => $alianzasArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
+            'activo' => true, 
         ]);
 
         $this->command->info('Usuarios de prueba creados exitosamente.');

@@ -178,17 +178,6 @@ class GastoController extends Controller
             }
         }
 
-        // 2.2. Validación de Saldo del Fondo
-        $montoTotalDeclarado = collect($gastosParaCrear)->sum('monto_total');
-        $gastosEnProceso = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable'])->sum('monto_total');
-        $saldoOperativo = $fondo->monto_disponible - $gastosEnProceso;
-
-        if ($saldoOperativo < $montoTotalDeclarado) {
-            throw ValidationException::withMessages([
-                'monto_total' => 'El monto total de los gastos (S/ ' . number_format($montoTotalDeclarado, 2) . ') excede el saldo operativo real del fondo (Aprox. S/. ' . number_format($saldoOperativo, 2) . ').'
-            ]);
-        }
-
         // 3. TRANSACCIÓN
         // Se envuelve toda la lógica en una transacción para garantizar la integridad de los datos.
         return DB::transaction(function () use ($request, $gastosParaCrear, $user, $fondo) {
@@ -307,11 +296,7 @@ class GastoController extends Controller
         return DB::transaction(function () use ($gasto, $user, $request) {
             $fondo = $gasto->fondoEfectivo;
             $montoFinal = $gasto->monto_total;
-
-            // Lógica de Saldo: EL DESCUENTO OCURRE AQUÍ.
-            if ($fondo->monto_disponible < $montoFinal) {
-                throw ValidationException::withMessages(['monto_total' => 'El fondo no tiene saldo suficiente (S/. ' . number_format($fondo->monto_disponible, 2) . ') para cubrir este gasto.']);
-            }
+           
             $fondo->decrement('monto_disponible', $montoFinal);
 
             $estadoAnterior = $gasto->estado;

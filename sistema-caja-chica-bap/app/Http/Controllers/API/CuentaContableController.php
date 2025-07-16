@@ -6,33 +6,42 @@ use App\Http\Controllers\Controller;
 use App\Models\CuentaContable;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class CuentaContableController extends Controller
 {
     /**
-     * Muestra una lista de todas las cuentas contables activas.
-     * Usado para poblar los selectores del frontend.
+     * Muestra una lista de cuentas contables.
+     * Acepta un parámetro 'scope' para diferenciar entre la vista de administración y los selectores.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $cuentas = \App\Models\CuentaContable::where('activo', true)
-            ->orderBy('codigo_cuenta')
-            ->get();
+        $query = CuentaContable::orderBy('codigo_cuenta');
 
-        // Estandarizamos la respuesta en un objeto JSON
+        if ($request->query('scope') === 'management') {
+            // Para el panel de administración, mostrar todas las cuentas
+        } else {
+            // Por defecto, para otros usos (ej. selectores), solo las activas
+            $query->where('activo', true);
+        }
+
+        $cuentas = $query->get();
+
         return response()->json(['cuentas_contables' => $cuentas]);
     }
 
     /**
      * Almacena una nueva cuenta contable en la base de datos.
-     * Protegido por middleware de rol en el archivo de rutas.
      */
     public function store(Request $request)
     {
+        if (!Auth::user()->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
         $validatedData = $request->validate([
             'codigo_cuenta' => 'required|string|max:255|unique:cuentas_contables,codigo_cuenta',
             'descripcion' => 'required|string|max:255',
-            'activo' => 'boolean',
+            'activo' => 'sometimes|boolean',
         ]);
 
         $cuenta = CuentaContable::create($validatedData);
@@ -45,30 +54,25 @@ class CuentaContableController extends Controller
 
     /**
      * Muestra una cuenta contable específica.
-     * Protegido por middleware de rol en el archivo de rutas.
      */
     public function show(CuentaContable $cuentaContable)
     {
-        // Usamos el Route-Model Binding de Laravel para encontrar la cuenta automáticamente.
-        return response()->json(['cuenta_contable' => $cuentaContable]);
+        return response()->json(['cuentas_contables' => $cuentaContable]);
     }
 
     /**
      * Actualiza una cuenta contable específica.
-     * Protegido por middleware de rol en el archivo de rutas.
+     * Se restringe la actualización para que el 'codigo_cuenta' sea inmutable.
      */
     public function update(Request $request, CuentaContable $cuentaContable)
     {
+        if (!Auth::user()->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
         $validatedData = $request->validate([
-            'codigo_cuenta' => [
-                'required',
-                'string',
-                'max:255',
-                // Asegura que el código sea único, ignorando la cuenta actual que se está editando.
-                Rule::unique('cuentas_contables')->ignore($cuentaContable->id),
-            ],
+            // El código de cuenta no debe ser editable una vez creado.
             'descripcion' => 'required|string|max:255',
-            'activo' => 'boolean',
+            'activo' => 'sometimes|boolean',
         ]);
 
         $cuentaContable->update($validatedData);
@@ -80,14 +84,40 @@ class CuentaContableController extends Controller
     }
 
     /**
-     * "Elimina" una cuenta contable (la desactiva).
-     * Protegido por middleware de rol en el archivo de rutas.
+     * "Elimina" una cuenta contable (la desactiva) tras validar que no esté en uso.
      */
     public function destroy(CuentaContable $cuentaContable)
     {
+        if (!Auth::user()->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
+        //  Verificar si la cuenta está siendo usada por algún Gasto Proyectado ACTIVO.
+        $gastosProyectadosActivos = $cuentaContable->gastosProyectados()->where('activo', true)->count();
+
+        if ($gastosProyectadosActivos > 0) {
+            return response()->json([
+                'message' => "No se puede desactivar: La cuenta está en uso por {$gastosProyectadosActivos} gasto(s) proyectado(s) activo(s)."
+            ], 409);
+        }
+
+        // Si no está en uso, se puede desactivar.
         $cuentaContable->activo = false;
         $cuentaContable->save();
 
         return response()->json(['message' => 'Cuenta contable desactivada exitosamente.']);
+    }
+
+    /**
+     * Activa una cuenta contable que fue desactivada.
+     */
+    public function activate(CuentaContable $cuentaContable)
+    {
+        $cuentaContable->activo = true;
+        $cuentaContable->save();
+
+        return response()->json([
+            'message' => 'Cuenta contable activada exitosamente.',
+            'cuenta_contable' => $cuentaContable
+        ]);
     }
 }

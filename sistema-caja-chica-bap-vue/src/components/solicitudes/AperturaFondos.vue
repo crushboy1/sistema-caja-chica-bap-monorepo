@@ -330,7 +330,7 @@ const manejarEnvio = async () => {
   if (data.tipo_fondo_solicitado === 'Proyecto' && data.id_proyecto) {
     const proyectoSeleccionado = props.proyectos.find(p => p.id_proyecto === data.id_proyecto);
     if (proyectoSeleccionado) {
-      proyectoHtml = `<p><strong>Proyecto:</strong> ${proyectoSeleccionado.nombre_proyecto}</p>`;
+      proyectoHtml = `<p><strong>Proyecto:</strong> ${proyectoSeleccionado.nombre}</p>`;
     }
   }
   // Agregar información de áreas participantes al resumen si es tipo Proyecto
@@ -565,7 +565,7 @@ onMounted(() => {
                 :required="formData.tipo_fondo_solicitado === 'Proyecto'">
                 <option :value="null" disabled>Seleccione un proyecto</option>
                 <option v-for="proyecto in proyectos" :key="proyecto.id_proyecto" :value="proyecto.id_proyecto">
-                  {{ proyecto.nombre_proyecto }}
+                  {{ proyecto.nombre }}
                 </option>
               </select>
             </div>

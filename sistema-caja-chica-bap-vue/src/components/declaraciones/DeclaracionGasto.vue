@@ -614,11 +614,9 @@ const obtenerFondosActivos = async () => {
 const obtenerCuentasContables = async () => {
     try {
         const response = await api.get('/v1/cuentas-contables');
-        // [CORRECCIÓN] Se verifica la estructura exacta de la respuesta de la API.
         if (response.data && Array.isArray(response.data.cuentas_contables)) {
             cuentasContables.value = response.data.cuentas_contables;
         } else if (Array.isArray(response.data)) {
-            // Fallback por si la API cambia y devuelve un array directo.
             cuentasContables.value = response.data;
         } else {
             console.error("La respuesta de la API de cuentas contables no tiene el formato esperado:", response.data);
@@ -667,15 +665,11 @@ const hayErroresValidacion = computed(() => {
         return true;
     }
     // `some` se detiene en cuanto encuentra el PRIMER gasto que no es válido.
-    return gastosADeclarar.value.some((gasto, index) => {
+    return gastosADeclarar.value.some((gasto) => {
         // 1. Validar campos obligatorios. Se incluye la glosa, que era un campo faltante.
         const camposIncompletos = !gasto.id_gasto_proyectado || !gasto.tipo_documento || !gasto.fecha_documento || !gasto.monto_total || !gasto.glosa || !gasto.evidencia;
-        // 2. Validar que el monto no exceda el saldo.
-        const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
-        const montoExcedido = gasto.monto_total > saldoMaximo;
 
-        // El gasto es inválido si los campos están incompletos O si el monto se excede.
-        return camposIncompletos || montoExcedido;
+        return camposIncompletos;
     });
 });
 // --- WATCHERS ---
@@ -906,7 +900,7 @@ const generarYDescargarDJ = async (gasto) => {
 // Confirmar envío del formulario
 const confirmarEnvio = () => {
     if (hayErroresValidacion.value) {
-        Swal.fire('Formulario Incompleto', 'Por favor, revise todos los gastos. Asegúrese de que todos los campos obligatorios (*) estén completos y que los montos no excedan los saldos disponibles.', 'warning');
+        Swal.fire('Formulario Incompleto', 'Por favor, revise todos los gastos. Asegúrese de que todos los campos obligatorios (*) estén completos.', 'warning');
         return;
     }
 
@@ -949,11 +943,6 @@ const enviarFormulario = async () => {
     for (const [index, gasto] of gastosADeclarar.value.entries()) {
         if (!gasto.id_gasto_proyectado || !gasto.glosa || !gasto.monto_total || !gasto.tipo_documento || !gasto.evidencia) {
             Swal.fire('Campos Incompletos', `Por favor, complete todos los campos requeridos (*) para el Gasto #${index + 1}.`, 'warning');
-            return;
-        }
-        const saldoMaximo = getSaldoMaximoParaGasto(gasto.id_gasto_proyectado, index);
-        if (parseFloat(gasto.monto_total) > saldoMaximo) {
-            Swal.fire('Monto Excedido', `El monto del Gasto #${index + 1} excede el saldo disponible para esa categoría.`, 'error');
             return;
         }
     }

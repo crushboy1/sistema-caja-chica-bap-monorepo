@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany; 
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Services\CodeGeneratorService;
@@ -15,7 +15,7 @@ class SolicitudFondo extends Model
 {
     use HasFactory;
     protected $table = 'solicitudes_fondos';
-    
+
     protected $fillable = [
         'codigo_solicitud',
         'id_solicitante',
@@ -58,7 +58,11 @@ class SolicitudFondo extends Model
     | Relaciones de Eloquent
     |--------------------------------------------------------------------------
     */
-
+    public function areasParticipantes(): BelongsToMany
+    {
+        // Se asume que la tabla pivote se llama 'area_proyecto' según tu migración.
+        return $this->belongsToMany(Area::class, 'area_proyecto', 'id_proyecto', 'id_area');
+    }
     /**
      * Relación: Una solicitud tiene muchos Gastos Proyectados a través de la tabla pivote.
      * Esta es la nueva relación que reemplaza a la antigua 'detallesGastosProyectados'.
@@ -66,8 +70,8 @@ class SolicitudFondo extends Model
     public function gastosProyectados(): BelongsToMany
     {
         return $this->belongsToMany(GastoProyectado::class, 'solicitud_gasto_proyectado', 'solicitud_fondo_id', 'gasto_proyectado_id')
-                    ->withPivot('monto_estimado') // Importante para poder acceder al monto estimado guardado en la tabla pivote.
-                    ->withTimestamps();
+            ->withPivot('monto_estimado') // Importante para poder acceder al monto estimado guardado en la tabla pivote.
+            ->withTimestamps();
     }
 
     /**
@@ -86,7 +90,7 @@ class SolicitudFondo extends Model
         // Se especifica la clave primaria de la tabla 'areas' para evitar ambigüedades.
         return $this->belongsTo(Area::class, 'id_area', 'id');
     }
-    
+
     /**
      * Relación opcional: Una solicitud puede estar asociada a un proyecto.
      */
@@ -94,7 +98,7 @@ class SolicitudFondo extends Model
     {
         return $this->belongsTo(Proyecto::class, 'id_proyecto', 'id_proyecto');
     }
-    
+
     /**
      * Relación: Una solicitud puede ser revisada por un Jefe de Administración (Usuario).
      */

@@ -17,10 +17,13 @@ class GastoProyectado extends Model
 
     protected $fillable = [
         'descripcion',
-        'activa',
+        'activo',
         'id_cuenta_contable',
     ];
-
+    public function getRouteKeyName()
+    {
+        return 'id_gasto_proyectado';
+    }
     /**
      * Relación: Un Gasto Proyectado pertenece a una Cuenta Contable.
      */

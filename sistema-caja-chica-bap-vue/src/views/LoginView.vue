@@ -27,18 +27,13 @@ const handleLogin = async () => {
   }
 
   try {
-    // ¡YA NO ES NECESARIO HACER api.get('/sanctum/csrf-cookie') AQUÍ!
-    // El interceptor en plugins/axios.js se encargará automáticamente.
-
     console.log('Intentando login...');
     const response = await api.post('/auth/login', {
       email: email.value,
       password: password.value,
     });
 
-    console.log('Login exitoso:', response.data);
-
-    // Redirigir al dashboard
+    // Redirigir al dashboard en caso de éxito
     router.push('/dashboard');
 
   } catch (error) {
@@ -46,32 +41,26 @@ const handleLogin = async () => {
 
     if (error.response) {
       const status = error.response.status;
+      const data = error.response.data;
 
       if (status === 422) {
-        // Errores de validación
-        const errors = error.response.data.errors;
-        if (errors) {
-          const validationErrors = [];
-          for (const key in errors) {
-            validationErrors.push(errors[key].join(', '));
-          }
-          errorMessage.value = validationErrors.join('\n');
+        if (data.errors && data.errors.email) {
+          errorMessage.value = data.errors.email[0];
         } else {
-          errorMessage.value = 'Datos de entrada inválidos.';
+          errorMessage.value = data.message || 'Los datos proporcionados no son válidos.';
         }
       } else if (status === 401 || status === 403) {
-        errorMessage.value = 'Credenciales inválidas. Por favor, verifica tu correo y contraseña.';
+        errorMessage.value = 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.';
       } else if (status === 419) {
-        errorMessage.value = 'Sesión expirada. Recargando página...';
-        // Recargar la página para obtener un nuevo token CSRF
+        errorMessage.value = 'Tu sesión ha expirado. Recargando la página...';
         setTimeout(() => window.location.reload(), 2000);
       } else {
-        errorMessage.value = error.response.data.message || 'Error del servidor. Inténtalo de nuevo.';
+        errorMessage.value = data.message || 'Ocurrió un error en el servidor. Por favor, inténtalo más tarde.';
       }
     } else if (error.request) {
-      errorMessage.value = 'No se pudo conectar con el servidor. Verifica que el backend esté funcionando.';
+      errorMessage.value = 'No se pudo conectar con el servidor. Verifica tu conexión y que el backend esté funcionando.';
     } else {
-      errorMessage.value = 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.';
+      errorMessage.value = 'Ocurrió un error inesperado al preparar la solicitud.';
     }
   } finally {
     isLoading.value = false;

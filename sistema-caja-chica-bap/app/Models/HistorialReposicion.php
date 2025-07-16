@@ -20,6 +20,7 @@ class HistorialReposicion extends Model
         'saldo_anterior',
         'saldo_nuevo',
         'comentario',
+        'ruta_comprobante',
         'fecha_reposicion',
     ];
 

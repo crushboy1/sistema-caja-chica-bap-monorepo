@@ -30,4 +30,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     require base_path('routes/api/proyectos.php');
     require base_path('routes/api/gastos_proyectados.php');
     require base_path('routes/api/areas.php');
+    require base_path('routes/api/users.php');
+    require base_path('routes/api/roles.php'); 
 });

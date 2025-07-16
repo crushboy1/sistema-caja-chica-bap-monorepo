@@ -13,5 +13,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/timeline', [FondoEfectivoController::class, 'getTimeline']);
         Route::get('/reposicion-summary', [FondoEfectivoController::class, 'getReposicionSummary']);
         Route::post('/reponer', [FondoEfectivoController::class, 'reponer']);
+        
     });
 });

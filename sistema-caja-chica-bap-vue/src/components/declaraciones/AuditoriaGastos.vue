@@ -4,7 +4,6 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
-import ReposicionFondoModal from './modals/ReposicionFondoModal.vue';
 
 // --- ESTADO DEL COMPONENTE ---
 const props = defineProps({
@@ -54,7 +53,6 @@ const registrosPorPagina = ref(10);
 // --- ESTADO DE MODALES ---
 const gastoSeleccionado = ref(null);
 const mostrarDetalleModal = ref(false);
-const mostrarReposicionModal = ref(false);
 
 // --- PROPIEDADES COMPUTADAS ---
 const hayFiltrosActivos = computed(() => {
@@ -63,7 +61,7 @@ const hayFiltrosActivos = computed(() => {
         filtros.value.fecha_inicio ||
         filtros.value.fecha_fin ||
         filtros.value.estado !== 'Todos' ||
-        filtros.value.area_id; // <-- AÑADIDO: Detecta si el filtro de área está activo
+        filtros.value.area_id; 
 });
 
 const totalPaginas = computed(() => {
@@ -275,10 +273,6 @@ const irAPagina = (pagina) => {
 const paginaAnterior = () => { if (paginaActual.value > 1) paginaActual.value--; };
 const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) paginaActual.value++; };
 
-const handleFondoRepuesto = () => {
-    console.log("Evento 'fondoRepuesto' recibido. Refrescando la lista de gastos...");
-    fetchGastos(); // Llama al método principal para recargar los datos de la tabla.
-};
 // --- WATCHERS Y LIFECYCLE ---
 watch([() => filtros.value.estado, () => filtros.value.area_id], () => {
     buscando.value = true;
@@ -394,15 +388,6 @@ onMounted(() => {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
                         Limpiar
-                    </button>
-                    <button @click="mostrarReposicionModal = true"
-                        class="bg-verde-bap hover:bg-verde-bap-hover text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6">
-                            </path>
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"></circle>
-                        </svg>
-                        Reposición de Fondos
                     </button>
                     <button @click="exportarGastos" :disabled="exportando"
                         class="bg-rojo-bap hover:bg-rojo-bap-dark text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
@@ -576,8 +561,6 @@ onMounted(() => {
         <GastoDetalleModal :mostrar="mostrarDetalleModal" :gasto="gastoSeleccionado"
             @close="mostrarDetalleModal = false" />
 
-        <ReposicionFondoModal :mostrar="mostrarReposicionModal" @close="mostrarReposicionModal = false"
-            @fondoRepuesto="handleFondoRepuesto" />
     </div>
 </template>
 

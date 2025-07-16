@@ -26,25 +26,25 @@ class SolicitudGastoProyectadoSeeder extends Seeder
             return;
         }
 
-        // Obtener algunos gastos proyectados del catálogo
-        $gastoMateriales = GastoProyectado::where('descripcion', 'MATERIALES DIVERSOS')->first();
-        $gastoAlimentacion = GastoProyectado::where('descripcion', 'ALIMENTACIÓN POR VIAJE')->first();
-        $gastoTransporte = GastoProyectado::where('descripcion', 'ALQUILER DE EQUIPO DE TRANSPORTE')->first();
+        // [MODIFICADO] Obtener gastos proyectados del catálogo usando las NUEVAS descripciones.
+        $gastoLibreria = GastoProyectado::where('descripcion', 'Gastos por artículos de librería')->first();
+        $gastoAlimentacion = GastoProyectado::where('descripcion', 'Gastos por Alimentación de personal')->first();
+        $gastoMovilidad = GastoProyectado::where('descripcion', 'Gastos por servicio de Movilidad')->first();
 
-        if (!$gastoMateriales || !$gastoAlimentacion || !$gastoTransporte) {
-            $this->command->error('No se encontraron los gastos proyectados de ejemplo. Asegúrate de que GastoProyectadoSeeder se haya ejecutado.');
+        if (!$gastoLibreria || !$gastoAlimentacion || !$gastoMovilidad) {
+            $this->command->error('No se encontraron los gastos proyectados de ejemplo. Asegúrate de que GastoProyectadoSeeder (actualizado) se haya ejecutado.');
             return;
         }
 
         // Asociar gastos proyectados a la solicitud APROBADA usando la relación
         $solicitudAprobada->gastosProyectados()->attach([
-            $gastoMateriales->id_gasto_proyectado => ['monto_estimado' => 500.00],
-            $gastoAlimentacion->id_gasto_proyectado => ['monto_estimado' => 1000.00],
+            $gastoLibreria->id_gasto_proyectado => ['monto_estimado' => 150.00],
+            $gastoAlimentacion->id_gasto_proyectado => ['monto_estimado' => 300.00],
         ]);
 
         // Asociar gastos proyectados a la solicitud PENDIENTE
         $solicitudPendiente->gastosProyectados()->attach([
-            $gastoTransporte->id_gasto_proyectado => ['monto_estimado' => 800.00],
+            $gastoMovilidad->id_gasto_proyectado => ['monto_estimado' => 200.00],
         ]);
 
         $this->command->info('Detalles de Gastos Proyectados (tabla pivote) creados exitosamente.');

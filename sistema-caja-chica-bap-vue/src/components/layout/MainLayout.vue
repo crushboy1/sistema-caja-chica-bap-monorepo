@@ -41,9 +41,9 @@ const canNavigateFondos = computed(() => {
   return hasPermission('navigate.fondos');
 });
 
-// Determina si se debe mostrar el enlace a "Gestión de Usuarios".
-const canNavigateGestionUsuarios = computed(() => {
-  return hasPermission('navigate.gestion.usuarios');
+// Determina si se debe mostrar el enlace a "Administración".
+const canNavigateAdministracion = computed(() => {
+  return hasPermission('navigate.administracion');
 });
 
 // --- Propiedades Computadas para Información del Usuario ---
@@ -134,10 +134,10 @@ onMounted(() => {
               style="--underline-color: var(--color-verde-bap);">
               Fondos
             </router-link>
-            <router-link v-if="canNavigateGestionUsuarios" to="/dashboard/gestion-usuarios"
+            <router-link v-if="canNavigateAdministracion" to="/dashboard/administracion"
               class="text-gray-600 font-medium nav-link-item whitespace-nowrap"
               style="--underline-color: var(--color-rojo-bap);">
-              Gestión de Usuarios
+              Administración
             </router-link>
           </div>
         </div>
@@ -196,10 +196,10 @@ onMounted(() => {
             active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
             Fondos
           </router-link>
-          <router-link v-if="canNavigateGestionUsuarios" to="/dashboard/gestion-usuarios"
+          <router-link v-if="canNavigateAdministracion" to="/dashboard/administracion"
             class="text-gray-600 font-medium py-2 px-3 rounded hover:bg-gray-100"
             active-class="bg-gray-100 text-gray-800" @click="closeMobileMenu">
-            Gestión de Usuarios
+            Administración
           </router-link>
         </div>
       </div>

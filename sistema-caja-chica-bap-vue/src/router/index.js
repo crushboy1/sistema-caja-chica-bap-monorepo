@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '@/views/LoginView.vue'
 import MainLayout from '@/components/layout/MainLayout.vue' // Importa el nuevo componente de layout
 import SolicitudFondoView from '@/views/SolicitudFondoView.vue'
-import GestiondeUsuariosView from '@/views/GestionUsuariosView.vue'
+import GestiondeUsuariosView from '@/views/AdministracionView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -48,9 +48,9 @@ const router = createRouter({
           component: () => import('@/components/fondos/GestionFondos.vue'), // Apuntando a tu componente
         },
         {
-          path: 'gestion-usuarios',
-          name: 'gestion-usuarios',
-          component: () => import('@/views/GestionUsuariosView.vue'),
+          path: 'administracion',
+          name: 'administracion',
+          component: () => import('@/views/AdministracionView.vue'),
         },
         // Puedes añadir más rutas hijas aquí para otros módulos
       ],

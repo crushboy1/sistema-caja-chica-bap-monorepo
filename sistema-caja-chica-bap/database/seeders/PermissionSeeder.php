@@ -25,7 +25,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'navigate.solicitudes', 'display_name' => 'Navegar a Solicitudes', 'description' => 'Permite ver el enlace al Módulo de Solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'navigate.declaraciones', 'display_name' => 'Navegar a Declaraciones', 'description' => 'Permite ver el enlace al Módulo de Declaraciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'navigate.fondos', 'display_name' => 'Navegar a Fondos', 'description' => 'Permite ver el enlace al Módulo de Fondos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'navigate.gestion.usuarios', 'display_name' => 'Navegar a Gestión de Usuarios', 'description' => 'Permite ver el enlace a la Gestión de Usuarios.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'navigate.administracion', 'display_name' => 'Navegar a Administracion', 'description' => 'Permite ver el enlace a Administracion.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
             // === PERMISOS DE ADMINISTRACIÓN DEL SISTEMA ===
             ['name' => 'admin.users.manage', 'display_name' => 'Gestionar Usuarios y Roles', 'description' => 'Permite crear, editar y eliminar usuarios y sus roles.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],

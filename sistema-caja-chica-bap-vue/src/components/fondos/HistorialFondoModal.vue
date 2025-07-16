@@ -80,6 +80,14 @@
                                             <p class="italic text-gray-600 mt-1 pl-2 border-l-2 border-gray-300">{{
                                                 item.motivo }}</p>
                                         </div>
+                                        <div v-if="item.tipo === 'Reposición' && item.ruta_comprobante" class="pt-2">
+                                            <a :href="getComprobanteUrl(item.ruta_comprobante)" target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center text-sm font-medium text-purple-600 hover:text-purple-800 bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded-full transition-colors">
+                                                <component :is="IconEnlace" />
+                                                Ver Comprobante
+                                            </a>
+                                        </div>
                                         <div v-if="item.codigo_solicitud" class="text-xs text-gray-400 pt-2 text-right">
                                             Ref. Solicitud: {{ item.codigo_solicitud }}
                                         </div>
@@ -104,9 +112,8 @@ const IconApertura = { template: `<svg fill="none" stroke="currentColor" viewBox
 const IconIncremento = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>` };
 const IconDecremento = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>` };
 const IconCierre = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>` };
-// NUEVO: Ícono para el evento de reposición
 const IconReposicion = { template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M5 5a7 7 0 0012.544 5.372M19 20v-5h-5m0 0l-3.544-3.544M14 15a7 7 0 00-12.544-5.372" /></svg>` };
-
+const IconEnlace = { template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>` };
 
 const props = defineProps({
     mostrar: Boolean,
@@ -153,7 +160,11 @@ const formatarFecha = (fechaString) => {
     return new Date(fechaString).toLocaleDateString('es-ES', opciones);
 };
 
-
+const getComprobanteUrl = (ruta) => {
+    if (!ruta) return '#';
+    // Asume que la carpeta 'public' está enlazada como 'storage' en el directorio público del proyecto.
+    return `/storage/${ruta}`;
+};
 // --- Funciones de ayuda para la UI ---
 const getTimelineClass = (tipo) => {
     switch (tipo) {
