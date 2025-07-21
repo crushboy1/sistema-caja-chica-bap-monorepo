@@ -25,6 +25,20 @@ class CuentaContableController extends Controller
             $query->where('activo', true);
         }
 
+        // Filtros personalizados
+        if ($request->filled('codigo_cuenta')) {
+            $query->where('codigo_cuenta', 'like', '%' . $request->codigo_cuenta . '%');
+        }
+        if ($request->filled('descripcion')) {
+            $query->where('descripcion', 'like', '%' . $request->descripcion . '%');
+        }
+        if ($request->has('activo') && $request->activo !== '') {
+            $query->where('activo', (bool)$request->activo);
+        } else if ($request->query('scope') !== 'management') {
+            // Por defecto, solo activos si no es management
+            $query->where('activo', true);
+        }
+
         $cuentas = $query->get();
 
         return response()->json(['cuentas_contables' => $cuentas]);

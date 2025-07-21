@@ -18,10 +18,17 @@ class ProyectoController extends Controller
     {
         $query = Proyecto::orderBy('nombre');
 
-        if ($request->query('scope') === 'management') {
-        
-        } else {
-
+        // Filtros personalizados
+        if ($request->filled('codigo')) {
+            $query->where('codigo', 'like', '%' . $request->codigo . '%');
+        }
+        if ($request->filled('nombre')) {
+            $query->where('nombre', 'like', '%' . $request->nombre . '%');
+        }
+        if ($request->has('activo') && $request->activo !== '') {
+            $query->where('activo', (bool)$request->activo);
+        } else if ($request->query('scope') !== 'management') {
+            // Por defecto, solo activos si no es management
             $query->where('activo', true);
         }
 

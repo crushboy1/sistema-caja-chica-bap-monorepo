@@ -36,6 +36,8 @@ const cuentaContableInfo = computed(() => {
     if (!props.gasto?.cuenta_contable) return 'N/A';
     return `${props.gasto.cuenta_contable.codigo_cuenta} - ${props.gasto.cuenta_contable.descripcion}`;
 });
+const montoTotal = computed(() => parseFloat(props.gasto?.monto_total || 0));
+const alertaMontoMayor = computed(() => montoTotal.value > parseFloat(props.gasto?.monto_proyectado_original || 0));
 // Detecta si la evidencia es una imagen
 const esImagen = computed(() => {
     if (!evidenciaUrl.value) return false;
@@ -97,28 +99,38 @@ const cerrarModal = () => {
                                 </svg>
                                 Información General
                             </h4>
-                            <p class="text-sm text-gray-600"><strong>Monto Total:</strong> S/. {{ gasto?.monto_total ?
-                                parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ gasto?.estado || 'N/A'
-                            }}</p>
-                            <p class="text-sm text-gray-600"><strong>Fecha de Registro:</strong> {{
-                                formatearFecha(gasto?.created_at) }}</p>
-                            <p class="text-sm text-gray-600"><strong>Glosa:</strong> {{ gasto?.glosa || 'No especificada' }}</p>
-                            <p v-if="gasto?.comentario" class="text-sm text-gray-600"><strong>Comentario
-                                    Adicional:</strong> {{ gasto.comentario }}</p>
-                            <p class="text-sm text-gray-600"><strong>Tipo de Documento:</strong> {{
-                                gasto?.tipo_documento || 'N/A' }}</p>
-                            <!-- Lógica para mostrar Serie y Correlativo -->
-                            <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
-                                <p v-if="!gasto?.es_declaracion_jurada" class="text-sm text-gray-600">
-                                    <strong>Comprobante:</strong> {{ gasto?.serie_documento || 'S/S' }} - {{
-                                        gasto?.correlativo_documento || 'S/C' }}
-                                </p>
-                            </template>
-                            <template v-else>
-                                <p class="text-sm text-gray-600"><strong>Serie:</strong> N/A</p>
-                                <p class="text-sm text-gray-600"><strong>Correlativo:</strong> N/A</p>
-                            </template>
+                            <!-- ALERTA si el monto total es mayor al proyectado -->
+                            <div v-if="alertaMontoMayor" class="mb-3 p-3 border-l-4 border-rojo-bap bg-red-50 text-rojo-bap flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-rojo-bap" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-1.414-1.414A9 9 0 105.636 18.364l1.414 1.414A9 9 0 1018.364 5.636z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01" />
+                                </svg>
+                                <span><strong>¡Atención!</strong> El <b>MONTO TOTAL</b> es mayor al <b>MONTO PROYECTADO</b>.</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <span class="text-gray-500 font-medium">MONTO TOTAL:</span>
+                                <span class="font-bold text-verde-bap">S/. {{ gasto?.monto_total ? parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</span>
+                                <span class="text-gray-500 font-medium">Estado Actual:</span>
+                                <span class="font-medium text-gray-800">{{ gasto?.estado || 'N/A' }}</span>
+                                <span class="text-gray-500 font-medium">Fecha de Registro:</span>
+                                <span class="font-medium text-gray-800">{{ formatearFecha(gasto?.created_at) }}</span>
+                                <span class="text-gray-500 font-medium">Glosa/descripción del gasto:</span>
+                                <span class="font-medium text-gray-800">{{ gasto?.glosa || 'No especificada' }}</span>
+                                <span v-if="gasto?.comentario" class="text-gray-500 font-medium">Comentario Adicional:</span>
+                                <span v-if="gasto?.comentario" class="font-medium text-gray-800">{{ gasto.comentario }}</span>
+                                <span class="text-gray-500 font-medium">Tipo de Documento:</span>
+                                <span class="font-medium text-gray-800">{{ gasto?.tipo_documento || 'N/A' }}</span>
+                                <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
+                                    <span v-if="!gasto?.es_declaracion_jurada" class="text-gray-500 font-medium">Comprobante:</span>
+                                    <span v-if="!gasto?.es_declaracion_jurada" class="font-medium text-gray-800">{{ gasto?.serie_documento || 'S/S' }} - {{ gasto?.correlativo_documento || 'S/C' }}</span>
+                                </template>
+                                <template v-else>
+                                    <span class="text-gray-500 font-medium">Serie:</span>
+                                    <span class="font-medium text-gray-800">N/A</span>
+                                    <span class="text-gray-500 font-medium">Correlativo:</span>
+                                    <span class="font-medium text-gray-800">N/A</span>
+                                </template>
+                            </div>
                         </div>
 
                         <!-- Tarjeta de Información del Registrador -->
@@ -149,16 +161,18 @@ const cerrarModal = () => {
                                 </svg>
                                 Detalles Contables y de Fondo
                             </h4>
-                            <p class="text-sm text-gray-600"><strong>Fondo Afectado:</strong> {{ fondoCodigo }}</p>
-                            <p class="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200/80"><strong>Proyección
-                                    Original:</strong> {{
-                                        proyeccionDescripcion }}</p>
-                            <p class="text-sm text-gray-600"><strong>Monto Proyectado:</strong> S/. {{
-                                proyeccionMontoOriginal }}</p>
-                            <p class="text-sm text-gray-600"><strong>Monto Original del Fondo:</strong> S/. {{
-                                fondoMontoOriginal }}</p>
-                            <p class="text-sm text-gray-600"><strong>Cuenta Contable:</strong> {{ cuentaContableInfo }}
-                            </p>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <span class="text-gray-500 font-medium">Fondo Afectado:</span>
+                                <span class="font-medium text-gray-800">{{ fondoCodigo }}</span>
+                                <span class="text-gray-500 font-medium">Proyección Original:</span>
+                                <span class="font-medium text-blue-800">{{ proyeccionDescripcion }}</span>
+                                <span class="text-gray-500 font-medium">MONTO PROYECTADO:</span>
+                                <span class="font-bold text-blue-800">S/. {{ proyeccionMontoOriginal }}</span>
+                                <span class="text-gray-500 font-medium">MONTO ORIGINAL DEL FONDO:</span>
+                                <span class="font-bold text-orange-700">S/. {{ fondoMontoOriginal }}</span>
+                                <span class="text-gray-500 font-medium">Cuenta Contable:</span>
+                                <span class="font-medium text-gray-800">{{ cuentaContableInfo }}</span>
+                            </div>
                         </div>
 
                         <!-- Tarjeta de Evidencia -->
@@ -289,3 +303,4 @@ const cerrarModal = () => {
     box-shadow: 0 0 10px rgba(118, 196, 157, 0.5);
 }
 </style>
+

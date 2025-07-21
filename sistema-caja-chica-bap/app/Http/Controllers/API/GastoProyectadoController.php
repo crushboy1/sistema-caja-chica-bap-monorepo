@@ -21,11 +21,24 @@ class GastoProyectadoController extends Controller
         $query = GastoProyectado::with('cuentaContable:id,codigo_cuenta,descripcion')
             ->orderBy('descripcion');
 
-        // Si el scope es para administración, mostrar todos (activos e inactivos)
-        if ($request->query('scope') === 'management') {
-            // No se aplica filtro de 'activo'
-        } else {
-            // Por defecto, para los selectores del frontend, solo mostrar los activos
+        // Filtros personalizados
+        if ($request->filled('descripcion')) {
+            $query->where('descripcion', 'like', '%' . $request->descripcion . '%');
+        }
+        if ($request->filled('id_cuenta_contable')) {
+            $query->where('id_cuenta_contable', $request->id_cuenta_contable);
+        }
+        if ($request->filled('cuenta_contable')) {
+            $search = $request->cuenta_contable;
+            $query->whereHas('cuentaContable', function ($q) use ($search) {
+                $q->where('codigo_cuenta', 'like', "%$search%")
+                  ->orWhere('descripcion', 'like', "%$search%") ;
+            });
+        }
+        if ($request->has('activo') && $request->activo !== '') {
+            $query->where('activo', (bool)$request->activo);
+        } else if ($request->query('scope') !== 'management') {
+            // Por defecto, solo activos si no es management
             $query->where('activo', true);
         }
 
