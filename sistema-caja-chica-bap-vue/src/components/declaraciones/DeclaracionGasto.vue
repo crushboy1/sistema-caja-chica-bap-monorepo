@@ -94,15 +94,15 @@
                                             Monto: <span class="font-semibold text-verde-bap-dark">{{
                                                 currencyFormatter.format(gasto.monto_total || 0) }}</span>
                                             <span v-if="gasto.tipo_documento" class="ml-2">• {{ gasto.tipo_documento
-                                            }}</span>
+                                                }}</span>
                                         </p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <!-- Indicador de completitud -->
                                     <div class="flex items-center">
-                                        <div v-if="gasto.id_gasto_proyectado && gasto.monto_total && gasto.tipo_documento && gasto.glosa && gasto.evidencia"
-                                            class="w-3 h-3 bg-green-500 rounded-full" title="Completo"></div>
+                                        <div v-if="isGastoCompleto(gasto)" class="w-3 h-3 bg-green-500 rounded-full"
+                                            title="Completo"></div>
                                         <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
                                     </div>
                                     <button type="button"
@@ -129,7 +129,7 @@
                                             {{ index + 1 }}
                                         </span>
                                         <h3 class="text-xl font-semibold text-gray-800">Detalle del Gasto #{{ index + 1
-                                        }}</h3>
+                                            }}</h3>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <button type="button" @click="minimizarGasto(index)"
@@ -271,10 +271,14 @@
                                                     <label :for="'serie_documento_' + index"
                                                         class="block text-sm font-medium text-gray-700 mb-2">
                                                         Serie del Documento
+                                                        <span
+                                                            v-if="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
+                                                            class="text-rojo-bap">*</span>
                                                     </label>
                                                     <input type="text" :id="'serie_documento_' + index"
                                                         v-model="gasto.serie_documento"
                                                         :disabled="gasto.tipo_documento === 'Declaración Jurada'"
+                                                        :required="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
                                                         class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                                                         placeholder="Ej: F001" />
                                                 </div>
@@ -284,10 +288,14 @@
                                                     <label :for="'correlativo_documento_' + index"
                                                         class="block text-sm font-medium text-gray-700 mb-2">
                                                         Correlativo del Documento
+                                                        <span
+                                                            v-if="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
+                                                            class="text-rojo-bap">*</span>
                                                     </label>
                                                     <input type="text" :id="'correlativo_documento_' + index"
                                                         v-model="gasto.correlativo_documento"
                                                         :disabled="gasto.tipo_documento === 'Declaración Jurada'"
+                                                        :required="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
                                                         class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                                                         placeholder="Ej: 0012345" />
                                                 </div>
@@ -380,22 +388,31 @@
                                                 Evidencia y Sustento
                                             </h4>
 
-                                            <div class="space-y-4">
-                                                <!-- Archivo de Evidencia -->
-                                                <div>
-                                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Archivo de Evidencia <span class="text-rojo-bap">*</span>
-                                                    </label>
+                                            <!-- Checkbox Declaración Jurada -->
+                                            <div class="flex items-center mb-4">
+                                                <input type="checkbox" :id="'dj_' + index"
+                                                    v-model="gasto.es_declaracion_jurada"
+                                                    @change="onDeclaracionJuradaChange(gasto)"
+                                                    class="h-4 w-4 text-verde-bap rounded border-gray-300 focus:ring-verde-bap transition-colors duration-200">
+                                                <label :for="'dj_' + index" class="ml-2 text-sm text-gray-900">
+                                                    Este gasto se sustenta con Declaración Jurada
+                                                </label>
+                                            </div>
 
-                                                    <!-- Área de subida de archivos -->
+                                            <!-- MODIFICACIÓN: El área para subir evidencia individual ahora es condicional -->
+                                            <!-- Solo se muestra si el gasto NO es una DJ -->
+                                            <transition name="slide-down">
+                                                <div v-if="!gasto.es_declaracion_jurada">
+                                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                        Archivo de Evidencia (Boleta/Factura) <span
+                                                            class="text-rojo-bap">*</span>
+                                                    </label>
                                                     <div
                                                         class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-verde-bap transition-colors duration-200">
                                                         <input type="file" :id="'evidencia_' + index"
                                                             @change="handleFileChange($event, index)" class="hidden"
-                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required>
-
+                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
                                                         <label :for="'evidencia_' + index" class="cursor-pointer block">
-                                                            <!-- Icono de archivo -->
                                                             <svg class="mx-auto h-12 w-12 text-gray-400 mb-4"
                                                                 stroke="currentColor" fill="none" viewBox="0 0 48 48">
                                                                 <path
@@ -403,20 +420,14 @@
                                                                     stroke-width="2" stroke-linecap="round"
                                                                     stroke-linejoin="round" />
                                                             </svg>
-
-                                                            <!-- Texto dinámico -->
                                                             <span class="text-lg font-medium text-gray-700">
                                                                 {{ gasto.evidencia ? gasto.evidencia.name : 'Haz clic para subir archivo' }}
                                                             </span>
-
-                                                            <!-- Información de formatos -->
                                                             <p class="text-sm text-gray-500 mt-2">
                                                                 📎 PDF, JPG, PNG, DOC (máx. 10MB)
                                                             </p>
                                                         </label>
                                                     </div>
-
-                                                    <!-- Mostrar archivo seleccionado -->
                                                     <transition name="fade" mode="out-in">
                                                         <div v-if="gasto.evidencia"
                                                             class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -447,59 +458,7 @@
                                                         </div>
                                                     </transition>
                                                 </div>
-
-                                                <!-- Checkbox Declaración Jurada -->
-                                                <div class="flex items-center">
-                                                    <input type="checkbox" :id="'dj_' + index"
-                                                        v-model="gasto.es_declaracion_jurada"
-                                                        @change="onDeclaracionJuradaChange(gasto)"
-                                                        class="h-4 w-4 text-verde-bap rounded border-gray-300 focus:ring-verde-bap transition-colors duration-200">
-                                                    <label :for="'dj_' + index" class="ml-2 text-sm text-gray-900">
-                                                        Este gasto se sustenta con Declaración Jurada
-                                                    </label>
-                                                </div>
-
-                                                <!-- Botón para generar Declaración Jurada (solo si está marcado) -->
-                                                <transition name="slide-down" mode="out-in">
-                                                    <div v-if="gasto.es_declaracion_jurada" class="mt-4">
-                                                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                            <div class="flex items-start">
-                                                                <svg class="w-5 h-5 text-blue-600 mr-2 mt-0.5"
-                                                                    fill="none" stroke="currentColor"
-                                                                    viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                                        stroke-width="2"
-                                                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                                                                    </path>
-                                                                </svg>
-                                                                <div class="flex-1">
-                                                                    <p class="text-sm text-blue-800 font-medium">
-                                                                        Declaración Jurada</p>
-                                                                    <p class="text-xs text-blue-600 mt-1">Genera la
-                                                                        plantilla de declaración jurada para este gasto.
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="mt-3 text-center">
-                                                                <button type="button"
-                                                                    @click="generarYDescargarDJ(gasto)"
-                                                                    :disabled="!gasto.monto_total || !gasto.glosa"
-                                                                    class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm flex items-center disabled:opacity-50 disabled:cursor-not-allowed mx-auto">
-                                                                    <svg class="w-4 h-4 mr-2" fill="none"
-                                                                        stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path stroke-linecap="round"
-                                                                            stroke-linejoin="round" stroke-width="2"
-                                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
-                                                                        </path>
-                                                                    </svg>
-                                                                    Generar Plantilla DJ
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </transition>
-                                            </div>
+                                            </transition>
                                         </div>
                                     </transition>
                                 </div>
@@ -533,6 +492,52 @@
                 </div>
             </div>
 
+            <transition name="fade-in-up">
+                <div v-if="mostrarSeccionDJConsolidada"
+                    class="p-6 border border-gray-200 rounded-xl bg-white shadow-soft">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-3">
+                        3. Declaración Jurada Consolidada
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                            <p class="text-sm text-blue-800 font-medium">Paso 1: Generar Plantilla</p>
+                            <p class="text-xs text-blue-600 mt-1 mb-3">
+                                Descarga el documento que agrupa todos los gastos marcados como DJ.
+                            </p>
+                            <button type="button" @click="generarDJConsolidada" :disabled="!puedeGenerarDJConsolidada"
+                                class="bg-verde-bap hover:bg-verde-bap-hover text-white font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm flex items-center disabled:opacity-50 disabled:cursor-not-allowed mx-auto">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                Generar Plantilla
+                            </button>
+                        </div>
+
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                            <p class="text-sm text-green-800 font-medium">Paso 2: Subir Documento Firmado</p>
+                            <p class="text-xs text-green-600 mt-1 mb-3">
+                                Adjunta aquí la plantilla después de haberla firmado.
+                            </p>
+                            <input type="file" id="dj_consolidada_input" @change="handleDJConsolidadaFileChange"
+                                class="hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <label for="dj_consolidada_input"
+                                class="cursor-pointer bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm flex items-center border border-gray-300 mx-auto justify-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                </svg>
+                                {{ djConsolidadaFile ? 'Cambiar Archivo' : 'Seleccionar Archivo' }}
+                            </label>
+                            <transition name="fade-in">
+                                <p v-if="djConsolidadaFile" class="text-xs text-green-700 mt-2 truncate">
+                                    Archivo: {{ djConsolidadaFile.name }}
+                                </p>
+                            </transition>
+                        </div>
+                    </div>
+                </div>
+            </transition>
             <!-- Botones de Acción Finales -->
             <div class="flex justify-end space-x-4 pt-6 mt-6 border-t border-gray-200">
                 <button type="button" @click="$emit('close')"
@@ -578,7 +583,7 @@ const cargandoGastosProyectados = ref(false);
 const enviando = ref(false);
 const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 const gastoActivoIndex = ref(0);
-
+const djConsolidadaFile = ref(null);
 
 // --- LÓGICA DE CARGA DE DATOS ---
 onMounted(async () => {
@@ -628,6 +633,18 @@ const obtenerCuentasContables = async () => {
     }
 };
 // --- COMPUTED PROPERTIES ---
+// MODIFICACIÓN: Propiedad computada para mostrar la sección de DJ consolidada
+const mostrarSeccionDJConsolidada = computed(() => {
+    return gastosADeclarar.value.some(gasto => gasto.es_declaracion_jurada || gasto.tipo_documento === 'Declaración Jurada');
+});
+const puedeGenerarDJConsolidada = computed(() => {
+    const gastosParaDJ = gastosADeclarar.value.filter(g => g.es_declaracion_jurada || g.tipo_documento === 'Declaración Jurada');
+    if (gastosParaDJ.length === 0) {
+        return false;
+    }
+    // El botón se habilita solo si TODOS los gastos para DJ tienen monto y glosa.
+    return gastosParaDJ.every(g => g.monto_total && g.glosa);
+});
 // Determina qué secciones son visibles para un gasto específico
 const seccionesVisibles = (gasto) => {
     return {
@@ -660,17 +677,15 @@ const fondoSeleccionado = computed(() => {
 });
 // Computed para verificar si hay errores de validación
 const hayErroresValidacion = computed(() => {
-    // Si no hay gastos, el formulario no es válido para enviar.
-    if (gastosADeclarar.value.length === 0) {
+    if (gastosADeclarar.value.length === 0) return true;
+    // Validar cada gasto individualmente
+    const algunGastoIncompleto = gastosADeclarar.value.some(gasto => !isGastoCompleto(gasto));
+    if (algunGastoIncompleto) return true;
+    // Validar globalmente si se necesita una DJ consolidada y no se ha subido
+    if (mostrarSeccionDJConsolidada.value && !djConsolidadaFile.value) {
         return true;
     }
-    // `some` se detiene en cuanto encuentra el PRIMER gasto que no es válido.
-    return gastosADeclarar.value.some((gasto) => {
-        // 1. Validar campos obligatorios. Se incluye la glosa, que era un campo faltante.
-        const camposIncompletos = !gasto.id_gasto_proyectado || !gasto.tipo_documento || !gasto.fecha_documento || !gasto.monto_total || !gasto.glosa || !gasto.evidencia;
-
-        return camposIncompletos;
-    });
+    return false;
 });
 // --- WATCHERS ---
 // Observa cambios en el fondo seleccionado para cargar sus proyecciones
@@ -869,60 +884,100 @@ const onDeclaracionJuradaChange = (gasto) => {
 const handleFileChange = (event, index) => {
     gastosADeclarar.value[index].evidencia = event.target.files[0];
 };
-// Generar y descargar declaración jurada
-const generarYDescargarDJ = async (gasto) => {
-    if (!gasto.monto_total || !gasto.glosa) {
-        Swal.fire('Datos incompletos', 'Por favor, ingrese el Monto Total y la Glosa del gasto antes de generar la DJ.', 'warning');
+// MODIFICACIÓN: Nuevo método para manejar el cambio de archivo de la DJ consolidada
+const handleDJConsolidadaFileChange = (event) => {
+    djConsolidadaFile.value = event.target.files[0];
+};
+// MODIFICACIÓN: Nuevo método para generar la DJ consolidada
+const generarDJConsolidada = async () => {
+    const gastosParaDJ = gastosADeclarar.value
+        .filter(g => g.es_declaracion_jurada)
+        .map(g => {
+            const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === g.id_gasto_proyectado);
+            return {
+                monto: g.monto_total,
+                glosa: g.glosa,
+                gasto_proyectado_descripcion: proyeccion ? proyeccion.descripcion : 'N/A'
+            };
+        });
+
+    if (gastosParaDJ.length === 0) {
+        Swal.fire('No hay gastos', 'No has marcado ningún gasto para sustentar con Declaración Jurada.', 'info');
         return;
     }
+
     try {
-        const response = await api.post('/v1/documentos/generar-dj', {
-            monto: gasto.monto_total,
-            glosa: gasto.glosa,
+        const response = await api.post('/v1/documentos/generar-dj-consolidada', {
+            gastos: gastosParaDJ
         }, {
             responseType: 'blob'
         });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        const filename = `DJ-${usuarioActual.value.name}-${Date.now()}.pdf`;
+        const filename = `DJ-Consolidada-${Date.now()}.pdf`;
         link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
     } catch (error) {
-        console.error("Error al generar la Declaración Jurada:", error);
-        Swal.fire('Error', 'No se pudo generar el documento PDF.', 'error');
+        console.error("Error al generar la DJ Consolidada:", error);
+        Swal.fire('Error', 'No se pudo generar el documento PDF consolidado.', 'error');
+    }
+};
+
+//validación
+const isGastoCompleto = (gasto) => {
+    const camposBaseCompletos = gasto.id_gasto_proyectado &&
+        gasto.tipo_documento &&
+        gasto.fecha_documento &&
+        gasto.monto_total &&
+        gasto.glosa;
+
+    if (!camposBaseCompletos) return false;
+
+    if (gasto.es_declaracion_jurada) {
+        // Si es una DJ, solo necesitamos los campos base. La evidencia se valida globalmente.
+        return true;
+    } else {
+        // Si no es DJ, necesita su propia evidencia y, si aplica, serie/correlativo.
+        const evidenciaCompleta = !!gasto.evidencia;
+        const comprobanteCompleto = (gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura')
+            ? (!!gasto.serie_documento && !!gasto.correlativo_documento)
+            : true;
+        return evidenciaCompleta && comprobanteCompleto;
     }
 };
 // --- MÉTODOS DE ENVÍO ---
 // Confirmar envío del formulario
 const confirmarEnvio = () => {
     if (hayErroresValidacion.value) {
-        Swal.fire('Formulario Incompleto', 'Por favor, revise todos los gastos. Asegúrese de que todos los campos obligatorios (*) estén completos.', 'warning');
+        let mensaje = 'Por favor, revise todos los gastos. Asegúrese de que todos los campos obligatorios (*) estén completos.';
+        if (mostrarSeccionDJConsolidada.value && !djConsolidadaFile.value) {
+            mensaje += '<br><br>Además, debe adjuntar el archivo de la <strong>Declaración Jurada Consolidada</strong>.';
+        }
+        Swal.fire('Formulario Incompleto', mensaje, 'warning');
         return;
     }
-
     const totalGeneral = gastosADeclarar.value.reduce((total, gasto) => total + (parseFloat(gasto.monto_total) || 0), 0);
     const resumenHtml = `
         <div class="text-left text-sm space-y-3 p-2 bg-gray-50 rounded-lg border">
             <h4 class="font-bold text-center text-base">Resumen de Gastos a Declarar</h4>
             ${gastosADeclarar.value.map((gasto, index) => {
-                const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
-                return `<div class="border-t pt-2 mt-2">
+        const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
+        return `<div class="border-t pt-2 mt-2">
                             <div class="flex justify-between"><strong>Gasto #${index + 1}:</strong><span class="text-right pl-2">${proyeccion?.descripcion || 'N/A'}</span></div>
                             <div class="flex justify-between"><strong>Documento:</strong><span>${gasto.tipo_documento}</span></div>
                             <div class="flex justify-between font-semibold"><strong>Monto:</strong><span>${currencyFormatter.format(gasto.monto_total || 0)}</span></div>
                         </div>`;
-            }).join('')}
+    }).join('')}
             <div class="border-t pt-2 mt-2 font-bold text-base">
                 <div class="flex justify-between"><strong>Total a Declarar:</strong><span>${currencyFormatter.format(totalGeneral)}</span></div>
             </div>
         </div>
         <p class="mt-4 text-gray-700">¿Desea registrar esta declaración con ${gastosADeclarar.value.length} gasto(s)?</p>
     `;
-
     Swal.fire({
         title: 'Revisar y Confirmar',
         html: resumenHtml,
@@ -940,26 +995,44 @@ const confirmarEnvio = () => {
 };
 // Enviar formulario al backend
 const enviarFormulario = async () => {
+    // 1. Doble verificación de completitud antes de enviar (buena práctica).
     for (const [index, gasto] of gastosADeclarar.value.entries()) {
-        if (!gasto.id_gasto_proyectado || !gasto.glosa || !gasto.monto_total || !gasto.tipo_documento || !gasto.evidencia) {
+        if (!isGastoCompleto(gasto)) {
             Swal.fire('Campos Incompletos', `Por favor, complete todos los campos requeridos (*) para el Gasto #${index + 1}.`, 'warning');
             return;
         }
     }
-
+    if (mostrarSeccionDJConsolidada.value && !djConsolidadaFile.value) {
+        Swal.fire('Falta Archivo', 'Debe adjuntar el archivo de la Declaración Jurada Consolidada.', 'warning');
+        return;
+    }
     enviando.value = true;
     const formDataPayload = new FormData();
     formDataPayload.append('id_fondo_efectivo', fondoSeleccionadoId.value);
 
+    // 2. Añadir el archivo de DJ consolidada si existe.
+    if (djConsolidadaFile.value) {
+        formDataPayload.append('dj_consolidada_file', djConsolidadaFile.value);
+    }
+    // 3. Construir el payload de gastos.
     gastosADeclarar.value.forEach((gasto, index) => {
         Object.keys(gasto).forEach(key => {
-            if (key !== 'id' && gasto[key] !== null && gasto[key] !== '') {
+            // No enviar el ID temporal del frontend.
+            if (key === 'id') return;
+            // Determinar si el gasto actual es una DJ.
+            const esDJ = gasto.es_declaracion_jurada || gasto.tipo_documento === 'Declaración Jurada';
+            // Si el gasto es una DJ, NO se envía su evidencia individual.
+            if (key === 'evidencia' && esDJ) {
+                return;
+            }
+            // Añadir el resto de los datos al FormData.
+            if (gasto[key] !== null && gasto[key] !== '') {
                 const value = typeof gasto[key] === 'boolean' ? (gasto[key] ? 1 : 0) : gasto[key];
                 formDataPayload.append(`gastos[${index}][${key}]`, value);
             }
         });
     });
-
+    // 4. Enviar la petición.
     try {
         const response = await api.post('/v1/gastos', formDataPayload, {
             headers: { 'Content-Type': 'multipart/form-data' }
@@ -1036,13 +1109,32 @@ const enviarFormulario = async () => {
 .fade-in-leave-to {
     opacity: 0;
 }
+
 .shake-enter-active {
-  animation: shake 0.5s;
+    animation: shake 0.5s;
 }
+
 @keyframes shake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
+
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
 }
 </style>

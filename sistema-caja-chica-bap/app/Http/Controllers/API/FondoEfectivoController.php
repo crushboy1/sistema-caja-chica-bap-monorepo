@@ -131,9 +131,6 @@ class FondoEfectivoController extends Controller
                 'monto_aprobado' => (float) $montoAprobado,
                 'saldo_restante' => (float) $saldoRestante,
             ];
-        })->filter(function ($proyeccion) {
-            // Filtrar para devolver solo aquellos que aún tienen saldo.
-            return $proyeccion['saldo_restante'] > 0.005; // Usar un umbral pequeño para evitar errores de punto flotante.
         });
 
         return response()->json($gastosParaDeclarar->values()->all());
@@ -171,12 +168,20 @@ class FondoEfectivoController extends Controller
                         });
                 });
             });
+        } elseif ($user->hasRole('colaborador')) {
+            // MODIFICACIÓN: Lógica específica para el Colaborador.
+            // Un colaborador ve los fondos cuyo responsable es su jefe de área.
+            if ($user->jefe_area_id) {
+                $query->where('id_responsable', $user->jefe_area_id);
+            } else {
+                // Si un colaborador no tiene un jefe asignado, no puede ver ningún fondo.
+                $query->whereRaw('1 = 0'); // No devuelve resultados.
+            }
         } elseif ($user->hasAnyRole(['jefe_administracion', 'gerente_general', 'super_admin'])) {
-            // Los roles de alta jerarquía ven todos los fondos. No se aplica ningún filtro de usuario.
+            // Los roles de alta jerarquía ven todos los fondos. No se aplica ningún filtro.
         } else {
-            // Por defecto, un colaborador solo ve los fondos de los que es responsable.
-            // Esta lógica también podría expandirse para incluir fondos de proyecto si fuera necesario.
-            $query->where('id_responsable', $user->id);
+            // Para cualquier otro rol no definido, no se muestran fondos por seguridad.
+            $query->whereRaw('1 = 0');
         }
     }
 

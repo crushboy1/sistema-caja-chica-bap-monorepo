@@ -1,6 +1,7 @@
 <script setup>
 import { defineProps, defineEmits, computed } from 'vue';
-
+import api from '@/plugins/axios';
+import Swal from 'sweetalert2';
 const props = defineProps({
     mostrar: {
         type: Boolean,
@@ -9,20 +10,49 @@ const props = defineProps({
     gasto: {
         type: Object,
         default: () => null
+    },
+    usuarioActual: { 
+        type: Object, 
+        default: () => null 
     }
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close','grupoValidado']);
 
 // Propiedad computada para obtener la URL de la evidencia de forma segura
-const evidenciaUrl = computed(() => {
+// --- PROPIEDADES COMPUTADAS PARA EVIDENCIAS ---
+const esAdmin = computed(() => {
+    const rolesAdmin = ['jefe_administracion', 'super_admin'];
+    return rolesAdmin.includes(props.usuarioActual?.role?.name);
+});
+const puedeValidarGrupoDJ = computed(() => {
+    return esAdmin.value && props.gasto?.estado === 'Pendiente de Validación DJ';
+});
+// Devuelve la URL de la evidencia INDIVIDUAL.
+const evidenciaIndividualUrl = computed(() => {
     if (!props.gasto?.ruta_evidencia) return null;
-    // Asume que tu storage está linkeado y es accesible desde /storage/
     return `/storage/${props.gasto.ruta_evidencia}`;
 });
-// Detecta si la evidencia es un PDF
+
+// Devuelve el objeto de la evidencia CONSOLIDADA.
+const djConsolidadaEvidencia = computed(() => {
+    if (!props.gasto?.dj_consolidada) return null;
+    return {
+        url: `/storage/${props.gasto.dj_consolidada.ruta_documento}`,
+        // Podríamos añadir más datos si fueran necesarios, como el uploader.
+    };
+});
+
+// Determina si la evidencia a mostrar (la individual) es una imagen.
+const esImagen = computed(() => {
+    if (!evidenciaIndividualUrl.value) return false;
+    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
+});
+
+// Determina si la evidencia a mostrar (la individual) es un PDF.
 const esPdf = computed(() => {
-    return evidenciaUrl.value && evidenciaUrl.value.toLowerCase().endsWith('.pdf');
+    return evidenciaIndividualUrl.value && evidenciaIndividualUrl.value.toLowerCase().endsWith('.pdf');
 });
 //Propiedades computadas para acceder a datos anidados de forma segura y limpia.
 const registradorNombre = computed(() => `${props.gasto?.registrador?.name || ''} ${props.gasto?.registrador?.last_name || ''}`.trim() || 'N/A');
@@ -38,13 +68,43 @@ const cuentaContableInfo = computed(() => {
 });
 const montoTotal = computed(() => parseFloat(props.gasto?.monto_total || 0));
 const alertaMontoMayor = computed(() => montoTotal.value > parseFloat(props.gasto?.monto_proyectado_original || 0));
-// Detecta si la evidencia es una imagen
-const esImagen = computed(() => {
-    if (!evidenciaUrl.value) return false;
-    const extension = evidenciaUrl.value.split('.').pop().toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
-});
 //METODOS
+
+const validarGrupoDJ = async () => {
+    if (!props.gasto?.id_dj_consolidada) {
+        Swal.fire('Error', 'No se pudo encontrar el ID de la DJ consolidada.', 'error');
+        return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+        title: '¿Validar Grupo de Gastos?',
+        text: "Esta acción validará todos los gastos asociados a esta Declaración Jurada. Pasarán a 'Pendiente de Validación Contable'.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, validar grupo',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (isConfirmed) {
+        try {
+            const response = await api.put(`/v1/djs-consolidadas/${props.gasto.id_dj_consolidada}/validar`);
+            Swal.fire('¡Grupo Validado!', response.data.message, 'success');
+            emit('grupoValidado'); // Notificar al padre para que refresque la lista
+            emit('close');
+        } catch (error) {
+            console.error("Error al validar el grupo de DJ:", error);
+            Swal.fire('Error', error.response?.data?.message || 'No se pudo validar el grupo.', 'error');
+        }
+    }
+};
+const formatCampo= (campo)=> {
+        // Asegurar que campo sea una cadena antes de usar replace
+        if (typeof campo === 'string') {
+            return campo.replace(/_/g, ' ');
+        }
+        // Si no es una cadena, convertirla a cadena primero
+        return String(campo).replace(/_/g, ' ');
+    };
 // Función para formatear la fecha con hora y minutos
 const formatearFecha = (fechaString) => {
     if (!fechaString) return 'N/A';
@@ -100,29 +160,40 @@ const cerrarModal = () => {
                                 Información General
                             </h4>
                             <!-- ALERTA si el monto total es mayor al proyectado -->
-                            <div v-if="alertaMontoMayor" class="mb-3 p-3 border-l-4 border-rojo-bap bg-red-50 text-rojo-bap flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-rojo-bap" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-1.414-1.414A9 9 0 105.636 18.364l1.414 1.414A9 9 0 1018.364 5.636z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01" />
+                            <div v-if="alertaMontoMayor"
+                                class="mb-3 p-3 border-l-4 border-rojo-bap bg-red-50 text-rojo-bap flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-rojo-bap" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M18.364 5.636l-1.414-1.414A9 9 0 105.636 18.364l1.414 1.414A9 9 0 1018.364 5.636z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01" />
                                 </svg>
-                                <span><strong>¡Atención!</strong> El <b>MONTO TOTAL</b> es mayor al <b>MONTO PROYECTADO</b>.</span>
+                                <span><strong>¡Atención!</strong> El <b>MONTO TOTAL</b> es mayor al <b>MONTO
+                                        PROYECTADO</b>.</span>
                             </div>
                             <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <span class="text-gray-500 font-medium">MONTO TOTAL:</span>
-                                <span class="font-bold text-verde-bap">S/. {{ gasto?.monto_total ? parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</span>
+                                <span class="font-bold text-verde-bap">S/. {{ gasto?.monto_total ?
+                                    parseFloat(gasto.monto_total).toFixed(2) : '0.00' }}</span>
                                 <span class="text-gray-500 font-medium">Estado Actual:</span>
                                 <span class="font-medium text-gray-800">{{ gasto?.estado || 'N/A' }}</span>
                                 <span class="text-gray-500 font-medium">Fecha de Registro:</span>
                                 <span class="font-medium text-gray-800">{{ formatearFecha(gasto?.created_at) }}</span>
                                 <span class="text-gray-500 font-medium">Glosa/descripción del gasto:</span>
                                 <span class="font-medium text-gray-800">{{ gasto?.glosa || 'No especificada' }}</span>
-                                <span v-if="gasto?.comentario" class="text-gray-500 font-medium">Comentario Adicional:</span>
-                                <span v-if="gasto?.comentario" class="font-medium text-gray-800">{{ gasto.comentario }}</span>
+                                <span v-if="gasto?.comentario" class="text-gray-500 font-medium">Comentario
+                                    Adicional:</span>
+                                <span v-if="gasto?.comentario" class="font-medium text-gray-800">{{ gasto.comentario
+                                    }}</span>
                                 <span class="text-gray-500 font-medium">Tipo de Documento:</span>
                                 <span class="font-medium text-gray-800">{{ gasto?.tipo_documento || 'N/A' }}</span>
                                 <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
-                                    <span v-if="!gasto?.es_declaracion_jurada" class="text-gray-500 font-medium">Comprobante:</span>
-                                    <span v-if="!gasto?.es_declaracion_jurada" class="font-medium text-gray-800">{{ gasto?.serie_documento || 'S/S' }} - {{ gasto?.correlativo_documento || 'S/C' }}</span>
+                                    <span v-if="!gasto?.es_declaracion_jurada"
+                                        class="text-gray-500 font-medium">Comprobante:</span>
+                                    <span v-if="!gasto?.es_declaracion_jurada" class="font-medium text-gray-800">{{
+                                        gasto?.serie_documento || 'S/S' }} - {{ gasto?.correlativo_documento || 'S/C'
+                                        }}</span>
                                 </template>
                                 <template v-else>
                                     <span class="text-gray-500 font-medium">Serie:</span>
@@ -186,32 +257,17 @@ const cerrarModal = () => {
                                 </svg>
                                 Evidencia Adjunta
                             </h4>
-                            <div v-if="evidenciaUrl" class="mt-2">
-                                <!-- Muestra la imagen si es una imagen -->
-                                <a v-if="esImagen" :href="evidenciaUrl" target="_blank" rel="noopener noreferrer"
-                                    class="block group">
-                                    <img :src="evidenciaUrl" alt="Evidencia del gasto"
-                                        class="w-full h-auto max-h-60 object-contain rounded-lg border border-gray-300 shadow-soft group-hover:shadow-glow-verde transition-all duration-300">
-                                </a>
-                                <!-- Muestra un ícono y enlace si es un PDF -->
-                                <div v-else-if="esPdf"
-                                    class="flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
-                                    <svg class="w-12 h-12 text-rojo-bap" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z">
-                                        </path>
-                                    </svg>
-                                    <a :href="evidenciaUrl" target="_blank" rel="noopener noreferrer"
-                                        class="mt-2 text-sm text-verde-bap-dark hover:underline font-semibold">
-                                        Ver PDF en nueva pestaña
-                                    </a>
-                                </div>
 
-                                <!-- Botón de descarga universal -->
+                            <!-- CASO 1: El gasto tiene una evidencia individual (imagen) -->
+                            <div v-if="esImagen" class="mt-2">
+                                <a :href="evidenciaIndividualUrl" target="_blank" rel="noopener noreferrer"
+                                    class="block group">
+                                    <img :src="evidenciaIndividualUrl" alt="Evidencia del gasto"
+                                        class="w-full h-auto max-h-60 object-contain rounded-lg border border-gray-300 shadow-soft group-hover:shadow-glow-verde transition-all">
+                                </a>
                                 <div class="flex justify-center mt-4">
-                                    <a :href="evidenciaUrl" download
-                                        class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                                    <a :href="evidenciaIndividualUrl" download
+                                        class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
@@ -221,14 +277,82 @@ const cerrarModal = () => {
                                     </a>
                                 </div>
                             </div>
+
+                            <!-- CASO 2: El gasto tiene evidencia en formato PDF (individual o consolidada) -->
+                            <div v-else-if="esPdf || djConsolidadaEvidencia" class="mt-2">
+                                <div
+                                    class="flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
+                                    <svg class="w-12 h-12 text-rojo-bap" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z">
+                                        </path>
+                                    </svg>
+                                    <a :href="esPdf ? evidenciaIndividualUrl : djConsolidadaEvidencia.url"
+                                        target="_blank" rel="noopener noreferrer"
+                                        class="mt-2 text-sm text-verde-bap-dark hover:underline font-semibold">
+                                        Ver PDF en nueva pestaña
+                                    </a>
+                                </div>
+                                <div class="flex justify-center mt-4">
+                                    <a :href="esPdf ? evidenciaIndividualUrl : djConsolidadaEvidencia.url" download
+                                        class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
+                                            </path>
+                                        </svg>
+                                        <span>Descargar {{ esPdf ? 'Evidencia' : 'DJ Consolidada' }}</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- CASO 3: No hay ninguna evidencia (salvaguarda) -->
                             <p v-else class="text-sm text-gray-500 mt-2">No se adjuntó evidencia para este gasto.</p>
                         </div>
+                        <div v-if="gasto?.historial_aprobaciones && gasto.historial_aprobaciones.length > 0" class="mt-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                            <h4 class="text-lg font-bold text-gray-700 mb-3 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-verde-bap-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Historial de Cambios
+                            </h4>
+                            <ul class="space-y-4">
+                                <li v-for="historial in gasto.historial_aprobaciones" :key="historial.id" class="text-xs border-t border-gray-200 pt-3">
+                                    <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                                        <span class="text-gray-500 font-medium">Acción:</span>
+                                        <span class="font-semibold text-gray-800">{{ historial.estado_nuevo }}</span>
+                                        <span class="text-gray-500 font-medium">Realizada por:</span>
+                                        <span class="font-medium text-gray-800">{{ historial.usuario_accion.name }} {{ historial.usuario_accion.last_name }}</span>
+                                        <span class="text-gray-500 font-medium">Fecha:</span>
+                                        <span class="font-medium text-gray-800">{{ formatearFecha(historial.fecha_cambio) }}</span>
+                                    </div>
+                                    <p v-if="historial.comentario" class="mt-2"><strong class="text-gray-600">Comentario:</strong> <em class="text-gray-700">"{{ historial.comentario }}"</em></p>
+                                    
+                                    <div v-if="historial.cambios_realizados" class="mt-2 p-2 bg-gray-100 rounded-md border border-gray-200">
+                                        <p class="font-semibold text-gray-800 text-xs mb-1">Detalle de la corrección:</p>
+                                        <ul class="list-disc list-inside text-gray-700 space-y-1">
+                                            <li v-for="(cambio, campo) in JSON.parse(historial.cambios_realizados)" :key="campo">
+                                                <strong class="capitalize">{{ formatCampo(campo) }}:</strong> cambió de '{{ cambio.anterior }}' a '{{ cambio.nuevo }}'
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-
+                    
                     <!-- Pie de página del modal con botón de cierre estilizado -->
                     <div
                         class="bg-gradient-to-r from-gray-50 to-verde-bap-extralight/30 px-6 py-4 border-t border-gray-200/50">
                         <div class="flex justify-end">
+                            <button v-if="puedeValidarGrupoDJ" @click="validarGrupoDJ"
+                                class="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl ...">
+                                <span class="relative z-10 flex items-center space-x-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <span>Validar Grupo de DJ</span>
+                                </span>
+                            </button>
                             <button @click="cerrarModal"
                                 class="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-verde-bap to-verde-bap-dark text-white font-semibold rounded-xl shadow-soft hover:shadow-glow-verde transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-verde-bap/30">
                                 <span class="relative z-10 flex items-center space-x-2">
@@ -243,11 +367,15 @@ const cerrarModal = () => {
                                     class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700">
                                 </div>
                             </button>
+                            
                         </div>
+                        
                     </div>
+                    
                 </div>
             </Transition>
         </div>
+        
     </Transition>
 </template>
 
@@ -303,4 +431,3 @@ const cerrarModal = () => {
     box-shadow: 0 0 10px rgba(118, 196, 157, 0.5);
 }
 </style>
-
