@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -21,13 +22,13 @@ class Gasto extends Model
 
     /**
      * Los atributos que son asignables en masa.
+     * Se han añadido los nuevos campos para el flujo de observación.
      *
      * @var array<int, string>
      */
     protected $fillable = [
         'codigo_gasto',
         'id_fondo_efectivo',
-        'detalle_gasto_proyectado_id', 
         'id_registrador',
         'id_jefe_aprobador',
         'id_validador_adm',
@@ -38,15 +39,18 @@ class Gasto extends Model
         'correlativo_documento',
         'monto_total',
         'monto_proyectado_original',
-        'moneda',                 
+        'moneda',
         'id_gasto_proyectado',
-        'glosa',                  
+        'glosa',
         'comentario',
         'ruta_evidencia',
         'es_declaracion_jurada',
         'estado',
         'motivo_observacion_adm',
         'motivo_rechazo',
+        'id_dj_consolidada',      
+        'id_observador_adm',      
+        'comentario_subsanacion', 
     ];
 
     /**
@@ -99,7 +103,7 @@ class Gasto extends Model
     | RELACIONES DE ELOQUENT
     |--------------------------------------------------------------------------
     */
-    
+
     /**
      * Un gasto pertenece a un tipo de Gasto Proyectado del catálogo.
      */
@@ -107,6 +111,7 @@ class Gasto extends Model
     {
         return $this->belongsTo(GastoProyectado::class, 'id_gasto_proyectado', 'id_gasto_proyectado');
     }
+
     public function fondoEfectivo(): BelongsTo
     {
         // Se asegura que los nombres de las claves sean explícitos para evitar ambigüedades.
@@ -133,10 +138,30 @@ class Gasto extends Model
         return $this->belongsTo(CuentaContable::class, 'id_cuenta_contable');
     }
 
-    public function historial()
+    public function historialAprobaciones(): HasMany
+{
+    // Ahora busca la clase correcta "HistorialAprobacionGasto"
+    return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
+}
+
+    // --- NUEVAS RELACIONES ---
+
+    /**
+     * El administrador que observó el gasto.
+     */
+    public function observadorAdm(): BelongsTo
     {
-        return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
+        return $this->belongsTo(User::class, 'id_observador_adm');
     }
+
+    /**
+     * La Declaración Jurada consolidada a la que puede pertenecer este gasto.
+     */
+    public function djConsolidada(): BelongsTo
+    {
+        return $this->belongsTo(DjConsolidada::class, 'id_dj_consolidada', 'id_dj_consolidada');
+    }
+
 
     /*
     |--------------------------------------------------------------------------

@@ -22,10 +22,7 @@ const hasPermission = (permissionName) => {
 
 // --- PROPIEDADES COMPUTADAS ---
 
-// [NUEVO] Propiedades computadas para controlar la visibilidad de los botones de acción.
-const canFinalizeGasto = computed(() => hasPermission('declaraciones.approve.adm'));
-const canObserveGastoAdm = computed(() => hasPermission('declaraciones.approve.adm'));
-const canRejectGastoAdm = computed(() => hasPermission('declaraciones.approve.adm'));
+
 
 const gastos = ref([]);
 const areas = ref([]);
@@ -61,7 +58,7 @@ const hayFiltrosActivos = computed(() => {
         filtros.value.fecha_inicio ||
         filtros.value.fecha_fin ||
         filtros.value.estado !== 'Todos' ||
-        filtros.value.area_id; 
+        filtros.value.area_id;
 });
 
 const totalPaginas = computed(() => {
@@ -88,6 +85,25 @@ const paginasVisibles = computed(() => {
 
 
 // --- MÉTODOS ---
+const canFinalizeGasto = (gasto) => {
+    const tienePermiso = hasPermission('declaraciones.approve.adm');
+    const estadoCorrecto = gasto.estado === 'Pendiente de Validación Contable';
+    return tienePermiso && estadoCorrecto;
+};
+
+const canObserveGastoAdm = (gasto) => {
+    const tienePermiso = hasPermission('declaraciones.approve.adm');
+    const estadosValidos = ['Pendiente de Validación Contable', 'Pendiente de Validación DJ'];
+    const estadoCorrecto = estadosValidos.includes(gasto.estado);
+
+    return tienePermiso && estadoCorrecto;
+};
+
+const canRejectGastoAdm = (gasto) => {
+    const tienePermiso = hasPermission('declaraciones.approve.adm');
+    const estadoCorrecto = gasto.estado === 'Pendiente de Validación Contable';
+    return tienePermiso && estadoCorrecto;
+};
 const fetchGastos = async () => {
     try {
         const params = { ...filtros.value };
@@ -148,7 +164,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 icon: 'success',
                 confirmButtonText: 'Sí, Contabilizar',
                 endpoint: `${endpointPrefix}/gastos/${gasto.id}/finalize`,
-                method: 'post',
+                method: 'put',
                 needsComment: false,
             };
             break;
@@ -159,7 +175,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 icon: 'warning',
                 confirmButtonText: 'Sí, Observar',
                 endpoint: `${endpointPrefix}/gastos/${gasto.id}/observe`,
-                method: 'post',
+                method: 'put',
                 needsComment: true,
                 commentLabel: 'Motivo de la observación:'
             };
@@ -171,7 +187,7 @@ const gestionarAccionAdm = async (gasto, accion) => {
                 icon: 'error',
                 confirmButtonText: 'Sí, Rechazar',
                 endpoint: `${endpointPrefix}/gastos/${gasto.id}/reject-final`,
-                method: 'post',
+                method: 'put',
                 needsComment: true,
                 commentLabel: 'Motivo del rechazo:'
             };
@@ -473,10 +489,9 @@ onMounted(() => {
                             </td>
                             <td class="py-4 px-4 text-gray-500">{{ new
                                 Date(gasto.created_at).toLocaleDateString('es-PE') }}</td>
-                            <td class="py-4 px-4">
-                                <!-- [CORRECCIÓN] Se utiliza un grid para agrupar los botones de 2 en 2 -->
-                                <div class="grid grid-cols-2 gap-2 w-20 mx-auto">
-                                    <!-- Botón Ver Detalles (siempre visible) -->
+                            <td class="py-4 px-4 text-center">
+                                <div class="grid grid-cols-2 gap-2 w-20 mx-auto ">
+
                                     <button @click="verDetalles(gasto)"
                                         class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-all duration-300 hover:scale-110"
                                         title="Ver Detalles y Evidencia">
@@ -488,9 +503,35 @@ onMounted(() => {
                                         </svg>
                                     </button>
 
-                                    <!-- Botones de acción condicionales -->
-                                    <template v-if="gasto.estado === 'Pendiente de Validación Contable'">
-                                        <button v-if="canFinalizeGasto"
+                                    <button v-if="canObserveGastoAdm(gasto)"
+                                        @click="gestionarAccionAdm(gasto, 'observe')" title="Observar Gasto"
+                                        class="w-8 h-8 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                    </button>
+
+                                    <template v-if="gasto.estado === 'Pendiente de Validación DJ'">
+                                        <button disabled
+                                            class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center cursor-not-allowed"
+                                            title="Acción deshabilitada. Valide el grupo de DJ en los detalles.">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </button>
+                                        <button disabled
+                                            class="w-8 h-8 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center cursor-not-allowed"
+                                            title="Acción deshabilitada. Valide el grupo de DJ en los detalles.">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </template>
+                                    <template v-else>
+                                        <button v-if="canFinalizeGasto(gasto)"
                                             @click="gestionarAccionAdm(gasto, 'finalizeAsAccounted')"
                                             title="Contabilizar Gasto"
                                             class="w-8 h-8 rounded-full bg-verde-bap-light hover:bg-verde-bap text-verde-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
@@ -499,15 +540,7 @@ onMounted(() => {
                                                     d="M5 13l4 4L19 7" />
                                             </svg>
                                         </button>
-                                        <button v-if="canObserveGastoAdm" @click="gestionarAccionAdm(gasto, 'observe')"
-                                            title="Observar Gasto"
-                                            class="w-8 h-8 rounded-full bg-estado-advertencia-bg hover:bg-orange-500 text-estado-advertencia-text hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                            </svg>
-                                        </button>
-                                        <button v-if="canRejectGastoAdm"
+                                        <button v-if="canRejectGastoAdm(gasto)"
                                             @click="gestionarAccionAdm(gasto, 'rejectFinal')" title="Rechazar Gasto"
                                             class="w-8 h-8 rounded-full bg-rojo-bap-light hover:bg-rojo-bap text-rojo-bap-dark hover:text-white flex items-center justify-center transition-all duration-300 hover:scale-110">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,7 +551,6 @@ onMounted(() => {
                                     </template>
                                 </div>
                             </td>
-
                         </tr>
                     </tbody>
                 </table>
@@ -558,7 +590,7 @@ onMounted(() => {
             </div>
         </div>
 
-        <GastoDetalleModal :mostrar="mostrarDetalleModal" :gasto="gastoSeleccionado"
+        <GastoDetalleModal :mostrar="mostrarDetalleModal" :gasto="gastoSeleccionado" :usuarioActual="usuarioActual"
             @close="mostrarDetalleModal = false" />
 
     </div>

@@ -29,6 +29,7 @@ class HistorialAprobacionGasto extends Model
         'id_usuario_accion',
         'comentario',
         'fecha_cambio',
+        'cambios_realizados',
     ];
 
     /**
@@ -37,6 +38,7 @@ class HistorialAprobacionGasto extends Model
      * @var array
      */
     protected $casts = [
+        'cambios_realizados' => 'array',
         'fecha_cambio' => 'datetime',
     ];
     
