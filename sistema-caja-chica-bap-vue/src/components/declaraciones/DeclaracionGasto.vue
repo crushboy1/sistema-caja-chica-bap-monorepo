@@ -101,19 +101,12 @@
                                 <div class="flex items-center space-x-2">
                                     <!-- Indicador de completitud -->
                                     <div class="flex items-center">
-                                        <div v-if="isGastoCompleto(gasto)" class="w-3 h-3 bg-green-500 rounded-full"
-                                            title="Completo"></div>
-                                        <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
-                                    </div>
-                                    <button type="button"
-                                        class="text-verde-bap hover:text-verde-bap-dark transition-colors duration-200 text-sm font-medium px-3 py-1 rounded-md hover:bg-verde-bap hover:bg-opacity-10">
-                                        Editar
-                                    </button>
-                                    <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none"
-                                        stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 9l-7 7-7-7"></path>
-                                    </svg>
+                                    <div v-if="isGastoCompleto(gasto)" class="w-3 h-3 bg-green-500 rounded-full" title="Completo"></div>
+                                    <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
+                                </div>
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
                                 </div>
                             </div>
                         </transition>
@@ -890,32 +883,31 @@ const handleDJConsolidadaFileChange = (event) => {
 };
 // MODIFICACIÓN: Nuevo método para generar la DJ consolidada
 const generarDJConsolidada = async () => {
-    const gastosParaDJ = gastosADeclarar.value
-        .filter(g => g.es_declaracion_jurada)
-        .map(g => {
-            const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === g.id_gasto_proyectado);
-            return {
-                monto: g.monto_total,
-                glosa: g.glosa,
-                gasto_proyectado_descripcion: proyeccion ? proyeccion.descripcion : 'N/A'
-            };
-        });
+    // 1. Filtrar solo los gastos que son DJ y están completos.
+    const gastosValidosParaDJ = gastosADeclarar.value
+        .filter(g => g.es_declaracion_jurada && isGastoCompleto(g));
 
-    if (gastosParaDJ.length === 0) {
-        Swal.fire('No hay gastos', 'No has marcado ningún gasto para sustentar con Declaración Jurada.', 'info');
+    if (gastosValidosParaDJ.length === 0) {
+        Swal.fire('No hay gastos de DJ completos', 'Asegúrese de que todos los gastos marcados como DJ estén completos antes de generar la plantilla.', 'info');
         return;
     }
+    
+    // 2. Extraer solo los IDs de esos gastos.
+    const gastosIds = gastosValidosParaDJ.map(g => g.id); // Asumimos que g.id es el identificador único.
 
     try {
+        // 3. Enviar solo los IDs al nuevo endpoint seguro.
         const response = await api.post('/v1/documentos/generar-dj-consolidada', {
-            gastos: gastosParaDJ
+            gastos_ids: gastosIds
         }, {
             responseType: 'blob'
         });
+
+        // 4. La lógica para descargar el archivo PDF se mantiene igual.
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        const filename = `DJ-Consolidada-${Date.now()}.pdf`;
+        const filename = `DJ-Consolidada-Previa-${Date.now()}.pdf`;
         link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
@@ -962,7 +954,7 @@ const confirmarEnvio = () => {
     }
     const totalGeneral = gastosADeclarar.value.reduce((total, gasto) => total + (parseFloat(gasto.monto_total) || 0), 0);
     const resumenHtml = `
-        <div class="text-left text-sm space-y-3 p-2 bg-gray-50 rounded-lg border">
+        <div class="text-left text-sm space-y-3 p-2 bg-gray-50 rounded-lg border" style="max-height: 300px; overflow-y: auto;">
             <h4 class="font-bold text-center text-base">Resumen de Gastos a Declarar</h4>
             ${gastosADeclarar.value.map((gasto, index) => {
         const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
@@ -1087,7 +1079,18 @@ const enviarFormulario = async () => {
 .gasto-list-move {
     transition: transform 0.5s ease;
 }
-
+/* Esto crea el efecto de acordeón suave al expandir y contraer. */
+.slide-up-enter-active,
+.slide-up-leave-active {
+    transition: all 0.3s ease-out;
+    max-height: 1000px; /* Altura máxima esperada del contenido */
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+}
 /* Transiciones para las secciones internas del formulario */
 .fade-in-up-enter-active,
 .fade-in-up-leave-active {

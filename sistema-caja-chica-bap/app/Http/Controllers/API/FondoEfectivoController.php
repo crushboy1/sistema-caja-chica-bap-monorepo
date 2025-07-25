@@ -160,7 +160,9 @@ class FondoEfectivoController extends Controller
             $query->where(function ($q) use ($user) {
                 // 1. Fondos donde es el responsable directo.
                 $q->where('id_responsable', $user->id);
-                // 2. O fondos de proyecto donde su área participa.
+                // 2. O fondos donde su área es la principal (esto cubre los fondos de su propio equipo).
+                $q->orWhere('id_area', $user->area_id);
+                // 3. O fondos de proyecto donde su área participa como invitada.
                 $q->orWhere(function ($subQ) use ($user) {
                     $subQ->where('tipo_fondo', 'Proyecto')
                         ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
@@ -169,14 +171,18 @@ class FondoEfectivoController extends Controller
                 });
             });
         } elseif ($user->hasRole('colaborador')) {
-            // MODIFICACIÓN: Lógica específica para el Colaborador.
-            // Un colaborador ve los fondos cuyo responsable es su jefe de área.
-            if ($user->jefe_area_id) {
-                $query->where('id_responsable', $user->jefe_area_id);
-            } else {
-                // Si un colaborador no tiene un jefe asignado, no puede ver ningún fondo.
-                $query->whereRaw('1 = 0'); // No devuelve resultados.
-            }
+            // EXPLICACIÓN: Un colaborador ahora puede ver fondos si CUALQUIERA de las siguientes condiciones se cumple.
+            $query->where(function ($q) use ($user) {
+                // Condición 1: El área principal del fondo es la misma que la del colaborador.
+                $q->where('id_area', $user->area_id);
+                // Condición 2: O, el fondo es de tipo 'Proyecto' y el área del colaborador
+                $q->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('tipo_fondo', 'Proyecto')
+                        ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
+                            $areaQuery->where('areas.id', $user->area_id);
+                        });
+                });
+            });
         } elseif ($user->hasAnyRole(['jefe_administracion', 'gerente_general', 'super_admin'])) {
             // Los roles de alta jerarquía ven todos los fondos. No se aplica ningún filtro.
         } else {
@@ -452,8 +458,8 @@ class FondoEfectivoController extends Controller
         // 1. Obtenemos la colección de gastos que están listos para ser repuestos.
         $gastosContabilizados = $fondo->gastos()
             ->where('estado', 'Contabilizado')
-            ->with('gastoProyectado:id_gasto_proyectado,descripcion') 
-            ->get(['id', 'glosa', 'monto_total','id_gasto_proyectado']); 
+            ->with('gastoProyectado:id_gasto_proyectado,descripcion')
+            ->get(['id', 'glosa', 'monto_total', 'id_gasto_proyectado']);
 
         // 2. Calculamos el monto total a reponer a partir de la colección obtenida.
         $montoAReponer = $gastosContabilizados->sum('monto_total');
@@ -467,7 +473,7 @@ class FondoEfectivoController extends Controller
             'monto_asignado' => (float) $fondo->monto_aprobado,
             'saldo_disponible_actual' => (float) $fondo->monto_disponible,
             'monto_a_reponer' => (float) $montoAReponer,
-            'gastos_a_reponer' => $gastosContabilizados, 
+            'gastos_a_reponer' => $gastosContabilizados,
             'tiene_gastos_pendientes' => $conteoGastosPendientes > 0,
             'conteo_gastos_pendientes' => $conteoGastosPendientes,
             'mensaje_estado' => $conteoGastosPendientes > 0

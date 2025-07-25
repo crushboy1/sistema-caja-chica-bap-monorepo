@@ -62,6 +62,7 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.view.all',
                 'declaraciones.create',
                 'declaraciones.approve.adm',
+                'declaraciones.approve.jefe',
                 'declaraciones.resubmit',
                 'declaraciones.reposition',
             ],

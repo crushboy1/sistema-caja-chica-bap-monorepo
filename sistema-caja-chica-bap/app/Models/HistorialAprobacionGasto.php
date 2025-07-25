@@ -22,13 +22,14 @@ class HistorialAprobacionGasto extends Model
      *
      * @var array<int, string>
      */
+    protected $primaryKey = 'id';
+    public $incrementing = true;
     protected $fillable = [
         'id_gasto',
         'estado_anterior',
         'estado_nuevo',
         'id_usuario_accion',
         'comentario',
-        'fecha_cambio',
         'cambios_realizados',
     ];
 
@@ -39,7 +40,6 @@ class HistorialAprobacionGasto extends Model
      */
     protected $casts = [
         'cambios_realizados' => 'array',
-        'fecha_cambio' => 'datetime',
     ];
     
     // --- RELACIONES ---

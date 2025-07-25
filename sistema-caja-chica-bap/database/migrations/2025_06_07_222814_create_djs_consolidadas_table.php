@@ -23,7 +23,6 @@ return new class extends Migration
 
             // Quién subió el documento, relacionado con la tabla de usuarios.
             $table->foreignId('id_uploader')->constrained('users', 'id');
-
             $table->timestamps();
         });
     }

@@ -81,8 +81,10 @@ class DjConsolidada extends Model
      */
     public function getDocumentoUrlAttribute(): ?string
     {
-        if ($this->ruta_documento) {
-            // Devuelve la URL pública del archivo almacenado.
+        // Chequeo para asegurar que el campo no esté vacío
+        // y se ha tipado el retorno para mejorar la predicción de código.
+        if ($this->ruta_documento && Storage::disk('public')->exists($this->ruta_documento)) {
+            // Devuelve la URL pública completa del archivo almacenado.
             return Storage::url($this->ruta_documento);
         }
         return null;

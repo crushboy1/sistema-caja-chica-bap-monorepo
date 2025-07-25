@@ -11,48 +11,37 @@ const props = defineProps({
         type: Object,
         default: () => null
     },
-    usuarioActual: { 
-        type: Object, 
-        default: () => null 
-    }
 });
 
-const emit = defineEmits(['close','grupoValidado']);
+const emit = defineEmits(['close']);
 
 // Propiedad computada para obtener la URL de la evidencia de forma segura
 // --- PROPIEDADES COMPUTADAS PARA EVIDENCIAS ---
-const esAdmin = computed(() => {
-    const rolesAdmin = ['jefe_administracion', 'super_admin'];
-    return rolesAdmin.includes(props.usuarioActual?.role?.name);
-});
-const puedeValidarGrupoDJ = computed(() => {
-    return esAdmin.value && props.gasto?.estado === 'Pendiente de Validación DJ';
-});
+
 // Devuelve la URL de la evidencia INDIVIDUAL.
 const evidenciaIndividualUrl = computed(() => {
-    if (!props.gasto?.ruta_evidencia) return null;
-    return `/storage/${props.gasto.ruta_evidencia}`;
+    return props.gasto?.evidencia_url || (props.gasto?.ruta_evidencia ? `/storage/${props.gasto.ruta_evidencia}` : null);
 });
 
 // Devuelve el objeto de la evidencia CONSOLIDADA.
 const djConsolidadaEvidencia = computed(() => {
     if (!props.gasto?.dj_consolidada) return null;
     return {
-        url: `/storage/${props.gasto.dj_consolidada.ruta_documento}`,
-        // Podríamos añadir más datos si fueran necesarios, como el uploader.
+        url: props.gasto.dj_consolidada.documento_url || `/storage/${props.gasto.dj_consolidada.ruta_documento}`,
     };
 });
 
 // Determina si la evidencia a mostrar (la individual) es una imagen.
 const esImagen = computed(() => {
     if (!evidenciaIndividualUrl.value) return false;
-    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase();
+    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase().split('?')[0]; 
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
 });
 
 // Determina si la evidencia a mostrar (la individual) es un PDF.
 const esPdf = computed(() => {
-    return evidenciaIndividualUrl.value && evidenciaIndividualUrl.value.toLowerCase().endsWith('.pdf');
+    if (!evidenciaIndividualUrl.value) return false;
+    return evidenciaIndividualUrl.value.toLowerCase().includes('.pdf');
 });
 //Propiedades computadas para acceder a datos anidados de forma segura y limpia.
 const registradorNombre = computed(() => `${props.gasto?.registrador?.name || ''} ${props.gasto?.registrador?.last_name || ''}`.trim() || 'N/A');
@@ -70,33 +59,6 @@ const montoTotal = computed(() => parseFloat(props.gasto?.monto_total || 0));
 const alertaMontoMayor = computed(() => montoTotal.value > parseFloat(props.gasto?.monto_proyectado_original || 0));
 //METODOS
 
-const validarGrupoDJ = async () => {
-    if (!props.gasto?.id_dj_consolidada) {
-        Swal.fire('Error', 'No se pudo encontrar el ID de la DJ consolidada.', 'error');
-        return;
-    }
-
-    const { isConfirmed } = await Swal.fire({
-        title: '¿Validar Grupo de Gastos?',
-        text: "Esta acción validará todos los gastos asociados a esta Declaración Jurada. Pasarán a 'Pendiente de Validación Contable'.",
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, validar grupo',
-        cancelButtonText: 'Cancelar'
-    });
-
-    if (isConfirmed) {
-        try {
-            const response = await api.put(`/v1/djs-consolidadas/${props.gasto.id_dj_consolidada}/validar`);
-            Swal.fire('¡Grupo Validado!', response.data.message, 'success');
-            emit('grupoValidado'); // Notificar al padre para que refresque la lista
-            emit('close');
-        } catch (error) {
-            console.error("Error al validar el grupo de DJ:", error);
-            Swal.fire('Error', error.response?.data?.message || 'No se pudo validar el grupo.', 'error');
-        }
-    }
-};
 const formatCampo= (campo)=> {
         // Asegurar que campo sea una cadena antes de usar replace
         if (typeof campo === 'string') {
@@ -325,14 +287,14 @@ const cerrarModal = () => {
                                         <span class="text-gray-500 font-medium">Realizada por:</span>
                                         <span class="font-medium text-gray-800">{{ historial.usuario_accion.name }} {{ historial.usuario_accion.last_name }}</span>
                                         <span class="text-gray-500 font-medium">Fecha:</span>
-                                        <span class="font-medium text-gray-800">{{ formatearFecha(historial.fecha_cambio) }}</span>
+                                        <span class="font-medium text-gray-800">{{ formatearFecha(historial.created_at) }}</span>
                                     </div>
                                     <p v-if="historial.comentario" class="mt-2"><strong class="text-gray-600">Comentario:</strong> <em class="text-gray-700">"{{ historial.comentario }}"</em></p>
                                     
                                     <div v-if="historial.cambios_realizados" class="mt-2 p-2 bg-gray-100 rounded-md border border-gray-200">
                                         <p class="font-semibold text-gray-800 text-xs mb-1">Detalle de la corrección:</p>
                                         <ul class="list-disc list-inside text-gray-700 space-y-1">
-                                            <li v-for="(cambio, campo) in JSON.parse(historial.cambios_realizados)" :key="campo">
+                                            <li v-for="(cambio, campo) in historial.cambios_realizados" :key="campo">
                                                 <strong class="capitalize">{{ formatCampo(campo) }}:</strong> cambió de '{{ cambio.anterior }}' a '{{ cambio.nuevo }}'
                                             </li>
                                         </ul>
@@ -346,13 +308,6 @@ const cerrarModal = () => {
                     <div
                         class="bg-gradient-to-r from-gray-50 to-verde-bap-extralight/30 px-6 py-4 border-t border-gray-200/50">
                         <div class="flex justify-end">
-                            <button v-if="puedeValidarGrupoDJ" @click="validarGrupoDJ"
-                                class="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl ...">
-                                <span class="relative z-10 flex items-center space-x-3">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    <span>Validar Grupo de DJ</span>
-                                </span>
-                            </button>
                             <button @click="cerrarModal"
                                 class="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-verde-bap to-verde-bap-dark text-white font-semibold rounded-xl shadow-soft hover:shadow-glow-verde transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-verde-bap/30">
                                 <span class="relative z-10 flex items-center space-x-2">

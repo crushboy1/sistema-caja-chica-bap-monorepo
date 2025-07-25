@@ -25,7 +25,6 @@ return new class extends Migration
             // Para guardar el motivo del rechazo, la instrucción del jefe, etc.
             $table->text('comentario')->nullable();
             $table->json('cambios_realizados')->nullable();
-            $table->timestamp('fecha_cambio');
             $table->timestamps();
         });
     }
