@@ -4,50 +4,75 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\GastoController;
 use App\Http\Controllers\API\DocumentoController;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes for Gastos & Documentos
+|--------------------------------------------------------------------------
+|
+| Todas las rutas aquí están protegidas y requieren autenticación vía Sanctum.
+|
+*/
+
 Route::middleware('auth:sanctum')->group(function () {
 
-    // --- RUTAS ESTÁNDAR CRUD ---
-    // Mantiene las rutas básicas: index, store, show, update, destroy.
-    // 'update' (PUT /gastos/{gasto}) se puede usar para ediciones generales si es necesario en el futuro.
-    Route::apiResource('gastos', GastoController::class);
-
-    // --- RUTAS DE ACCIONES ESPECÍFICAS (FLUJO DE APROBACIÓN) ---
-    // Se agrupan todas las acciones específicas para un gasto.
-    Route::prefix('gastos/{gasto}')->group(function () {
-
-        // Acción del Jefe de Área para aprobar un gasto de un colaborador.
-        // Endpoint: PUT /api/gastos/{gasto}/approve
-        Route::put('/approve', [GastoController::class, 'approve'])->name('gastos.approve');
-
-        // Acción de Administración para validar y contabilizar un gasto.
-        // Endpoint: PUT /api/gastos/{gasto}/finalize
-        Route::put('/finalize', [GastoController::class, 'finalizeAsAccounted'])->name('gastos.finalize');
-
-        // Acción UNIFICADA para observar un gasto (usada por Jefe de Área y Administración).
-        // Endpoint: PUT /api/gastos/{gasto}/observe
-        Route::put('/observe', [GastoController::class, 'observe'])->name('gastos.observe');
-
-        // Acción UNIFICADA para rechazar un gasto (usada por Jefe de Área y Administración).
-        // Endpoint: PUT /api/gastos/{gasto}/reject
-        Route::put('/reject', [GastoController::class, 'reject'])->name('gastos.reject'); // Necesitarás crear este método unificado en el controller.
-
-        // NUEVA RUTA: Acción del registrador para corregir y reenviar un gasto observado.
-        // Se usa POST para manejar correctamente la subida de archivos (multipart/form-data).
-        // Endpoint: POST /api/gastos/{gasto}/actualizar-observado
-        Route::post('/actualizar-observado', [GastoController::class, 'actualizarGastoObservado'])->name('gastos.actualizarObservado');
-    });
-
-    // --- RUTAS ADICIONALES ---
-    // Endpoint para que un usuario obtenga solo sus gastos registrados.
-    Route::get('/mis-gastos', [GastoController::class, 'misGastos'])->name('gastos.misGastos');
-
-
+    // --- RUTAS DE DOCUMENTOS ---
     Route::prefix('documentos')->name('documentos.')->group(function () {
-
-        // Endpoint para generar la Declaración Jurada consolidada.
-        // Se llamará desde el componente de Vue.
         Route::post('/generar-dj-consolidada', [DocumentoController::class, 'generarDjConsolidada'])
             ->name('generarDjConsolidada');
-        Route::put('/djs-consolidadas/{dj}/validar', [DocumentoController::class, 'validarDjConsolidada'])->name('djs.validar');
     });
+
+    // --- RUTAS DE GASTOS ---
+
+    // Endpoint para obtener la lista de gastos para las bandejas de aprobación (ya agrupados).
+    Route::get('/gastos/para-aprobacion', [GastoController::class, 'getGastosParaAprobacion'])
+        ->name('gastos.paraAprobacion');
+
+    // Endpoint para consolidar gastos existentes en una nueva DJ.
+    Route::post('/gastos/consolidate-dj', [GastoController::class, 'consolidateDj'])
+        ->name('gastos.consolidateDj');
+
+    // Endpoint para que un usuario obtenga solo sus gastos registrados.
+    Route::get('/mis-gastos', [GastoController::class, 'misGastos'])
+        ->name('gastos.misGastos');
+
+    // --- RUTAS DE ACCIONES SOBRE GRUPOS DE DJ ---
+    // Agrupa todas las acciones que se aplican a un paquete completo de DJ.
+    Route::prefix('dj-groups/{djConsolidada}')->name('dj-groups.')->group(function () {
+
+        // Acción del Jefe de Área para aprobar un grupo de DJ.
+        Route::put('/approve', [GastoController::class, 'approveDjGroup'])->name('approve');
+
+        // Acción de Administración para validar el documento de la DJ.
+        Route::put('/validate-document', [GastoController::class, 'validateDjDocument'])->name('validateDocument');
+
+        // Acción de Administración para marcar un grupo de DJ como 'Contabilizado'.
+        Route::put('/finalize', [GastoController::class, 'finalizeDjGroupAsAccounted'])->name('finalize');
+        //Reject grupal
+        Route::put('/reject', [GastoController::class, 'rejectDjGroup'])->name('rejectGroup');
+        // NOTA: La acción de observar es individual (gastos/{gasto}/observe) porque invalida el grupo.
+        // La acción de rechazar también se puede manejar a nivel de grupo si se necesita, pero por ahora se mantiene individual.
+    });
+
+
+    // --- RUTAS DE ACCIONES SOBRE UN GASTO INDIVIDUAL ---
+    Route::prefix('gastos/{gasto}')->name('gastos.')->group(function () {
+
+        // Acción del Jefe de Área para aprobar un gasto individual.
+        Route::put('/approve', [GastoController::class, 'approve'])->name('approve');
+
+        // Acción de Administración para marcar un gasto individual como 'Contabilizado'.
+        Route::put('/finalize', [GastoController::class, 'finalizeAsAccounted'])->name('finalize');
+
+        // Acción para observar un gasto (invalida el grupo si pertenece a uno).
+        Route::put('/observe', [GastoController::class, 'observe'])->name('observe');
+
+        // Acción para rechazar un gasto de forma definitiva.
+        Route::put('/reject', [GastoController::class, 'reject'])->name('reject');
+
+        // Acción del registrador para corregir y reenviar un gasto observado.
+        Route::post('/actualizar-observado', [GastoController::class, 'actualizarGastoObservado'])->name('actualizarObservado');
+    });
+
+    // --- RUTAS ESTÁNDAR CRUD ---
+    Route::apiResource('gastos', GastoController::class);
 });

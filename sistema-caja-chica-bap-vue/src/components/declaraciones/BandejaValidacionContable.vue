@@ -21,9 +21,6 @@ const hasPermission = (permissionName) => {
 };
 
 // --- PROPIEDADES COMPUTADAS ---
-
-
-
 const gastos = ref([]);
 const areas = ref([]);
 const cargando = ref(true);

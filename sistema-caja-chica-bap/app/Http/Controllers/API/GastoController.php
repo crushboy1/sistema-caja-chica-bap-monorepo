@@ -9,7 +9,9 @@ use App\Models\FondoEfectivo;
 use App\Models\SolicitudFondo;
 use App\Models\HistorialAprobacionGasto;
 use App\Models\GastoProyectado;
+use App\Models\DjConsolidada;
 use App\Rules\UniqueComprobante;
+use App\Traits\RegistersHistory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +25,7 @@ use Illuminate\Validation\ValidationException;
  */
 class GastoController extends Controller
 {
+    use RegistersHistory;
     /**
      * Muestra una lista de gastos.
      * La lógica de autorización determina qué gastos puede ver el usuario según su rol.
@@ -135,7 +138,7 @@ class GastoController extends Controller
             'gastos.*.comentario' => 'nullable|string|max:2000',
             'gastos.*.moneda' => 'sometimes|in:PEN,USD',
             'gastos.*' => [new UniqueComprobante],
-            'dj_consolidada_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'dj_consolidada_file' => 'nullable|file|mimes:pdf|max:10240',
         ];
         $messages = [
             'required' => 'Este campo es obligatorio.',
@@ -308,41 +311,17 @@ class GastoController extends Controller
         }
 
         return DB::transaction(function () use ($gasto, $user, $request) {
-            $fondo = $gasto->fondoEfectivo;
-            $montoFinal = $gasto->monto_total;
-
-            $fondo->decrement('monto_disponible', $montoFinal);
+            $gasto->fondoEfectivo()->decrement('monto_disponible', $gasto->monto_total);
 
             $estadoAnterior = $gasto->estado;
             $gasto->estado = 'Contabilizado';
             $gasto->id_validador_adm = $user->id;
             $gasto->save();
 
-            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto validado y contabilizado por administración.'));
+            $this->registrarHistorial($gasto, $estadoAnterior, 'Contabilizado', $user->id, $request->input('comentario', 'Gasto validado y contabilizado por administración.'));
 
-            return response()->json(['message' => 'Gasto validado y contabilizado exitosamente.', 'gasto' => $gasto]);
+            return response()->json(['message' => 'Gasto validado y contabilizado exitosamente.', 'gasto' => $gasto->fresh()]);
         });
-    }
-
-    public function rejectByJefe(Request $request, Gasto $gasto)
-    {
-        $user = Auth::user();
-        $request->validate(['comentario' => 'required|string|max:2000']);
-
-        if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
-            return response()->json(['message' => 'No tienes permiso para rechazar este gasto.'], 403);
-        }
-        if ($gasto->estado !== 'Pendiente de Aprobación') {
-            return response()->json(['message' => 'Solo se pueden rechazar gastos que estén pendientes.'], 409);
-        }
-
-        $estadoAnterior = $gasto->estado;
-        $gasto->estado = 'Rechazado';
-        $gasto->motivo_rechazo = $request->input('comentario');
-        $gasto->save();
-        $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Rechazado por Jefe: " . $request->input('comentario'));
-
-        return response()->json(['message' => 'Gasto rechazado exitosamente.', 'gasto' => $gasto]);
     }
 
     /**
@@ -422,14 +401,13 @@ class GastoController extends Controller
             );
 
             // 6. --- Respuesta Exitosa ---
-            return response()->json(['message' => 'Gasto observado. El registrador será notificado para su corrección.', 'gasto' => $gasto]);
+            return response()->json(['message' => 'Gasto observado. El registrador será notificado para su corrección.', 'gasto' => $gasto->fresh()]);
         });
     }
     //Actualizar gasto observado.
     public function actualizarGastoObservado(Request $request, Gasto $gasto)
     {
         $user = Auth::user();
-        $user->load('role');
 
         // 1. --- Autorización ---
         // Solo el usuario que registró el gasto puede corregirlo.
@@ -517,42 +495,163 @@ class GastoController extends Controller
             // 5. --- Respuesta Exitosa ---
             return response()->json([
                 'message' => 'Gasto corregido y reenviado para aprobación.',
-                'gasto' => $gasto->load(['registrador.role', 'jefeAprobador']) // Devolver el gasto actualizado
+                'gasto' => $gasto->fresh()->load(['registrador.role', 'jefeAprobador'])
             ]);
         });
     }
+
+    // MÉTODOS DE GESTIÓN DE DJ CONSOLIDADA
+    public function consolidateDj(Request $request)
+    {
+        $validated = $request->validate([
+            'gastos_ids' => 'required|array|min:1',
+            'gastos_ids.*' => 'required|integer|exists:gastos,id',
+            'dj_consolidada_file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $user = Auth::user();
+        $gastosIds = $validated['gastos_ids'];
+
+        return DB::transaction(function () use ($gastosIds, $user, $request) {
+            // 1. Usamos el Query Scope 'readyForConsolidation' que creamos en el modelo Gasto.
+            $gastosAConsolidar = Gasto::readyForConsolidation($user->id)->whereIn('id', $gastosIds)->get();
+
+            // 2. Verificar que todos los gastos solicitados son válidos para este usuario y estado.
+            if (count($gastosAConsolidar) !== count($gastosIds)) {
+                return response()->json(['message' => 'Algunos de los gastos seleccionados no pueden ser consolidados. Verifique que le pertenecen y están en un estado válido.'], 409);
+            }
+
+            // 3. Crear el nuevo registro de DJ Consolidada.
+            $pathDj = $request->file('dj_consolidada_file')->store('djs_consolidadas', 'public');
+            $djConsolidada = DjConsolidada::create([
+                'ruta_documento' => $pathDj,
+                'id_uploader' => $user->id,
+            ]);
+
+            // 4. Vincular los gastos y actualizar su estado.
+            foreach ($gastosAConsolidar as $gasto) {
+                $estadoAnterior = $gasto->estado;
+                $gasto->update([
+                    'id_dj_consolidada' => $djConsolidada->id_dj_consolidada,
+                    'estado' => 'Pendiente de Validación DJ'
+                ]);
+
+                $this->registrarHistorial(
+                    $gasto,
+                    $estadoAnterior,
+                    'Pendiente de Validación DJ',
+                    $user->id,
+                    "Gasto agrupado en la DJ Consolidada #{$djConsolidada->id_dj_consolidada}."
+                );
+            }
+
+            return response()->json([
+                'message' => 'Gastos consolidados exitosamente en una nueva Declaración Jurada.',
+                'dj_consolidada' => $djConsolidada->load('gastos')
+            ], 201);
+        });
+    }
+
     // MÉTODOS ADICIONALES PARA COMPLETAR EL FLUJO
 
     //Rechaza un gasto de forma definitiva. (Acción de Administración)
-    public function rejectFinal(Request $request, Gasto $gasto)
+    public function reject(Request $request, Gasto $gasto)
     {
+        $validated = $request->validate(['comentario' => 'required|string|max:2000']);
         $user = Auth::user();
-        $request->validate(['comentario' => 'required|string|max:2000']);
+        $isJefeArea = $user->hasRole('jefe_area') && $user->area_id === $gasto->registrador->area_id;
+        $isAdministrador = $user->hasAnyRole(['jefe_administracion', 'super_admin']);
 
-        if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
-            return response()->json(['message' => 'No tienes permiso para esta acción.'], 403);
-        }
-        if ($gasto->estado !== 'Pendiente de Validación Contable') {
-            return response()->json(['message' => 'Solo se pueden rechazar gastos que ya están aprobados por jefatura.'], 409);
+        // 1. Autorización y validación de estado en un solo bloque.
+        if ($isJefeArea && $gasto->estado === 'Pendiente de Aprobación') {
+            // El Jefe de Área puede rechazar.
+        } elseif ($isAdministrador && $gasto->estado === 'Pendiente de Validación Contable') {
+            // El Administrador puede rechazar.
+        } else {
+            return response()->json(['message' => 'No tienes permiso para rechazar este gasto o no está en un estado válido para ser rechazado.'], 403);
         }
 
-        return DB::transaction(function () use ($gasto, $user, $request) {
+        // 2. Ejecución de la lógica.
+        return DB::transaction(function () use ($gasto, $user, $validated) {
             $estadoAnterior = $gasto->estado;
-            // Lógica de Saldo: No se revierte dinero porque nunca se descontó.
             $gasto->estado = 'Rechazado';
-            $gasto->motivo_rechazo = $request->comentario;
-            $gasto->id_jefe_aprobador = null;
+            $gasto->motivo_rechazo = $validated['comentario'];
+            $gasto->id_jefe_aprobador = $gasto->id_jefe_aprobador ?? ($isJefeArea ? $user->id : null);
             $gasto->save();
 
-            $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, "Rechazado por ADM: " . $request->comentario);
+            $rolRechazador = $isJefeArea ? 'Jefe de Área' : 'Administración';
+            $this->registrarHistorial($gasto, $estadoAnterior, 'Rechazado', $user->id, "Rechazado por {$rolRechazador}: " . $validated['comentario']);
 
-            return response()->json(['message' => 'Gasto rechazado definitivamente.', 'gasto' => $gasto]);
+            return response()->json(['message' => 'Gasto rechazado exitosamente.', 'gasto' => $gasto->fresh()]);
+        });
+    }
+    
+    public function rejectDjGroup(Request $request, DjConsolidada $djConsolidada)
+    {
+        $validated = $request->validate(['comentario' => 'required|string|max:2000']);
+        $user = Auth::user();
+        $djConsolidada->load('gastos.registrador.area'); // Cargar relaciones necesarias para validaciones
+
+        // 1. Autorización: Solo un jefe de área o administrador puede rechazar un grupo.
+        $primerGasto = $djConsolidada->gastos->first();
+        if (!$primerGasto) {
+            return response()->json(['message' => 'Este grupo de DJ no contiene gastos válidos para ser rechazado.'], 404);
+        }
+
+        $isJefeAreaAutorizado = ($user->hasRole('jefe_area') && $user->area_id === $primerGasto->registrador->area_id);
+        $isAdministrador = $user->hasAnyRole(['jefe_administracion', 'super_admin']);
+
+        if (!$isJefeAreaAutorizado && !$isAdministrador) {
+            return response()->json(['message' => 'No tienes permiso para rechazar este grupo de gastos.'], 403);
+        }
+
+        // 2. Validación de Estado: Asegurar que todos los gastos del grupo estén en un estado rechazable.
+        // Para Jefes de Área: Solo pueden rechazar si está 'Pendiente de Aprobación'.
+        // Para Administradores: Pueden rechazar si está 'Pendiente de Validación DJ' o 'Pendiente de Validación Contable'.
+        foreach ($djConsolidada->gastos as $gasto) {
+            if ($isJefeAreaAutorizado && $gasto->estado !== 'Pendiente de Aprobación') {
+                return response()->json(['message' => 'Como Jefe de Área, solo puedes rechazar grupos que estén pendientes de tu aprobación.'], 409);
+            }
+            if ($isAdministrador && !in_array($gasto->estado, ['Pendiente de Validación DJ', 'Pendiente de Validación Contable'])) {
+                return response()->json(['message' => 'Como Administrador, este grupo no se encuentra en un estado válido para ser rechazado.'], 409);
+            }
+        }
+
+        // 3. Ejecución de la Lógica: Rechazar todos los gastos del grupo.
+        return DB::transaction(function () use ($djConsolidada, $user, $validated, $isJefeAreaAutorizado) {
+            foreach ($djConsolidada->gastos as $gasto) {
+                $estadoAnterior = $gasto->estado;
+                $gasto->estado = 'Rechazado';
+                $gasto->motivo_rechazo = $validated['comentario']; // El comentario de rechazo aplica a todo el grupo
+
+                // IMPORTANTE: NO se rompe el vínculo id_dj_consolidada aquí.
+                // Los gastos rechazados mantienen su referencia a la DJ original para trazabilidad.
+                // Si se necesita una nueva DJ, el colaborador deberá crearla desde 0.
+
+                $gasto->save();
+
+                $rolRechazador = $isJefeAreaAutorizado ? 'Jefe de Área' : 'Administración';
+                $this->registrarHistorial($gasto, $estadoAnterior, 'Rechazado', $user->id, "Grupo de DJ rechazado por {$rolRechazador}: " . $validated['comentario']);
+            }
+
+            return response()->json(['message' => 'Grupo de DJ rechazado exitosamente.', 'dj_consolidada' => $djConsolidada->load('gastos')]);
         });
     }
     public function misGastos()
     {
         $user = Auth::user();
-        $gastos = Gasto::with('fondoEfectivo:id_fondo,codigo_fondo')
+
+        $gastos = Gasto::with([
+            'registrador.role',
+            'registrador.area:id,name',
+            'jefeAprobador:id,name,last_name',
+            'validadorAdm:id,name,last_name',
+            'cuentaContable:id,codigo_cuenta,descripcion',
+            'fondoEfectivo:id_fondo,codigo_fondo,monto_aprobado',
+            'gastoProyectado:id_gasto_proyectado,descripcion',
+            'djConsolidada',
+            'historialAprobaciones.usuarioAccion'
+        ])
             ->where('id_registrador', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();
@@ -561,27 +660,226 @@ class GastoController extends Controller
     }
 
     /**
-     * Helper para registrar en el historial de manera consistente.
-     */
-    private function registrarHistorial(Gasto $gasto, string $estadoAnterior, string $estadoNuevo, int $userId, ?string $comentario, array $cambios = null)
-    {
-        HistorialAprobacionGasto::create([
-            'id_gasto' => $gasto->id,
-            'estado_anterior' => $estadoAnterior,
-            'estado_nuevo' => $estadoNuevo,
-            'id_usuario_accion' => $userId,
-            'comentario' => $comentario,
-            'cambios_realizados' => $cambios ? json_encode($cambios) : null,
-            'fecha_cambio' => now(),
-        ]);
-    }
-
-    /**
      * Muestra un gasto específico.
      */
     public function show(Gasto $gasto)
     {
-        return response()->json($gasto->load(['registrador.role', 'registrador.area', 'jefeAprobador', 'validadorAdm', 'cuentaContable', 'gastoProyectado', 'historial.usuarioAccion']));
+        // CAMBIO: La política de autorización se ha reescrito para ser más explícita y
+        // seguir exactamente las reglas de negocio definidas.
+        $user = Auth::user();
+
+        // Regla 1: Super Admin y Jefe de Administración pueden ver todo.
+        if ($user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            // Acceso concedido
+        }
+        // Regla 2: Jefe de Área puede ver los gastos de su propia área (incluidos los suyos).
+        elseif ($user->hasRole('jefe_area') && $user->area_id === $gasto->registrador->area_id) {
+            // Acceso concedido
+        }
+        // Regla 3: Cualquier usuario (Colaborador, Gerente General, etc.) puede ver sus propios gastos.
+        elseif ($user->id === $gasto->id_registrador) {
+            // Acceso concedido
+        }
+        // Si ninguna regla se cumple, se deniega el acceso.
+        else {
+            return response()->json(['message' => 'No tienes permiso para ver este gasto.'], 403);
+        }
+
+        // Si el acceso fue concedido, cargar y devolver el gasto.
+        return response()->json($gasto->load([
+            'registrador.role',
+            'registrador.area',
+            'jefeAprobador',
+            'validadorAdm',
+            'cuentaContable',
+            'gastoProyectado',
+            'historialAprobaciones.usuarioAccion'
+        ]));
+    }
+    public function getGastosParaAprobacion(Request $request)
+    {
+        $user = Auth::user();
+
+        // Query base con las relaciones necesarias para mostrar en la bandeja.
+        $baseQuery = Gasto::with([
+            'registrador.role',
+            'registrador.area:id,name',
+            'djConsolidada',
+            'cuentaContable',
+            'fondoEfectivo',
+            'gastoProyectado',
+            'historialAprobaciones.usuarioAccion'
+        ]);
+
+        // Lógica de autorización: qué gastos puede ver el usuario.
+        if ($user->hasRole('jefe_area')) {
+            // Un Jefe de Área ve los gastos de su área que están pendientes de su aprobación.
+            $areaId = $user->area_id;
+            $query = $baseQuery->whereHas('registrador', function ($q) use ($areaId) {
+                $q->where('area_id', $areaId);
+            })->where('estado', 'Pendiente de Aprobación');
+        } elseif ($user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            // Administración ve los gastos que ya pasaron el primer filtro o fueron registrados por un jefe.
+            $query = $baseQuery->whereIn('estado', ['Pendiente de Validación DJ', 'Pendiente de Validación Contable']);
+        } else {
+            // Un colaborador u otro rol no debería acceder a esta bandeja.
+            return response()->json(['message' => 'No tienes permiso para acceder a esta bandeja.'], 403);
+        }
+
+        $gastos = $query->orderBy('created_at', 'desc')->get();
+
+        // Agrupar los gastos por DJ consolidada.
+        $gastosAgrupados = $gastos->groupBy('id_dj_consolidada');
+
+        // Procesamos el resultado
+        $resultado = collect();
+
+        foreach ($gastosAgrupados as $djId => $grupo) {
+            if ($djId) {
+                // Agrupado por DJ consolidada
+                $resultado->push([
+                    'es_grupo' => true,
+                    'id_dj_consolidada' => $djId,
+                    'estado_grupo' => $grupo->first()->estado,
+                    'monto_total_grupo' => $grupo->sum('monto_total'),
+                    'registrador' => $grupo->first()->registrador,
+                    'fecha_registro' => $grupo->first()->created_at,
+                    'dj_consolidada' => $grupo->first()->djConsolidada,
+                    'gastos' => $grupo->values(),
+                ]);
+            } else {
+                // Gastos individuales (sin DJ consolidada)
+                foreach ($grupo as $gasto) {
+                    $resultado->push([
+                        'es_grupo' => false,
+                        'gasto' => $gasto,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($resultado->values());
+    }
+
+    /**
+     * Aprueba un grupo completo de gastos asociados a una DJ Consolidada. (Acción de Jefe de Área)
+     *
+     * @param Request $request
+     * @param DjConsolidada $djConsolidada
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function approveDjGroup(Request $request, DjConsolidada $djConsolidada)
+    {
+        $user = Auth::user();
+        // Cargar las relaciones necesarias para la validación.
+        $djConsolidada->load('gastos.registrador');
+        // --- 1. Autorización ---
+        // Verificamos que el usuario sea un jefe de área y que el gasto pertenezca a un colaborador de su área.
+        $primerGasto = $djConsolidada->gastos->first();
+        if (!$primerGasto) {
+            return response()->json(['message' => 'Este grupo de DJ no contiene gastos válidos.'], 404);
+        }
+        // Se comprueba si el usuario actual tiene el rol de 'jefe_area' y si su ID de área coincide con el del registrador del gasto.
+        if (!$user->hasRole('jefe_area') || $user->area_id !== $primerGasto->registrador->area_id) {
+            return response()->json(['message' => 'No tienes permiso para aprobar este grupo de gastos.'], 403);
+        }
+        // --- 2. Validación de Estado ---
+        // Se comprueba que todos los gastos del grupo estén en el estado correcto antes de proceder.
+        if ($djConsolidada->gastos->contains(fn($gasto) => $gasto->estado !== 'Pendiente de Aprobación')) {
+            return response()->json(['message' => 'No se puede aprobar. Al menos un gasto no está en el estado correcto.'], 409);
+        }
+        // --- 3. Ejecución de la Lógica ---
+        // La lógica de negocio dentro de la transacción es correcta y se mantiene.
+        DB::transaction(function () use ($djConsolidada, $user, $request) {
+            foreach ($djConsolidada->gastos as $gasto) {
+                $estadoAnterior = $gasto->estado;
+                $gasto->update([
+                    'estado' => 'Pendiente de Validación DJ',
+                    'id_jefe_aprobador' => $user->id,
+                ]);
+                // Se asume que $this->registrarHistorial existe en el controlador.
+                $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Grupo de DJ aprobado por Jefe de Área.'));
+            }
+        });
+
+        return response()->json(['message' => 'Grupo de DJ aprobado exitosamente. Pasa a validación de documento.']);
+    }
+
+    /**
+     * Valida el documento de una DJ Consolidada. (Acción de Administración)
+     * Esto mueve todos los gastos del grupo al siguiente estado para la validación contable.
+     *
+     * @param Request $request
+     * @param DjConsolidada $djConsolidada
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function validateDjDocument(Request $request, DjConsolidada $djConsolidada)
+    {
+        $user = Auth::user();
+        $djConsolidada->load('gastos');
+        // --- 1. Autorización ---
+        // Solo los administradores pueden validar el documento de la DJ.
+        if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'No tienes permiso para realizar esta acción.'], 403);
+        }
+        // --- 2. Validación de Estado ---
+        if ($djConsolidada->gastos->contains(fn($gasto) => $gasto->estado !== 'Pendiente de Validación DJ')) {
+            return response()->json(['message' => 'No se puede validar el documento. El grupo no está en el estado correcto.'], 409);
+        }
+        // --- 3. Ejecución de la Lógica ---
+        // La lógica de negocio dentro de la transacción es correcta y se mantiene.
+        DB::transaction(function () use ($djConsolidada, $user, $request) {
+            foreach ($djConsolidada->gastos as $gasto) {
+                $estadoAnterior = $gasto->estado;
+                $gasto->update(['estado' => 'Pendiente de Validación Contable']);
+                $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Documento de DJ validado por Administración.'));
+            }
+        });
+
+        return response()->json(['message' => 'Documento de DJ validado. Los gastos están listos para la validación contable.']);
+    }
+
+    /**
+     * Contabiliza un grupo completo de gastos de una DJ. (Acción de Administración)
+     *
+     * @param Request $request
+     * @param DjConsolidada $djConsolidada
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function finalizeDjGroupAsAccounted(Request $request, DjConsolidada $djConsolidada)
+    {
+        $user = Auth::user();
+        $djConsolidada->load('gastos.fondoEfectivo');
+
+        // 1. --- Autorización ---
+        if (!$user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
+            return response()->json(['message' => 'No tienes permiso para esta acción.'], 403);
+        }
+
+        // 2. --- Validación de Estado ---
+        foreach ($djConsolidada->gastos as $gasto) {
+            if ($gasto->estado !== 'Pendiente de Validación Contable') {
+                return response()->json(['message' => 'No se puede contabilizar el grupo. Al menos un gasto no está listo para ser contabilizado.'], 409);
+            }
+        }
+
+        // 3. --- Ejecución de la Lógica ---
+        return DB::transaction(function () use ($djConsolidada, $user, $request) {
+            foreach ($djConsolidada->gastos as $gasto) {
+                // Descontar el monto del fondo.
+                $gasto->fondoEfectivo()->decrement('monto_disponible', $gasto->monto_total);
+
+                $estadoAnterior = $gasto->estado;
+                $gasto->update([
+                    'estado' => 'Contabilizado',
+                    'id_validador_adm' => $user->id,
+                ]);
+
+                $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto de grupo DJ validado y contabilizado.'));
+            }
+
+            return response()->json(['message' => 'Grupo de DJ contabilizado exitosamente.', 'dj_consolidada' => $djConsolidada->load('gastos')]);
+        });
     }
 
     /**
@@ -590,16 +888,19 @@ class GastoController extends Controller
     public function destroy(Gasto $gasto)
     {
         $user = Auth::user();
-        if (($gasto->estado === 'Pendiente de Aprobación' && $user->id === $gasto->id_registrador) || $user->hasRole('super_admin')) {
-            DB::transaction(function () use ($gasto) {
-                if ($gasto->ruta_evidencia) {
-                    Storage::disk('public')->delete($gasto->ruta_evidencia);
-                }
-                $gasto->historial()->delete();
-                $gasto->delete();
-            });
-            return response()->json(['message' => 'Gasto eliminado exitosamente.']);
+        $canDelete = ($gasto->id_registrador === $user->id && in_array($gasto->estado, ['Pendiente de Aprobación', 'Observado']));
+
+        if (!$canDelete && !$user->hasRole('super_admin')) {
+            return response()->json(['message' => 'No tienes permiso para eliminar este gasto o ya no se puede eliminar.'], 403);
         }
-        return response()->json(['message' => 'No tienes permiso para eliminar este gasto o ya no se encuentra en un estado que permita su eliminación.'], 403);
+
+        DB::transaction(function () use ($gasto) {
+            if ($gasto->ruta_evidencia) {
+                Storage::disk('public')->delete($gasto->ruta_evidencia);
+            }
+            $gasto->historialAprobaciones()->delete();
+            $gasto->delete();
+        });
+        return response()->json(['message' => 'Gasto eliminado exitosamente.']);
     }
 }

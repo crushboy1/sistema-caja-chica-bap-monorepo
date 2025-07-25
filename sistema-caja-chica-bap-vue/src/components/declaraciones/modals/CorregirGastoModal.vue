@@ -7,7 +7,7 @@ import { cloneDeep } from 'lodash-es';
 // --- PROPS Y EMITS ---
 // El componente recibe el gasto a corregir y una bandera para mostrarse.
 const props = defineProps({
-    gastoACorregir: {
+    gasto: {
         type: Object,
         required: true
     },
@@ -27,12 +27,11 @@ const gastoEditable = ref({});
 const nuevaEvidenciaFile = ref(null);
 // 'enviando' controla el estado de carga del botón de envío.
 const enviando = ref(false);
-const confirmacionDJ = ref(false);
 // --- LÓGICA DEL FORMULARIO ---
 
-// Esta función se activa cada vez que la prop 'gastoACorregir' cambia.
+// Esta función se activa cada vez que la prop 'gasto' cambia.
 // Clona el objeto para evitar mutaciones directas y pre-llena el formulario.
-watch(() => props.gastoACorregir, (newGasto) => {
+watch(() => props.gasto, (newGasto) => {
     if (newGasto) {
         gastoEditable.value = cloneDeep(newGasto);
         // Añadimos el campo para el comentario de subsanación, igual que en tu AperturaFondos.vue
@@ -41,21 +40,7 @@ watch(() => props.gastoACorregir, (newGasto) => {
     }
 }, { immediate: true, deep: true });
 
-const djConsolidadaUrl = computed(() => {
-    if (!props.gastoACorregir?.dj_consolidada?.ruta_documento) return '#';
-    return `/storage/${props.gastoACorregir.dj_consolidada.ruta_documento}`;
-});
-
-const isGuardarDisabled = computed(() => {
-    // Deshabilitado si se está enviando
-    if (enviando.value) return true;
-    // Si es un gasto de DJ consolidada, también se deshabilita si no se ha marcado la confirmación
-    if (props.gastoACorregir?.dj_consolidada) {
-        return !confirmacionDJ.value;
-    }
-    // En otros casos, el botón está habilitado
-    return false;
-});
+const isGuardarDisabled = computed(() => enviando.value);
 // Maneja la selección de un nuevo archivo de evidencia.
 const handleFileChange = (event) => {
     nuevaEvidenciaFile.value = event.target.files[0];
@@ -86,10 +71,10 @@ const enviarCorreccion = async () => {
     if (nuevaEvidenciaFile.value) {
         formDataPayload.append('evidencia', nuevaEvidenciaFile.value);
     }
-
+    formDataPayload.append('_method', 'POST');
     try {
         // Hacemos la llamada al endpoint que definimos en las rutas.
-        const response = await api.post(`/v1/gastos/${props.gastoACorregir.id}/actualizar-observado`, formDataPayload, {
+        const response = await api.post(`/v1/gastos/${props.gasto.id}/actualizar-observado`, formDataPayload, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
 
@@ -124,7 +109,7 @@ const enviarCorreccion = async () => {
                 <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl transform transition-all">
                     <div class="bg-gray-100 p-4 rounded-t-lg">
                         <h3 class="text-xl font-semibold text-gray-800">
-                            Corregir Gasto Observado: {{ gastoACorregir?.codigo_gasto }}
+                            Corregir Gasto Observado: {{ gasto?.codigo_gasto }}
                         </h3>
                     </div>
 
@@ -132,13 +117,13 @@ const enviarCorreccion = async () => {
 
                         <div class="p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded-r-lg">
                             <p class="font-bold text-sm">Motivo de la Observación:</p>
-                            <p class="text-sm">{{ gastoACorregir.motivo_observacion_adm || 'No se especificó un motivo.'
-                            }}</p>
+                            <p class="text-sm">{{ gasto.motivo_observacion_adm || 'No se especificó un motivo.'
+                                }}</p>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Gasto Proyectado</label>
-                            <input type="text" :value="gastoACorregir?.gasto_proyectado?.descripcion || 'N/A'"
+                            <input type="text" :value="gasto?.gasto_proyectado?.descripcion || 'N/A'"
                                 class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                                 disabled />
                         </div>
@@ -163,34 +148,11 @@ const enviarCorreccion = async () => {
                         </div>
 
                         <div>
-                            <div v-if="gastoACorregir.dj_consolidada">
-                                <label class="block text-sm font-medium text-gray-700">Evidencia</label>
-                                <div class="mt-1 p-3 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded-r-lg">
-                                    <p class="font-bold text-sm">Sustento Consolidado</p>
-                                    <p class="text-xs mt-1">Este gasto se sustenta con una Declaración Jurada
-                                        Consolidada.</p>
-                                    <a :href="djConsolidadaUrl" target="_blank"
-                                        class="text-xs font-semibold text-blue-600 hover:underline mt-2 inline-block">Ver
-                                        Documento Consolidado Actual</a>
-                                </div>
-
-                                <div class="mt-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-800 rounded-r-lg">
-                                    <p class="font-bold text-sm">Acción Requerida</p>
-                                    <p class="text-xs mt-1">Al modificar este gasto, la DJ consolidada actual quedará
-                                        invalidada. Deberás generar y subir una nueva en la pantalla de Declaración de
-                                        Gastos.</p>
-                                    <div class="mt-2 flex items-center">
-                                        <input type="checkbox" id="confirmacionDJ" v-model="confirmacionDJ"
-                                            class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                                        <label for="confirmacionDJ" class="ml-2 block text-xs text-gray-900">Entiendo
-                                            que deberé regenerar la DJ consolidada.</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-else>
+                            <div>
                                 <label class="block text-sm font-medium text-gray-700">Cambiar Archivo de Evidencia
                                     (Opcional)</label>
+                                <p class="text-xs text-gray-500 mb-1">Si la observación está relacionada con el
+                                    sustento, sube un nuevo archivo aquí.</p>
                                 <input type="file" @change="handleFileChange"
                                     class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-verde-bap-extralight file:text-verde-bap-dark hover:file:bg-verde-bap/20" />
                                 <p v-if="nuevaEvidenciaFile" class="text-xs text-green-600 mt-1">Nuevo archivo: {{

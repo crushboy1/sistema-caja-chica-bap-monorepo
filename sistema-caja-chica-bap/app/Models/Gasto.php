@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -48,9 +49,9 @@ class Gasto extends Model
         'estado',
         'motivo_observacion_adm',
         'motivo_rechazo',
-        'id_dj_consolidada',      
-        'id_observador_adm',      
-        'comentario_subsanacion', 
+        'id_dj_consolidada',
+        'id_observador_adm',
+        'comentario_subsanacion',
     ];
 
     /**
@@ -139,10 +140,10 @@ class Gasto extends Model
     }
 
     public function historialAprobaciones(): HasMany
-{
-    // Ahora busca la clase correcta "HistorialAprobacionGasto"
-    return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
-}
+    {
+        // Ahora busca la clase correcta "HistorialAprobacionGasto"
+        return $this->hasMany(HistorialAprobacionGasto::class, 'id_gasto');
+    }
 
     // --- NUEVAS RELACIONES ---
 
@@ -162,7 +163,18 @@ class Gasto extends Model
         return $this->belongsTo(DjConsolidada::class, 'id_dj_consolidada', 'id_dj_consolidada');
     }
 
-
+    /*
+    |--------------------------------------------------------------------------
+    | QUERY SCOPES
+    |--------------------------------------------------------------------------
+    |  Los scopes permiten encapsular y reutilizar lógica de consulta.
+    */
+    public function scopeReadyForConsolidation(Builder $query, int $userId): Builder
+    {
+        return $query->whereNull('id_dj_consolidada')
+            ->where('id_registrador', $userId)
+            ->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable']);
+    }
     /*
     |--------------------------------------------------------------------------
     | ACCESSORS & MUTATORS
