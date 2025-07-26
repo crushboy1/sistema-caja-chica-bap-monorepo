@@ -526,14 +526,17 @@ const getNestedValue = (obj, path) => {
                                 <input v-if="field.type === 'text'" v-model="currentItem[field.key]" type="text"
                                     class="form-input" :required="field.required"
                                     :disabled="isEditing && field.disabledOnEdit">
-                                <select v-if="field.type === 'select'" v-model="currentItem[field.key]"
-                                    class="form-input" :required="field.required">
-                                    <option :value="null" disabled>Seleccione una cuenta</option>
-                                    <option v-for="option in dataSets[field.options].filter(o => o.activo)"
-                                        :key="option.id" :value="option.id">
-                                        {{ option.codigo_cuenta }} - {{ option.descripcion }}
-                                    </option>
-                                </select>
+                                <v-select
+                                v-if="field.type === 'select'"
+                                v-model="currentItem[field.key]"
+                                :reduce="option => option.id"
+                                :options="dataSets[field.options].filter(o => o.activo)"
+                                label="descripcion"
+                                placeholder="Seleccione una cuenta"
+                                class="mt-1"
+                                :required="field.required"
+                                />
+
                             </div>
                         </div>
                         <div class="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-4">

@@ -560,14 +560,17 @@ onMounted(() => {
               <label for="proyecto" class="block text-sm font-medium text-gray-700 mb-1">
                 Proyecto Asociado <span class="text-rojo-bap">*</span>
               </label>
-              <select id="proyecto" v-model="formData.id_proyecto"
-                class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-                :required="formData.tipo_fondo_solicitado === 'Proyecto'">
-                <option :value="null" disabled>Seleccione un proyecto</option>
-                <option v-for="proyecto in proyectos" :key="proyecto.id_proyecto" :value="proyecto.id_proyecto">
-                  {{ proyecto.nombre }}
-                </option>
-              </select>
+              <v-select
+                id="proyecto"
+                v-model="formData.id_proyecto"
+                :options="proyectos"
+                label="nombre"
+                :reduce="proyecto => proyecto.id_proyecto"
+                placeholder="Seleccione un proyecto"
+                class="mt-1"
+                :required="formData.tipo_fondo_solicitado === 'Proyecto'"
+              />
+
             </div>
 
             <div v-if="mostrarAreasParticipantes" class="md:col-span-2">
@@ -636,16 +639,18 @@ onMounted(() => {
                 <label :for="'gasto_proyectado_' + index" class="block text-sm font-medium text-gray-700 mb-1">
                   Gasto Proyectado <span class="text-rojo-bap">*</span>
                 </label>
-                <select :id="'gasto_proyectado_' + index" v-model="item.gasto_proyectado_id"
-                  class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-                  required>
-                  <option :value="null" disabled>Seleccione un tipo de gasto</option>
-                  <option v-for="gastoCatalogo in gastosProyectadosCatalogo" :key="gastoCatalogo.id_gasto_proyectado"
-                    :value="gastoCatalogo.id_gasto_proyectado"
-                    :disabled="esOpcionDeshabilitada(gastoCatalogo.id_gasto_proyectado, item.gasto_proyectado_id)">
-                    {{ gastoCatalogo.descripcion }}
-                  </option>
-                </select>
+                <v-select
+                  :id="'gasto_proyectado_' + index"
+                  v-model="item.gasto_proyectado_id"
+                  :options="gastosProyectadosCatalogo"
+                  label="descripcion"
+                  :reduce="gasto => gasto.id_gasto_proyectado"
+                  :placeholder="'Seleccione un tipo de gasto'"
+                  class="mt-1"
+                  required
+                  :selectable="gasto => !esOpcionDeshabilitada(gasto.id_gasto_proyectado, item.gasto_proyectado_id)"
+                />
+
               </div>
               <div class="flex items-center justify-between">
                 <div>
