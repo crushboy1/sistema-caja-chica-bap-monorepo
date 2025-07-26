@@ -145,7 +145,7 @@
                 <td class="py-3 px-2 text-center">
                   <!-- Usa la propiedad de resumen del grupo directamente -->
                   <div class="font-bold text-lg text-blue-800">{{ currencyFormatter.format(item.monto_total_grupo || 0)
-                    }}</div>
+                  }}</div>
                   <div class="text-xs text-gray-500">Total consolidado</div>
                 </td>
                 <td class="py-3 px-2 text-center">
@@ -520,34 +520,72 @@ const toggleGroup = (groupId) => {
   }
 };
 
-const gestionarAccion = async (item, accion) => {
-  const esGrupo = item.es_grupo;
+const getGastoDetailsForAction = (item) => {
+  let id = null;
+  let codigo = 'N/A';
+  let isGroup = false;
+
+  if (item.es_grupo) { // Caso 1: Es un objeto de resumen de grupo ({es_grupo: true, ...})
+    id = item.id_dj_consolidada;
+    codigo = `DJ-${item.id_dj_consolidada}`;
+    isGroup = true;
+  } else if (item.gasto) { // Caso 2: Es un wrapper de gasto individual ({es_grupo: false, gasto: {...}})
+    id = item.gasto.id;
+    codigo = item.gasto.codigo_gasto;
+    isGroup = false;
+  } else { // Caso 3: Es un objeto de gasto directo (como los que vienen de /v1/mis-gastos o dentro de item.gastos[])
+    id = item.id;
+    codigo = item.codigo_gasto;
+    isGroup = false; // Un gasto directo no es un "grupo"
+  }
+
+  // Asegurarse de que el ID sea un valor válido antes de retornarlo
+  if (id === undefined || id === null) {
+    console.error("ERROR: ID del gasto/grupo es nulo o indefinido. Item problemático:", item);
+    return { id: null, codigo: 'ID_NO_VALIDO', isGroup: isGroup }; // Retornar un valor nulo para que la acción falle en el frontend
+  }
+
+  return { id, codigo, isGroup };
+};
+
+// --- Método gestionarAccion (Completo y Refactorizado) ---
+const gestionarAccion = async (itemOriginal, accion) => { // Renombrado a itemOriginal para mayor claridad
+  // Usamos el helper para obtener el ID, código y si es grupo de forma segura
+  const { id, codigo, isGroup } = getGastoDetailsForAction(itemOriginal);
+
+  if (id === null) { // Si getGastoDetailsForAction no pudo obtener un ID válido
+    Swal.fire('Error', 'No se pudo identificar el gasto para realizar la acción. Por favor, recargue la página.', 'error');
+    return;
+  }
+
+  // Definición de configuraciones base para cada tipo de acción
   const configBase = {
     approve: { title: 'Aprobar', icon: 'success', confirmButtonText: 'Sí, ¡Aprobar!', needsComment: false },
     observe: { title: 'Observar', icon: 'warning', confirmButtonText: 'Sí, ¡Observar!', needsComment: true, commentLabel: 'Motivo de la observación:' },
     reject: { title: 'Rechazar', icon: 'error', confirmButtonText: 'Sí, ¡Rechazar!', needsComment: true, commentLabel: 'Motivo del rechazo:' }
   };
 
-  // Construye la configuración dinámicamente.
+  // Construye la configuración específica para la acción y el tipo de ítem
   const config = {
     ...configBase[accion],
-    title: `${configBase[accion].title} ${esGrupo ? 'Grupo de DJ' : 'Gasto'}`,
-    text: esGrupo
+    title: `${configBase[accion].title} ${isGroup ? 'Grupo de DJ' : 'Gasto'}`,
+    text: isGroup
       ? `¿Estás seguro de ${accion.toLowerCase()} el grupo de DJ completo?`
-      : `¿Estás seguro de ${accion.toLowerCase()} el gasto ${item.gasto?.codigo_gasto}?`, // Acceso seguro
-    endpoint: esGrupo
-      ? `/v1/dj-groups/${item.id_dj_consolidada || ''}/${accion}` // Acceso seguro: Para 'reject' de grupo, esto apunta a /v1/dj-groups/{id}/reject
-      : `/v1/gastos/${item.gasto?.id || ''}/${accion}`, // Acceso seguro: Para 'reject' individual, esto apunta a /v1/gastos/{id}/reject
-    method: 'put'
+      : `¿Estás seguro de ${accion.toLowerCase()} el gasto ${codigo}?`, // Usar 'codigo' de la función auxiliar
+    endpoint: isGroup
+      ? `/v1/dj-groups/${id || ''}/${accion}` // Usar 'id' de la función auxiliar
+      : `/v1/gastos/${id || ''}/${accion}`, // Usar 'id' de la función auxiliar
+    method: 'put' // Todas las acciones son PUT
   };
 
   // Lógica de negocio: No se puede observar un grupo directamente, se debe observar un gasto hijo.
-  if (esGrupo && accion === 'observe') {
+  if (isGroup && accion === 'observe') { // Usar 'isGroup'
     Swal.fire('Acción no permitida', 'Para observar un grupo, debe expandirlo y observar un gasto individual específico. Esto invalidará la DJ para su corrección.', 'info');
     return;
   }
 
   let comentario = '';
+  // Si la acción requiere comentario, mostrar el input de SweetAlert
   if (config.needsComment) {
     const { value: text } = await Swal.fire({
       title: config.title,
@@ -556,30 +594,34 @@ const gestionarAccion = async (item, accion) => {
       inputPlaceholder: 'Escribe tu comentario aquí...',
       showCancelButton: true,
       confirmButtonText: config.confirmButtonText,
-      cancelButtonText: 'Cancelar',
+      cancelButtonText: 'Cancelar', // Añadir botón de cancelar
       inputValidator: (value) => !value && '¡Necesitas escribir un motivo!'
     });
-    if (!text) return;
+    if (!text) return; // El usuario canceló o no escribió nada.
     comentario = text;
   } else {
-    const { isConfirmed } = await Swal.fire({
+    // Si no requiere comentario, mostrar solo el modal de confirmación
+    const result = await Swal.fire({
       title: config.title,
       text: config.text,
       icon: config.icon,
       showCancelButton: true,
+      confirmButtonColor: '#3085d6', // Color por defecto de confirmación
+      cancelButtonColor: '#d33', // Color por defecto de cancelación
       confirmButtonText: config.confirmButtonText,
       cancelButtonText: 'Cancelar'
     });
-    if (!isConfirmed) return;
+    if (!result.isConfirmed) return; // El usuario canceló la confirmación
   }
 
+  // Ejecutar la llamada a la API
   try {
-    await api[config.method](config.endpoint, { comentario });
+    await api.put(config.endpoint, { comentario }); // Todas las acciones son PUT y pueden llevar comentario
     Swal.fire('¡Acción Completada!', 'La operación se realizó con éxito.', 'success');
-    fetchGastos(); // Recargar la lista para reflejar el cambio.
+    fetchGastos(); // Refrescar la tabla para reflejar los cambios de estado
   } catch (error) {
     console.error(`Error al ejecutar la acción ${accion}:`, error);
-    Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error.', 'error');
+    Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error inesperado.', 'error');
   }
 };
 

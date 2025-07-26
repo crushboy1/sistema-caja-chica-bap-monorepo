@@ -566,7 +566,7 @@ import { getClassesForActionButton } from '@/utils/statusStyles.js';
 const emit = defineEmits(['close', 'gastoCreado']);
 // --- ESTADO REACTIVO DEL COMPONENTE ---
 const gastosADeclarar = ref([]);
-const usuarioActual = ref(null);
+
 const fondosActivos = ref([]);
 const fondoSeleccionadoId = ref(null);
 const gastosProyectadosDisponibles = ref([]);
@@ -582,24 +582,19 @@ const djConsolidadaFile = ref(null);
 onMounted(async () => {
     cargandoInicial.value = true;
     await Promise.all([
-        obtenerUsuarioLogueado(),
+      
         obtenerFondosActivos(),
         obtenerCuentasContables()
 
     ]);
     cargandoInicial.value = false;
 });
-const obtenerUsuarioLogueado = async () => {
-    try {
-        const response = await api.get('/auth/user');
-        usuarioActual.value = response.data;
-        const firstName = usuarioActual.value.name || '';
-        const lastName = usuarioActual.value.last_name || '';
-        usuarioActual.value.fullName = `${firstName} ${lastName}`.trim();
-    } catch (error) {
-        console.error("Error al obtener datos del usuario:", error);
+const props = defineProps({
+    usuarioActual: {
+        type: Object,
+        required: true
     }
-};
+});
 const obtenerFondosActivos = async () => {
     try {
         const response = await api.get('/v1/fondos-activos-usuario');
@@ -740,7 +735,7 @@ const agregarGasto = async () => {
         serie_documento: '',
         correlativo_documento: '',
         monto_total: null,
-        responsable_gasto: usuarioActual.value?.fullName || '',
+        
         comentario: '',
         evidencia: null,
         es_declaracion_jurada: false,
@@ -883,39 +878,76 @@ const handleDJConsolidadaFileChange = (event) => {
 };
 // MODIFICACIÓN: Nuevo método para generar la DJ consolidada
 const generarDJConsolidada = async () => {
-    // 1. Filtrar solo los gastos que son DJ y están completos.
-    const gastosValidosParaDJ = gastosADeclarar.value
-        .filter(g => g.es_declaracion_jurada && isGastoCompleto(g));
+    const gastosValidosParaDJ = gastosADeclarar.value.filter(g => g.es_declaracion_jurada && isGastoCompleto(g));
 
-    if (gastosValidosParaDJ.length === 0) {
-        Swal.fire('No hay gastos de DJ completos', 'Asegúrese de que todos los gastos marcados como DJ estén completos antes de generar la plantilla.', 'info');
+    if (gastosValidosParaDJ.length < 1) {
+        Swal.fire('Gastos Insuficientes para DJ', 'Necesitas al menos 1 gastos marcados como "Declaración Jurada" y completos para generar la plantilla de DJ Consolidada.', 'info');
         return;
     }
     
-    // 2. Extraer solo los IDs de esos gastos.
-    const gastosIds = gastosValidosParaDJ.map(g => g.id); // Asumimos que g.id es el identificador único.
+    // Preparar FormData para enviar los datos de los gastos al backend
+    const formDataForDJGen = new FormData();
+    formDataForDJGen.append('id_fondo_efectivo', fondoSeleccionadoId.value);
+    formDataForDJGen.append('id_registrador', props.usuarioActual.id); // Asegurar que el ID del registrador se envía
+
+    gastosValidosParaDJ.forEach((gasto, index) => {
+        Object.keys(gasto).forEach(key => {
+            // No enviar el ID temporal de Vue ni campos que no son del modelo
+            if (key === 'id' || key === 'responsable_gasto_nombre' || key === 'evidencia' || key === 'ruta_evidencia' || key === 'monto_proyectado_original') return;
+            
+            // Convertir booleanos a 0 o 1
+            const value = typeof gasto[key] === 'boolean' ? (gasto[key] ? 1 : 0) : gasto[key];
+            formDataForDJGen.append(`gastos[${index}][${key}]`, value);
+        });
+    });
 
     try {
-        // 3. Enviar solo los IDs al nuevo endpoint seguro.
-        const response = await api.post('/v1/documentos/generar-dj-consolidada', {
-            gastos_ids: gastosIds
-        }, {
-            responseType: 'blob'
+        Swal.fire({
+            title: 'Generando Plantilla...',
+            text: 'Por favor, espera mientras preparamos el documento. No cierres esta ventana.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
         });
 
-        // 4. La lógica para descargar el archivo PDF se mantiene igual.
+        // Enviar los datos completos de los gastos al backend para la generación de la plantilla
+        // El backend VALIDARÁ estos datos y usará los que necesite para la plantilla PDF.
+        const response = await api.post('/v1/documentos/generar-dj-consolidada', formDataForDJGen, {
+            responseType: 'blob', // Para manejar la descarga del archivo
+            headers: { 'Content-Type': 'multipart/form-data' } // Importante para FormData, ya que incluye archivos
+        });
+
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        const filename = `DJ-Consolidada-Previa-${Date.now()}.pdf`;
+        const filename = `DJ-Consolidada-Plantilla-${Date.now()}.pdf`;
         link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
+
+        Swal.fire('¡Plantilla Generada!', 'La plantilla de DJ Consolidada ha sido descargada. Por favor, fírmala y súbela en el siguiente paso.', 'success');
     } catch (error) {
         console.error("Error al generar la DJ Consolidada:", error);
-        Swal.fire('Error', 'No se pudo generar el documento PDF consolidado.', 'error');
+        const errorMessage = error.response?.data?.message || 'No se pudo generar el documento PDF consolidado.';
+        const errors = error.response?.data?.errors;
+        let htmlError = `<p>${errorMessage}</p>`;
+        if (errors) {
+            htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
+            for (const key in errors) {
+                // Formato de error más amigable para errores de validación de gastos anidados
+                const fieldName = key.replace(/gastos\.(\d+)\.(\w+)/, (match, gastoIndex, field) => `Gasto #${parseInt(gastoIndex) + 1} (${field.replace(/_/g, ' ')})`);
+                htmlError += `<li>${fieldName}: ${errors[key][0]}</li>`;
+            }
+            htmlError += '</ul>';
+        }
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al Generar DJ',
+            html: htmlError
+        });
     }
 };
 

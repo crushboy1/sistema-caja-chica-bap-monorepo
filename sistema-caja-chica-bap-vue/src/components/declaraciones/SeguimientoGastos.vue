@@ -9,7 +9,7 @@
             </div>
             <!-- Botón para Re-consolidar DJ (se muestra condicionalmente) -->
             <transition name="fade-in-up">
-                <button v-if="gastosSeleccionados.length > 0" @click="abrirModalReconsolidacion"
+                <button v-if="puedeReconsolidarDJ" @click="abrirModalReconsolidacion"
                     class="bg-verde-bap hover:bg-verde-bap-dark text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 flex items-center space-x-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -53,111 +53,122 @@
                 <p>Cargando tus gastos...</p>
             </div>
 
-            <!-- Estado Vacío -->
-            <div v-else-if="gastos.length === 0" class="p-10 text-center text-gray-500">
-                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                    </path>
-                </svg>
-                <h3 class="font-semibold text-lg text-gray-700">No tienes gastos registrados</h3>
-                <p class="text-sm mt-1">Cuando registres una nueva declaración, aparecerá aquí.</p>
-            </div>
-
-            <!-- Tabla de Gastos -->
+            <!-- Tabla o Mensaje de Vacío (envuelto en un solo bloque condicional) -->
             <div v-else class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y  divide-gray-200" style="table-layout: fixed; min-width: 900px;">
+                    <thead class="bg-gray-50 ">
                         <tr>
-                            <th scope="col" class="p-4"><input type="checkbox" @change="seleccionarTodos"
-                                    :checked="todosSeleccionados"
+                            <th scope="col" class="p-4 w-12 ">
+                                <input type="checkbox" @change="seleccionarTodos" :checked="todosSeleccionados"
                                     class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
                             </th>
                             <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 Código</th>
                             <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Glosa / Descripción del Gasto</th>
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Glosa / Descripción del Gasto
+                            </th>
                             <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Monto</th>
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Monto
+                            </th>
                             <th scope="col"
-                                class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Fecha</th>
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Fecha
+                            </th>
                             <th scope="col"
-                                class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Estado</th>
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-42">
+                                Estado
+                            </th>
                             <th scope="col"
-                                class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Acciones</th>
-                            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Acciones
+                            </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <transition-group name="gasto-list">
-                            <tr v-for="gasto in gastosFiltrados" :key="gasto.id"
-                                class="hover:bg-verde-bap-extralight transition-colors duration-200">
-                                <td class="p-4 align-middle">
-                                    <input v-if="esConsolidable(gasto)" type="checkbox" v-model="gastosSeleccionados"
-                                        :value="gasto.id"
-                                        class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 align-middle">
-                                    {{ gasto.codigo_gasto }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate align-middle"
-                                    :title="gasto.glosa">{{ gasto.glosa }}</td>
-                                <td
-                                    class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold align-middle">
-                                    {{ currencyFormatter.format(gasto.monto_total) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 align-middle">{{
-                                    formatDate(gasto.created_at) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center align-middle">
-                                    <span :class="getClassesForAuditoriaBadge(gasto.estado)">{{ gasto.estado }}</span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium align-middle">
-                                    <div class="flex items-center justify-center space-x-2">
-                                        <button @click="abrirModalDetalle(gasto)"
-                                            class="p-2 rounded-full hover:bg-blue-100 text-blue-600 transition-colors"
-                                            title="Ver Detalle">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
-                                                </path>
-                                            </svg>
-                                        </button>
-                                        <button v-if="gasto.estado === 'Observado'" @click="abrirModalCorreccion(gasto)"
-                                            class="p-2 rounded-full hover:bg-orange-100 text-orange-600 transition-colors"
-                                            title="Corregir Gasto">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z">
-                                                </path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </transition-group>
-                    </tbody>
+                    <!-- CAMBIO: tbody es ahora el tag de transition-group -->
+                    <transition-group name="gasto-list" tag="tbody" class="bg-white divide-y divide-gray-200">
+                        <tr v-for="gasto in gastosFiltrados" :key="gasto.id"
+                            class="hover:bg-verde-bap-extralight transition-colors duration-200">
+                            <td class="p-4 align-middle">
+                                <input v-if="esConsolidable(gasto)" type="checkbox" v-model="gastosSeleccionados"
+                                    :value="gasto.id"
+                                    class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
+                            </td>
+                            <td
+                                class="px-4 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900 align-middle">
+                                {{ gasto.codigo_gasto }}</td>
+                            <td class="px-4 py-4  text-center text-sm text-gray-600 truncate align-middle"
+                                :title="gasto.glosa">
+                                {{ gasto.glosa }}</td>
+                            <td
+                                class="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-800 font-semibold align-middle">
+                                {{ currencyFormatter.format(gasto.monto_total) }}</td>
+                            <td class="px-4 py-4 whitespace-nowrap text-center text-sm text-gray-500 align-middle">{{
+                                formatDate(gasto.created_at) }}</td>
+                            <td
+                                class="py-4 px-4 flex justify-center items-center text-center whitespace-nowrap align-middle">
+                                <span :class="getClassesForAuditoriaBadge(gasto.estado)">{{ gasto.estado }}</span>
+                            </td>
+                            <td class="px-4 py-4 whitespace-nowrap text-center text-sm font-medium align-middle">
+                                <div class="flex items-center justify-center space-x-2">
+                                    <button @click="abrirModalDetalle(gasto)"
+                                        class="p-2 rounded-full  hover:bg-blue-100 text-blue-600 transition-colors"
+                                        title="Ver Detalle">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                    <button v-if="gasto.estado === 'Observado'" @click="abrirModalCorreccion(gasto)"
+                                        class="p-2 rounded-full hover:bg-orange-100 text-orange-600 transition-colors"
+                                        title="Corregir Gasto">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </transition-group>
                 </table>
+                <!-- Mensaje de "Sin resultados" si los filtros no devuelven nada -->
+                <div v-if="gastosFiltrados.length === 0 && !cargando" class="p-10 text-center text-gray-500">
+                    <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <h3 class="font-semibold text-lg text-gray-700">No se encontraron gastos</h3>
+                    <p class="text-sm mt-1">Ajusta tus filtros o registra nuevos gastos.</p>
+                </div>
             </div>
         </div>
 
-        <!-- Modales (placeholders) -->
+        <!-- Modales -->
         <GastoDetalleModal v-if="mostrarModalDetalle" :gasto="gastoSeleccionado" :mostrar="mostrarModalDetalle"
             @close="mostrarModalDetalle = false" />
-        <CorregirGastoModal v-if="mostrarModalCorreccion" :gasto="gastoSeleccionado"
-            @close="mostrarModalCorreccion = false" @gasto-actualizado="handleGastoActualizado" />
+        <CorregirGastoModal 
+    v-if="mostrarModalCorreccion && gastoSeleccionado"
+    :mostrar="mostrarModalCorreccion" 
+    :gasto="gastoSeleccionado" 
+    :usuarioActual="usuarioActual"
+    @close="mostrarModalCorreccion = false" 
+    @gasto-actualizado="handleGastoActualizado" />
         <ReconsolidarDjModal v-if="mostrarModalReconsolidar" :gastos-a-consolidar="gastosParaReconsolidar"
-            @close="mostrarModalReconsolidar = false" @dj-creada="handleDjReconsolidada" />
+            :usuarioActual="usuarioActual" @close="mostrarModalReconsolidar = false"
+            @dj-creada="handleDjReconsolidada" />
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
@@ -165,12 +176,22 @@ import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import CorregirGastoModal from './modals/CorregirGastoModal.vue';
 import ReconsolidarDjModal from './modals/ReconsolidarDjModal.vue';
 
+// --- PROPS ---
+const props = defineProps({
+    usuarioActual: {
+        type: Object,
+        required: true
+    }
+});
+
 // --- ESTADO REACTIVO ---
-const gastos = ref([]);
+const gastos = ref([]); // Lista completa de gastos del usuario
 const cargando = ref(true);
 const filtros = ref({ busqueda: '', estado: '' });
-const gastosSeleccionados = ref([]);
-const gastoSeleccionado = ref(null);
+const gastosSeleccionados = ref([]); // IDs de gastos seleccionados para re-consolidar
+
+// Modales
+const gastoSeleccionado = ref(null); // Gasto actual para ver detalle/corrección
 const mostrarModalDetalle = ref(false);
 const mostrarModalCorreccion = ref(false);
 const mostrarModalReconsolidar = ref(false);
@@ -185,9 +206,9 @@ onMounted(() => {
 const fetchGastos = async () => {
     cargando.value = true;
     try {
-        // Usamos el endpoint que trae solo los gastos del usuario autenticado.
-        const response = await api.get('/v1/mis-gastos'); // O '/v1/mis-gastos' si existe
-        gastos.value = response.data;
+        // Endpoint para obtener solo los gastos del usuario autenticado
+        const response = await api.get('/v1/mis-gastos');
+        gastos.value = response.data; // Asume que el backend devuelve un array plano de objetos Gasto
     } catch (error) {
         console.error("Error al obtener los gastos:", error);
         Swal.fire('Error', 'No se pudieron cargar tus gastos.', 'error');
@@ -199,26 +220,43 @@ const fetchGastos = async () => {
 // --- PROPIEDADES COMPUTADAS ---
 const gastosFiltrados = computed(() => {
     let gastosFiltrados = [...gastos.value];
+
+    // Filtro por búsqueda de texto (código o glosa)
     if (filtros.value.busqueda) {
         const busquedaLower = filtros.value.busqueda.toLowerCase();
         gastosFiltrados = gastosFiltrados.filter(g =>
-            g.codigo_gasto.toLowerCase().includes(busquedaLower) ||
-            g.glosa.toLowerCase().includes(busquedaLower)
+            g.codigo_gasto?.toLowerCase().includes(busquedaLower) ||
+            g.glosa?.toLowerCase().includes(busquedaLower)
         );
     }
+
+    // Filtro por estado
     if (filtros.value.estado) {
         gastosFiltrados = gastosFiltrados.filter(g => g.estado === filtros.value.estado);
     }
+
     return gastosFiltrados;
 });
 
+// Determina si todos los gastos consolidables visibles están seleccionados
 const todosSeleccionados = computed(() => {
-    const consolidables = gastosFiltrados.value.filter(esConsolidable);
-    return consolidables.length > 0 && gastosSeleccionados.value.length === consolidables.length;
+    const consolidablesVisibles = gastosFiltrados.value.filter(esConsolidable);
+    return consolidablesVisibles.length > 0 && gastosSeleccionados.value.length === consolidablesVisibles.length;
 });
+
+// Prepara la lista de gastos a pasar al modal de re-consolidación
 const gastosParaReconsolidar = computed(() => {
     return gastos.value.filter(g => gastosSeleccionados.value.includes(g.id));
 });
+
+// Habilita el botón "Crear DJ Consolidada"
+const puedeReconsolidarDJ = computed(() => {
+    // Solo se habilita si hay al menos dos gastos seleccionados Y todos son consolidables.
+    // La validación más estricta de que sean "tipo DJ" se hace en esConsolidable.
+    return gastosSeleccionados.value.length >= 1 &&
+        gastosParaReconsolidar.value.every(g => esConsolidable(g));
+});
+
 // --- MÉTODOS ---
 const resetearFiltros = () => {
     filtros.value = { busqueda: '', estado: '' };
@@ -227,17 +265,27 @@ const resetearFiltros = () => {
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-
-    date.setDate(date.getDate() + 1);
+    // Formatear la fecha sin añadir un día extra
     const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
     return date.toLocaleDateString('es-PE', options);
 };
 
+// Lógica para determinar si un gasto es elegible para ser seleccionado para re-consolidación
 const esConsolidable = (gasto) => {
-    const estadosConsolidables = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
-    return estadosConsolidables.includes(gasto.estado) && !gasto.id_dj_consolidada && gasto.es_declaracion_jurada;
+    // Un gasto es consolidable si:
+    // 1. Está en estado 'Observado' (solo los observados pueden ser corregidos y re-consolidados)
+    // 2. NO tiene un id_dj_consolidada (significa que ya fue desvinculado de una DJ anterior)
+    // 3. Es de tipo 'Declaración Jurada' (es_declaracion_jurada es true)
+    // 4. Pertenece al usuario actual (seguridad)
+    const esObservado = gasto.estado === 'Observado';
+    const noEstaEnDj = !gasto.id_dj_consolidada;
+    const esTipoDj = gasto.es_declaracion_jurada;
+    const esDelUsuario = gasto.id_registrador === props.usuarioActual?.id; // Asegurar que el gasto pertenece al usuario
+
+    return esObservado && noEstaEnDj && esTipoDj && esDelUsuario;
 };
 
+// Selecciona/deselecciona todos los gastos consolidables visibles
 const seleccionarTodos = (event) => {
     if (event.target.checked) {
         gastosSeleccionados.value = gastosFiltrados.value
@@ -249,8 +297,14 @@ const seleccionarTodos = (event) => {
 };
 
 const abrirModalReconsolidacion = () => {
+    // Antes de abrir el modal, se puede hacer una validación final de los seleccionados
+    if (gastosParaReconsolidar.value.length < 2) {
+        Swal.fire('Selección Insuficiente', 'Debes seleccionar al menos dos gastos tipo DJ observados para crear una Declaración Jurada Consolidada.', 'warning');
+        return;
+    }
     mostrarModalReconsolidar.value = true;
 };
+
 const abrirModalDetalle = (gasto) => {
     gastoSeleccionado.value = gasto;
     mostrarModalDetalle.value = true;
@@ -261,16 +315,34 @@ const abrirModalCorreccion = (gasto) => {
     mostrarModalCorreccion.value = true;
 };
 
+// Manejador después de que un gasto es actualizado en el modal de corrección
 const handleGastoActualizado = () => {
     mostrarModalCorreccion.value = false;
-    fetchGastos();
+    fetchGastos(); // Recargar la lista para reflejar el cambio de estado
+    gastosSeleccionados.value = []; // Limpiar selección por si acaso
 };
+
+// Manejador después de que una DJ es re-consolidada en el modal
 const handleDjReconsolidada = () => {
     mostrarModalReconsolidar.value = false;
-    gastosSeleccionados.value = []; // Limpiar selección
-    fetchGastos(); // Recargar la lista para mostrar los nuevos estados
-    Swal.fire('¡Éxito!', 'La Declaración Jurada ha sido consolidada y enviada para validación.', 'success');
+    gastosSeleccionados.value = []; // Limpiar selección después de la consolidación
+    fetchGastos(); // Recargar la lista para mostrar los nuevos estados de los gastos
 };
+
+// --- WATCHERS ---
+// Observa cambios en los filtros para recargar los gastos
+watch(filtros, () => {
+    // Cuando los filtros cambian, la lista de gastos filtrados se actualiza automáticamente.
+    // También limpiamos la selección para evitar inconsistencias.
+    gastosSeleccionados.value = [];
+}, { deep: true }); // Observación profunda para detectar cambios en las propiedades del objeto filtros
+
+// Opcional: Si quieres que la búsqueda por texto tenga un debounce
+// watch(() => filtros.value.busqueda, (newValue) => {
+//   // Implementar debounce si es necesario
+//   // clearTimeout(debounceTimeout);
+//   // debounceTimeout = setTimeout(() => { /* lógica de búsqueda */ }, 300);
+// });
 </script>
 
 <style scoped>
@@ -284,5 +356,48 @@ const handleDjReconsolidada = () => {
 .gasto-list-leave-to {
     opacity: 0;
     transform: translateY(20px);
+}
+
+/* Asegura que los elementos que salen no afecten el layout antes de desaparecer */
+.gasto-list-leave-active {
+    position: absolute;
+}
+
+.gasto-list-move {
+    transition: transform 0.4s ease;
+}
+
+/* Estilos mejorados para la tabla responsive */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    vertical-align: middle;
+}
+
+/* Responsive: en pantallas pequeñas, permitir scroll horizontal */
+@media (max-width: 768px) {
+    .overflow-x-auto {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        min-width: 700px;
+    }
+}
+
+/* Estilos para el truncate en la glosa */
+.max-w-xs {
+    max-width: 20rem;
+}
+
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 </style>

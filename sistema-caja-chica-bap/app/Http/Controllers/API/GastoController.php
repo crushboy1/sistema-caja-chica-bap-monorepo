@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Exports\GastosReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * GastoController se encarga de todo el ciclo de vida de las declaraciones de gastos.
@@ -330,20 +332,24 @@ class GastoController extends Controller
     public function observe(Request $request, Gasto $gasto)
     {
         $user = Auth::user();
-        $user->load('role'); // Asegurarse de que el rol esté cargado
+        $user->load('role');
 
         // 1. --- Validación de entrada ---
         $request->validate(['comentario' => 'required|string|max:2000']);
+
         // 2. --- Lógica de Autorización y Permisos por Rol ---
-        $isJefeAreaAutorizado = ($user->role->name === 'jefe_area' && $user->area_id === $gasto->registrador->area_id);
-        $isAdministrador = in_array($user->role->name, ['jefe_administracion', 'super_admin']);
+        $isJefeAreaAutorizado = ($user->hasRole('jefe_area') && $user->area_id === $gasto->registrador->area_id);
+        $isAdministrador = in_array($user->hasRole('jefe_administracion'), ['jefe_administracion', 'super_admin']); // Corregir esta línea si usas hasAnyRole
+        // REVISAR: $isAdministrador = $user->hasAnyRole(['jefe_administracion', 'super_admin']); // Esta línea es la que debería estar si se usa hasAnyRole
+
         if (!$isJefeAreaAutorizado && !$isAdministrador) {
             return response()->json(['message' => 'No tienes permiso para observar este gasto.'], 403);
         }
-        // 3. --- Validación de Estado según el Rol  ---
+
+        // 3. --- Validación de Estado según el Rol ---
         $estadosValidosParaJefe = ['Pendiente de Aprobación'];
-        // Un administrador ahora también puede observar gastos pendientes de validación de DJ.
         $estadosValidosParaAdmin = ['Pendiente de Validación Contable', 'Pendiente de Validación DJ'];
+
         if ($isJefeAreaAutorizado && !in_array($gasto->estado, $estadosValidosParaJefe)) {
             return response()->json(['message' => 'Como Jefe de Área, solo puedes observar gastos pendientes de tu aprobación.'], 409);
         }
@@ -353,55 +359,54 @@ class GastoController extends Controller
 
         // 4. --- Ejecución de la Lógica de Negocio ---
         return DB::transaction(function () use ($gasto, $user, $request, $isJefeAreaAutorizado) {
-            $estadoAnterior = $gasto->estado;
+            $estadoAnteriorGastoObservado = $gasto->estado; // Estado del gasto que se observó directamente
             $comentarioObservacion = $request->comentario;
             $djId = $gasto->id_dj_consolidada;
+
             // --- LÓGICA DE INVALIDACIÓN DE GRUPO DE DJ ---
             if ($djId) {
-                // 1. Obtener todos los gastos del grupo, EXCLUYENDO el que se está observando.
-                $gastosHermanos = Gasto::where('id_dj_consolidada', $djId)
-                    ->where('id', '!=', $gasto->id)
-                    ->get();
-                // 2. Romper el vínculo de la DJ y revertir el estado de los gastos hermanos.
-                foreach ($gastosHermanos as $gastoHermano) {
-                    $estadoPrevioHermano = $gastoHermano->estado;
-                    $gastoHermano->id_dj_consolidada = null;
-                    // Revertir al estado anterior a la DJ.
-                    // Se asume que un colaborador los envió a 'Pendiente de Aprobación'
-                    // y un jefe/admin a 'Pendiente de Validación Contable'.
-                    $registradorHermano = $gastoHermano->registrador->load('role');
-                    if (in_array($registradorHermano->role->name, ['jefe_area', 'gerente_general', 'jefe_administracion', 'super_admin'])) {
-                        $gastoHermano->estado = 'Pendiente de Validación Contable';
-                    } else {
-                        $gastoHermano->estado = 'Pendiente de Aprobación';
-                    }
-                    $gastoHermano->save();
-                    $this->registrarHistorial($gastoHermano, $estadoPrevioHermano, $gastoHermano->estado, $user->id, "DJ consolidada invalidada debido a observación en Gasto {$gasto->codigo_gasto}.");
+                // Obtener TODOS los gastos del grupo, incluido el que se está observando.
+                // Usamos where('id_dj_consolidada', $djId) para obtener todo el paquete.
+                $gastosDelGrupo = Gasto::where('id_dj_consolidada', $djId)->get();
+
+                foreach ($gastosDelGrupo as $gastoMiembro) {
+                    $estadoPrevioMiembro = $gastoMiembro->estado; // Estado individual antes de la observación
+                    $gastoMiembro->id_dj_consolidada = null; // Romper el vínculo de la DJ para TODOS
+                    $gastoMiembro->estado = 'Observado'; // CAMBIO CLAVE: TODOS los miembros pasan a OBSERVADO
+                    $gastoMiembro->motivo_observacion_adm = $comentarioObservacion; // Añadir motivo de observación
+                    $gastoMiembro->id_observador_adm = $user->id; // Añadir observador
+                    $gastoMiembro->save();
+
+                    // Registrar historial para cada gasto del grupo
+                    $this->registrarHistorial(
+                        $gastoMiembro,
+                        $estadoPrevioMiembro,
+                        'Observado',
+                        $user->id,
+                        "DJ consolidada invalidada debido a observación en Gasto {$gasto->codigo_gasto}. Este gasto ahora requiere corrección."
+                    );
                 }
-                // 3. Romper el vínculo del gasto principal que está siendo observado.
-                $gasto->id_dj_consolidada = null;
-            }
-            // --- Lógica de Observación Individual (se ejecuta siempre) ---
-            if ($gasto->id_jefe_aprobador) {
-                $gasto->id_jefe_aprobador = null;
-            }
-            $gasto->estado = 'Observado';
-            $gasto->motivo_observacion_adm = $comentarioObservacion;
-            $gasto->id_observador_adm = $user->id;
-            $gasto->save();
+            } else {
+                // --- Lógica de Observación Individual (solo si NO pertenecía a un grupo DJ) ---
+                // Si el gasto no era parte de un grupo DJ, solo se observa a sí mismo.
+                $gasto->estado = 'Observado';
+                $gasto->motivo_observacion_adm = $comentarioObservacion;
+                $gasto->id_observador_adm = $user->id;
+                $gasto->save();
 
-            // 5. --- Registrar en el Historial ---
-            $rolObservador = $isJefeAreaAutorizado ? 'Jefe de Área' : 'Administración';
-            $this->registrarHistorial(
-                $gasto,
-                $estadoAnterior,
-                'Observado',
-                $user->id,
-                "Observado por {$rolObservador}: " . $comentarioObservacion
-            );
+                $rolObservador = $isJefeAreaAutorizado ? 'Jefe de Área' : 'Administración';
+                $this->registrarHistorial(
+                    $gasto,
+                    $estadoAnteriorGastoObservado,
+                    'Observado',
+                    $user->id,
+                    "Observado por {$rolObservador}: " . $comentarioObservacion
+                );
+            }
 
-            // 6. --- Respuesta Exitosa ---
-            return response()->json(['message' => 'Gasto observado. El registrador será notificado para su corrección.', 'gasto' => $gasto->fresh()]);
+            // La respuesta final es sobre el gasto que fue originalmente el objetivo del PUT.
+            // Es buena práctica devolver el estado actualizado de este gasto.
+            return response()->json(['message' => 'Gasto(s) observado(s). El registrador será notificado para su corrección.', 'gasto' => $gasto->fresh()]);
         });
     }
     //Actualizar gasto observado.
@@ -585,7 +590,7 @@ class GastoController extends Controller
             return response()->json(['message' => 'Gasto rechazado exitosamente.', 'gasto' => $gasto->fresh()]);
         });
     }
-    
+
     public function rejectDjGroup(Request $request, DjConsolidada $djConsolidada)
     {
         $validated = $request->validate(['comentario' => 'required|string|max:2000']);
@@ -880,6 +885,164 @@ class GastoController extends Controller
 
             return response()->json(['message' => 'Grupo de DJ contabilizado exitosamente.', 'dj_consolidada' => $djConsolidada->load('gastos')]);
         });
+    }
+    public function getReporteGastos(Request $request)
+    {
+        // Query base con todas las relaciones necesarias para el reporte.
+        $query = Gasto::with([
+            'registrador.role',
+            'registrador.area:id,name',
+            'djConsolidada',
+            'cuentaContable',
+            'fondoEfectivo',
+            'gastoProyectado',
+            'historialAprobaciones.usuarioAccion'
+        ]);
+
+        // Aplicar filtros de búsqueda adicionales de la request.
+        // El filtro 'texto' en el frontend busca en 'codigo_gasto' y 'glosa'.
+        if ($request->filled('texto')) {
+            $searchTerm = strtolower($request->texto);
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('codigo_gasto', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('glosa', 'like', '%' . $searchTerm . '%');
+            });
+        }
+        if ($request->filled('registrador_name')) {
+            $searchTerm = strtolower($request->registrador_name);
+            $query->whereHas('registrador', function ($q) use ($searchTerm) {
+                $q->where(DB::raw("CONCAT(LOWER(name), ' ', LOWER(last_name))"), 'like', '%' . $searchTerm . '%');
+            });
+        }
+        if ($request->filled('area_id')) {
+            $query->whereHas('registrador', function ($q) use ($request) {
+                $q->where('area_id', $request->area_id);
+            });
+        }
+        // El filtro 'estado' ahora debe permitir 'Todos' y otros estados finales.
+        if ($request->filled('estado') && $request->estado !== 'Todos') {
+            $query->where('estado', $request->estado);
+        }
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('created_at', '>=', $request->fecha_inicio); // Filtrar por fecha de registro
+        }
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '<=', $request->fecha_fin); // Filtrar por fecha de registro
+        }
+
+        $gastos = $query->orderBy('created_at', 'desc')->get();
+
+        // Agrupar los gastos por DJ consolidada, similar a getGastosParaAprobacion,
+        // para mantener la estructura esperada por el frontend.
+        $gastosAgrupados = $gastos->groupBy('id_dj_consolidada');
+
+        // Procesamos el resultado para el formato esperado por el frontend.
+        $resultadoFinal = $gastosAgrupados->flatMap(function ($gastosDelGrupo, $djId) {
+            if (is_null($djId)) {
+                // Gastos individuales
+                return $gastosDelGrupo->map(fn($gasto) => [
+                    'es_grupo' => false,
+                    'gasto' => $gasto
+                ]);
+            } else {
+                // Grupos de DJ consolidada
+                return collect([[
+                    'es_grupo' => true,
+                    'id_dj_consolidada' => $djId,
+                    'estado_grupo' => $gastosDelGrupo->first()->estado,
+                    'monto_total_grupo' => $gastosDelGrupo->sum('monto_total'),
+                    'registrador' => $gastosDelGrupo->first()->registrador,
+                    'fecha_registro' => $gastosDelGrupo->first()->created_at,
+                    'dj_consolidada' => $gastosDelGrupo->first()->djConsolidada,
+                    'gastos' => $gastosDelGrupo->values(),
+                ]]);
+            }
+        })->values(); // Re-indexar el array final.
+
+        return response()->json($resultadoFinal);
+    }
+
+    /**
+     * Exporta los gastos a un archivo Excel, aplicando los mismos filtros que el reporte.
+     * Este método NO modifica el estado de los gastos.
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportReport(Request $request)
+    {
+        // La lógica de filtrado será idéntica a getReporteGastos, pero sin la transformación de agrupamiento
+        // ya que el exportador necesita los gastos individuales para las filas del Excel.
+        $query = Gasto::with([
+            'registrador.area',
+            'cuentaContable',
+            'fondoEfectivo',
+            'gastoProyectado',
+            'djConsolidada' // Necesario para identificar si es parte de una DJ en el reporte
+        ]);
+
+        // Aplicar filtros de la request (igual que en getReporteGastos)
+        if ($request->filled('texto')) {
+            $searchTerm = strtolower($request->texto);
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('codigo_gasto', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('glosa', 'like', '%' . $searchTerm . '%');
+            });
+        }
+        if ($request->filled('registrador_name')) {
+            $searchTerm = strtolower($request->registrador_name);
+            $query->whereHas('registrador', function ($q) use ($searchTerm) {
+                $q->where(DB::raw("CONCAT(LOWER(name), ' ', LOWER(last_name))"), 'like', '%' . $searchTerm . '%');
+            });
+        }
+        if ($request->filled('area_id')) {
+            $query->whereHas('registrador', function ($q) use ($request) {
+                $q->where('area_id', $request->area_id);
+            });
+        }
+        if ($request->filled('estado') && $request->estado !== 'Todos') {
+            $query->where('estado', $request->estado);
+        }
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('created_at', '>=', $request->fecha_inicio);
+        }
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('created_at', '<=', $request->fecha_fin);
+        }
+
+        $gastosParaExportar = $query->orderBy('created_at', 'desc')->get();
+
+        // Preparar los datos para el exportador.
+        // Cada gasto es una fila en el Excel. Si es parte de una DJ, se incluye el ID de la DJ.
+        $dataForExport = $gastosParaExportar->map(function ($gasto) {
+            return [
+                'ID Gasto' => $gasto->id,
+                'Código Gasto' => $gasto->codigo_gasto,
+                'Glosa' => $gasto->glosa,
+                'Monto Total' => number_format($gasto->monto_total, 2, '.', ''), // Formato numérico
+                'Estado' => $gasto->estado,
+                'Registrador' => $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
+                'Rol Registrador' => $gasto->registrador->role->display_name ?? 'N/A',
+                'Área Registrador' => $gasto->registrador->area->name ?? 'N/A',
+                'Fondo Afectado' => $gasto->fondoEfectivo->codigo_fondo ?? 'N/A',
+                'Cuenta Contable' => $gasto->cuentaContable->codigo_cuenta ?? 'N/A',
+                'Descripción Proyectado' => $gasto->gastoProyectado->descripcion ?? 'N/A',
+                'Fecha Documento' => $gasto->fecha_documento ? $gasto->fecha_documento->format('Y-m-d') : 'N/A',
+                'Fecha Registro' => $gasto->created_at ? $gasto->created_at->format('Y-m-d H:i:s') : 'N/A',
+                'Es Declaración Jurada' => $gasto->es_declaracion_jurada ? 'Sí' : 'No',
+                'ID DJ Consolidada' => $gasto->id_dj_consolidada ?? 'N/A',
+                'Tipo Documento' => $gasto->tipo_documento ?? 'N/A',
+                'Serie Documento' => $gasto->serie_documento ?? 'N/A',
+                'Correlativo Documento' => $gasto->correlativo_documento ?? 'N/A',
+                'Motivo Observación' => $gasto->motivo_observacion_adm ?? '',
+                'Motivo Rechazo' => $gasto->motivo_rechazo ?? '',
+                // Puedes añadir más campos según sea necesario para tu reporte
+            ];
+        });
+
+        // Usar Maatwebsite/Laravel-Excel para generar el archivo
+        // Asegúrate de que la clase App\Exports\GastosReportExport exista.
+        return Excel::download(new GastosReportExport($dataForExport->toArray()), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     /**
