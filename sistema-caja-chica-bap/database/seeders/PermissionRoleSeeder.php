@@ -65,6 +65,7 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.approve.jefe',
                 'declaraciones.resubmit',
                 'declaraciones.reposition',
+                'declaraciones.view.reports',
             ],
 
             'jefe_area' => [

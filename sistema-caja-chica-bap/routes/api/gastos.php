@@ -73,6 +73,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/actualizar-observado', [GastoController::class, 'actualizarGastoObservado'])->name('actualizarObservado');
     });
 
+    // --- RUTAS DE REPORTES (NUEVAS) ---
+    // Endpoint para obtener la lista de gastos para la tabla de reportes.
+    Route::get('/gastos/reportes', [GastoController::class, 'getReporteGastos'])->name('gastos.reportes');
+    // Endpoint para exportar los gastos a Excel.
+    Route::post('/gastos/exportar-reporte', [GastoController::class, 'exportReport'])->name('gastos.exportarReporte');
+
+
     // --- RUTAS ESTÁNDAR CRUD ---
     Route::apiResource('gastos', GastoController::class);
 });

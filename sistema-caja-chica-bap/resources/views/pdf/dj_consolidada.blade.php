@@ -102,7 +102,7 @@
                     <!-- MODIFICACIÓN: Nuevo campo a mostrar -->
                     <td>{{ $gasto['gasto_proyectado_descripcion'] }}</td>
                     <td>{{ $gasto['glosa'] }}</td>
-                    <td class="text-right">{{ number_format($gasto['monto'], 2) }}</td>
+                    <td class="text-right">{{ number_format($gasto['monto_total'], 2) }}</td>
                 </tr>
                 @endforeach
                 <tr class="total-row">

@@ -88,9 +88,10 @@ import DeclaracionGasto from '@/components/declaraciones/DeclaracionGasto.vue';
 import SeguimientoGastos from '@/components/declaraciones/SeguimientoGastos.vue';
 import BandejaAprobacionArea from '@/components/declaraciones/BandejaAprobacionArea.vue';
 import BandejaValidacionContable from '@/components/declaraciones/BandejaValidacionContable.vue';
+import ReporteGastos from '@/components/declaraciones/ReporteGastos.vue'; // NUEVO: Importar el componente de reportes
 
 // --- PROPS ---
-//  Se recibe el objeto 'user' desde el componente padre (MainLayout.vue)
+// Se recibe el objeto 'user' desde el componente padre (MainLayout.vue)
 const props = defineProps({
   user: {
     type: Object,
@@ -159,14 +160,29 @@ const ALL_CARDS = [
     iconBg: 'bg-white/10 group-hover:bg-white/20',
     iconColor: 'text-white',
     iconPath: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4s8-4 8-4"></path><line x1="4" y1="12" x2="4" y2="12"></line><line x1="4" y1="17" x2="4" y2="17"></line><line x1="20" y1="12" x2="20" y2="12"></line>',
+  },
+  // NUEVO: Card para Reporte de Gastos
+  {
+    tab: 'reportes',
+    title: 'REPORTE DE GASTOS',
+    subtitle: 'Generar reportes para SAP',
+    permission: ['declaraciones.view.reports', 'declaraciones.view.all'], // Asumiendo que solo Admins/SuperAdmins pueden generar reportes para SAP
+    gradient: 'bg-gradient-to-br from-purple-500 to-purple-700', // Un nuevo color para diferenciar
+    textColor: 'text-white',
+    subtitleColor: 'text-white/90 group-hover:text-white',
+    iconBg: 'bg-white/25 group-hover:bg-white/35',
+    iconColor: 'text-white',
+    iconPath: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-5m3 5v-5m3 5v-5m-9 12h10a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v10a2 2 0 002 2z"></path>', // Icono de gráfico/reporte
   }
 ];
 
 // --- FUNCIÓN HELPER PARA VERIFICAR PERMISOS ---
 const hasCardPermission = (cardPermission) => {
   if (Array.isArray(cardPermission)) {
+    // Si es un array, el usuario necesita al menos UNO de esos permisos
     return cardPermission.some(permission => hasPermission(permission));
   }
+  // Si es una cadena, el usuario necesita ese permiso específico
   return hasPermission(cardPermission);
 };
 
@@ -178,6 +194,7 @@ const visibleCards = computed(() => {
 // --- MÉTODOS ---
 const cambiarTab = (tab) => {
   if (activeTab.value === tab) {
+    // Si se hace clic en la pestaña activa, la desactiva
     activeTab.value = '';
     activeComponent.value = null;
   } else {
@@ -194,6 +211,9 @@ const cambiarTab = (tab) => {
         break;
       case 'validacionContable':
         activeComponent.value = BandejaValidacionContable;
+        break;
+      case 'reportes': // NUEVO: Caso para el componente de reportes
+        activeComponent.value = ReporteGastos;
         break;
       default:
         activeComponent.value = null;
@@ -217,6 +237,9 @@ const getCardClasses = (tab) => {
       break;
     case 'validacionContable':
       glowClass = 'hover:shadow-glow-rojo';
+      break;
+    case 'reportes': // NUEVO: Clase de glow para reportes
+      glowClass = 'hover:shadow-glow-purple'; // Asumiendo un color púrpura para el glow
       break;
   }
 
@@ -346,6 +369,17 @@ const getCardClasses = (tab) => {
 .hover\:shadow-glow-blue:hover {
   box-shadow: 0 0 35px 5px rgba(59, 130, 246, 0.5);
 }
+
+/* NUEVO: Estilos para la sombra de "glow" púrpura */
+.shadow-glow-purple {
+  box-shadow: 0 0 25px 0 rgba(168, 85, 247, 0.4);
+  /* Tailwind purple-500 */
+}
+
+.hover\:shadow-glow-purple:hover {
+  box-shadow: 0 0 35px 5px rgba(168, 85, 247, 0.5);
+}
+
 
 /* CORRECCIÓN ADICIONAL: Para texto largo que pueda causar problemas */
 .group h3,
