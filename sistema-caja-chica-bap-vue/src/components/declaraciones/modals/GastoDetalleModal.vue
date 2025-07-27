@@ -15,9 +15,13 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
-// Propiedad computada para obtener la URL de la evidencia de forma segura
+const currencyFormatter = new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'PEN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
 // --- PROPIEDADES COMPUTADAS PARA EVIDENCIAS ---
-
 // Devuelve la URL de la evidencia INDIVIDUAL.
 const evidenciaIndividualUrl = computed(() => {
     return props.gasto?.evidencia_url || (props.gasto?.ruta_evidencia ? `/storage/${props.gasto.ruta_evidencia}` : null);
@@ -34,7 +38,7 @@ const djConsolidadaEvidencia = computed(() => {
 // Determina si la evidencia a mostrar (la individual) es una imagen.
 const esImagen = computed(() => {
     if (!evidenciaIndividualUrl.value) return false;
-    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase().split('?')[0]; 
+    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase().split('?')[0];
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
 });
 
@@ -56,17 +60,19 @@ const cuentaContableInfo = computed(() => {
     return `${props.gasto.cuenta_contable.codigo_cuenta} - ${props.gasto.cuenta_contable.descripcion}`;
 });
 const montoTotal = computed(() => parseFloat(props.gasto?.monto_total || 0));
-const alertaMontoMayor = computed(() => montoTotal.value > parseFloat(props.gasto?.monto_proyectado_original || 0));
-//METODOS
+const montoExcedidoAlRegistrar = computed(() => parseFloat(props.gasto?.monto_excedido_al_registrar || 0));
+const saldoDisponibleAlRegistrar = computed(() => parseFloat(props.gasto?.saldo_disponible_al_registrar || 0));
+const alertaMontoExcedido = computed(() => montoExcedidoAlRegistrar.value > 0);
 
-const formatCampo= (campo)=> {
-        // Asegurar que campo sea una cadena antes de usar replace
-        if (typeof campo === 'string') {
-            return campo.replace(/_/g, ' ');
-        }
-        // Si no es una cadena, convertirla a cadena primero
-        return String(campo).replace(/_/g, ' ');
-    };
+//METODOS
+const formatCampo = (campo) => {
+    // Asegurar que campo sea una cadena antes de usar replace
+    if (typeof campo === 'string') {
+        return campo.replace(/_/g, ' ');
+    }
+    // Si no es una cadena, convertirla a cadena primero
+    return String(campo).replace(/_/g, ' ');
+};
 // Función para formatear la fecha con hora y minutos
 const formatearFecha = (fechaString) => {
     if (!fechaString) return 'N/A';
@@ -122,7 +128,7 @@ const cerrarModal = () => {
                                 Información General
                             </h4>
                             <!-- ALERTA si el monto total es mayor al proyectado -->
-                            <div v-if="alertaMontoMayor"
+                            <div v-if="alertaMontoExcedido"
                                 class="mb-3 p-3 border-l-4 border-rojo-bap bg-red-50 text-rojo-bap flex items-center">
                                 <svg class="w-5 h-5 mr-2 text-rojo-bap" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
@@ -131,8 +137,16 @@ const cerrarModal = () => {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 8v4m0 4h.01" />
                                 </svg>
-                                <span><strong>¡Atención!</strong> El <b>MONTO TOTAL</b> es mayor al <b>MONTO
-                                        PROYECTADO</b>.</span>
+                                <span>
+                                    <strong>¡Atención!</strong> Este gasto de
+                                    <b class="text-rojo-bap">{{ currencyFormatter.format(montoTotal) }}</b>
+                                    excedió el saldo disponible de la proyección (que era
+                                    <b class="text-rojo-bap">{{ currencyFormatter.format(saldoDisponibleAlRegistrar)
+                                    }}</b>)
+                                    en
+                                    <b class="text-rojo-bap">{{ currencyFormatter.format(montoExcedidoAlRegistrar)
+                                    }}</b>.
+                                </span>
                             </div>
                             <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <span class="text-gray-500 font-medium">MONTO TOTAL:</span>
@@ -147,7 +161,7 @@ const cerrarModal = () => {
                                 <span v-if="gasto?.comentario" class="text-gray-500 font-medium">Comentario
                                     Adicional:</span>
                                 <span v-if="gasto?.comentario" class="font-medium text-gray-800">{{ gasto.comentario
-                                    }}</span>
+                                }}</span>
                                 <span class="text-gray-500 font-medium">Tipo de Documento:</span>
                                 <span class="font-medium text-gray-800">{{ gasto?.tipo_documento || 'N/A' }}</span>
                                 <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
@@ -205,6 +219,11 @@ const cerrarModal = () => {
                                 <span class="font-bold text-orange-700">S/. {{ fondoMontoOriginal }}</span>
                                 <span class="text-gray-500 font-medium">Cuenta Contable:</span>
                                 <span class="font-medium text-gray-800">{{ cuentaContableInfo }}</span>
+                                <span class="text-gray-500 font-medium">SALDO DISPONIBLE (al registrar):</span>
+                                <span
+                                    :class="['font-bold', saldoDisponibleAlRegistrar < 0 ? 'text-rojo-bap' : 'text-verde-bap']">
+                                    {{ currencyFormatter.format(saldoDisponibleAlRegistrar) }}
+                                </span>
                             </div>
                         </div>
 
@@ -272,30 +291,42 @@ const cerrarModal = () => {
                             <!-- CASO 3: No hay ninguna evidencia (salvaguarda) -->
                             <p v-else class="text-sm text-gray-500 mt-2">No se adjuntó evidencia para este gasto.</p>
                         </div>
-                        <div v-if="gasto?.historial_aprobaciones && gasto.historial_aprobaciones.length > 0" class="mt-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                        <div v-if="gasto?.historial_aprobaciones && gasto.historial_aprobaciones.length > 0"
+                            class="mt-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-3 flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-verde-bap-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <svg class="w-5 h-5 mr-2 text-verde-bap-dark" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 Historial de Cambios
                             </h4>
                             <ul class="space-y-4">
-                                <li v-for="historial in gasto.historial_aprobaciones" :key="historial.id" class="text-xs border-t border-gray-200 pt-3">
+                                <li v-for="historial in gasto.historial_aprobaciones" :key="historial.id"
+                                    class="text-xs border-t border-gray-200 pt-3">
                                     <div class="grid grid-cols-2 gap-x-4 gap-y-1">
                                         <span class="text-gray-500 font-medium">Acción:</span>
                                         <span class="font-semibold text-gray-800">{{ historial.estado_nuevo }}</span>
                                         <span class="text-gray-500 font-medium">Realizada por:</span>
-                                        <span class="font-medium text-gray-800">{{ historial.usuario_accion.name }} {{ historial.usuario_accion.last_name }}</span>
+                                        <span class="font-medium text-gray-800">{{ historial.usuario_accion.name }} {{
+                                            historial.usuario_accion.last_name }}</span>
                                         <span class="text-gray-500 font-medium">Fecha:</span>
-                                        <span class="font-medium text-gray-800">{{ formatearFecha(historial.created_at) }}</span>
+                                        <span class="font-medium text-gray-800">{{ formatearFecha(historial.created_at)
+                                            }}</span>
                                     </div>
-                                    <p v-if="historial.comentario" class="mt-2"><strong class="text-gray-600">Comentario:</strong> <em class="text-gray-700">"{{ historial.comentario }}"</em></p>
-                                    
-                                    <div v-if="historial.cambios_realizados" class="mt-2 p-2 bg-gray-100 rounded-md border border-gray-200">
-                                        <p class="font-semibold text-gray-800 text-xs mb-1">Detalle de la corrección:</p>
+                                    <p v-if="historial.comentario" class="mt-2"><strong
+                                            class="text-gray-600">Comentario:</strong> <em class="text-gray-700">"{{
+                                                historial.comentario }}"</em></p>
+
+                                    <div v-if="historial.cambios_realizados"
+                                        class="mt-2 p-2 bg-gray-100 rounded-md border border-gray-200">
+                                        <p class="font-semibold text-gray-800 text-xs mb-1">Detalle de la corrección:
+                                        </p>
                                         <ul class="list-disc list-inside text-gray-700 space-y-1">
                                             <li v-for="(cambio, campo) in historial.cambios_realizados" :key="campo">
-                                                <strong class="capitalize">{{ formatCampo(campo) }}:</strong> cambió de '{{ cambio.anterior }}' a '{{ cambio.nuevo }}'
+                                                <strong class="capitalize">{{ formatCampo(campo) }}:</strong> cambió de
+                                                '{{ cambio.anterior }}'
+                                                a '{{ cambio.nuevo }}'
                                             </li>
                                         </ul>
                                     </div>
@@ -303,7 +334,7 @@ const cerrarModal = () => {
                             </ul>
                         </div>
                     </div>
-                    
+
                     <!-- Pie de página del modal con botón de cierre estilizado -->
                     <div
                         class="bg-gradient-to-r from-gray-50 to-verde-bap-extralight/30 px-6 py-4 border-t border-gray-200/50">
@@ -322,15 +353,15 @@ const cerrarModal = () => {
                                     class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700">
                                 </div>
                             </button>
-                            
+
                         </div>
-                        
+
                     </div>
-                    
+
                 </div>
             </Transition>
         </div>
-        
+
     </Transition>
 </template>
 

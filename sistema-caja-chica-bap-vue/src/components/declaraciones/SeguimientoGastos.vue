@@ -154,13 +154,9 @@
         <!-- Modales -->
         <GastoDetalleModal v-if="mostrarModalDetalle" :gasto="gastoSeleccionado" :mostrar="mostrarModalDetalle"
             @close="mostrarModalDetalle = false" />
-        <CorregirGastoModal 
-    v-if="mostrarModalCorreccion && gastoSeleccionado"
-    :mostrar="mostrarModalCorreccion" 
-    :gasto="gastoSeleccionado" 
-    :usuarioActual="usuarioActual"
-    @close="mostrarModalCorreccion = false" 
-    @gasto-actualizado="handleGastoActualizado" />
+        <CorregirGastoModal v-if="mostrarModalCorreccion && gastoSeleccionado" :mostrar="mostrarModalCorreccion"
+            :gasto="gastoSeleccionado" :usuarioActual="usuarioActual" @close="mostrarModalCorreccion = false"
+            @gasto-actualizado="handleGastoActualizado" />
         <ReconsolidarDjModal v-if="mostrarModalReconsolidar" :gastos-a-consolidar="gastosParaReconsolidar"
             :usuarioActual="usuarioActual" @close="mostrarModalReconsolidar = false"
             @dj-creada="handleDjReconsolidada" />
@@ -168,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, onUpdated } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
@@ -189,7 +185,7 @@ const gastos = ref([]); // Lista completa de gastos del usuario
 const cargando = ref(true);
 const filtros = ref({ busqueda: '', estado: '' });
 const gastosSeleccionados = ref([]); // IDs de gastos seleccionados para re-consolidar
-
+const fondoActivoParaConsolidacion = ref(null);
 // Modales
 const gastoSeleccionado = ref(null); // Gasto actual para ver detalle/corrección
 const mostrarModalDetalle = ref(false);
@@ -239,11 +235,59 @@ const gastosFiltrados = computed(() => {
 });
 
 // Determina si todos los gastos consolidables visibles están seleccionados
-const todosSeleccionados = computed(() => {
-    const consolidablesVisibles = gastosFiltrados.value.filter(esConsolidable);
-    return consolidablesVisibles.length > 0 && gastosSeleccionados.value.length === consolidablesVisibles.length;
+const todosSeleccionados = computed({
+    get() {
+        // Si no hay fondo activo, no puede estar marcado
+        if (!fondoActivoParaConsolidacion.value) return false;
+        // Filtra solo los gastos que son consolidables, pertenecen al fondo activo y están visibles
+        const consolidablesDelFondoActivo = gastosFiltrados.value.filter(g =>
+            esConsolidable(g) &&
+            g.id_fondo_efectivo === fondoActivoParaConsolidacion.value &&
+            !esCheckboxDeshabilitado(g)
+        );
+        // Si no hay gastos consolidables del fondo activo, no puede estar marcado
+        if (consolidablesDelFondoActivo.length === 0) return false;
+        // Solo se marca si TODOS los gastos consolidables del fondo activo están seleccionados
+        return consolidablesDelFondoActivo.every(g => gastosSeleccionados.value.includes(g.id));
+    },
+    set(value) {
+        if (value) {
+            // Al marcar, primero determina cuál es el fondo activo
+            let fondoTarget = fondoActivoParaConsolidacion.value;
+            if (!fondoTarget) {
+                const primerGasto = gastosFiltrados.value.find(esConsolidable);
+                if (primerGasto) fondoTarget = primerGasto.id_fondo_efectivo;
+            }
+            // Luego, selecciona TODOS y ÚNICAMENTE los gastos de ESE fondo
+            gastosSeleccionados.value = gastosFiltrados.value
+                .filter(g => esConsolidable(g) && g.id_fondo_efectivo === fondoTarget)
+                .map(g => g.id);
+        } else {
+            // Al desmarcar, limpia la selección
+            gastosSeleccionados.value = [];
+        }
+    }
 });
+// Hook para evitar el bug del auto-check al seleccionar el único item.
+onUpdated(() => {
+    // Solo proceder si hay un fondo activo
+    if (!fondoActivoParaConsolidacion.value) return;
 
+    // Encontrar los gastos consolidables del fondo activo que están visibles
+    const consolidablesDelFondoActivo = gastosFiltrados.value.filter(g =>
+        esConsolidable(g) &&
+        g.id_fondo_efectivo === fondoActivoParaConsolidacion.value &&
+        !esCheckboxDeshabilitado(g)
+    );
+    // Verificar si todos están seleccionados
+    const todosEstanSeleccionados = consolidablesDelFondoActivo.length > 0 &&
+        consolidablesDelFondoActivo.every(g => gastosSeleccionados.value.includes(g.id));
+    // Actualizar el checkbox principal si es necesario
+    const masterCheckbox = document.querySelector('th input[type="checkbox"]');
+    if (masterCheckbox && masterCheckbox.checked !== todosEstanSeleccionados) {
+        masterCheckbox.checked = todosEstanSeleccionados;
+    }
+});
 // Prepara la lista de gastos a pasar al modal de re-consolidación
 const gastosParaReconsolidar = computed(() => {
     return gastos.value.filter(g => gastosSeleccionados.value.includes(g.id));
@@ -272,24 +316,25 @@ const formatDate = (dateString) => {
 
 // Lógica para determinar si un gasto es elegible para ser seleccionado para re-consolidación
 const esConsolidable = (gasto) => {
-    // Un gasto es consolidable si:
-    // 1. Está en estado 'Observado' (solo los observados pueden ser corregidos y re-consolidados)
-    // 2. NO tiene un id_dj_consolidada (significa que ya fue desvinculado de una DJ anterior)
-    // 3. Es de tipo 'Declaración Jurada' (es_declaracion_jurada es true)
-    // 4. Pertenece al usuario actual (seguridad)
-    const esObservado = gasto.estado === 'Observado';
+    const estadosValidos = [
+        'Pendiente de Aprobación',
+        'Pendiente de Validación Contable'
+    ];
     const noEstaEnDj = !gasto.id_dj_consolidada;
     const esTipoDj = gasto.es_declaracion_jurada;
-    const esDelUsuario = gasto.id_registrador === props.usuarioActual?.id; // Asegurar que el gasto pertenece al usuario
+    const esDelUsuario = gasto.id_registrador === props.usuarioActual?.id;
 
-    return esObservado && noEstaEnDj && esTipoDj && esDelUsuario;
+    return estadosValidos.includes(gasto.estado) && noEstaEnDj && esTipoDj && esDelUsuario;
 };
-
-// Selecciona/deselecciona todos los gastos consolidables visibles
+const esCheckboxDeshabilitado = (gasto) => {
+    if (gastosSeleccionados.value.length === 0) return false;
+    return gasto.id_fondo_efectivo !== fondoActivoParaConsolidacion.value;
+};
+// Selecciona/deselecciona todos los gastos consolidables visibles que no estan deshabilitados
 const seleccionarTodos = (event) => {
     if (event.target.checked) {
         gastosSeleccionados.value = gastosFiltrados.value
-            .filter(esConsolidable)
+            .filter(g => esConsolidable(g) && !esCheckboxDeshabilitado(g))
             .map(g => g.id);
     } else {
         gastosSeleccionados.value = [];
@@ -297,11 +342,24 @@ const seleccionarTodos = (event) => {
 };
 
 const abrirModalReconsolidacion = () => {
-    // Antes de abrir el modal, se puede hacer una validación final de los seleccionados
-    if (gastosParaReconsolidar.value.length < 2) {
-        Swal.fire('Selección Insuficiente', 'Debes seleccionar al menos dos gastos tipo DJ observados para crear una Declaración Jurada Consolidada.', 'warning');
+    if (gastosParaReconsolidar.value.length === 0) {
+        Swal.fire('Sin Selección', 'Debes seleccionar al menos un gasto tipo DJ para continuar.', 'warning');
         return;
     }
+    const primerGasto = gastosParaReconsolidar.value[0];
+    const primerEstado = primerGasto.estado;
+    const primerFondoId = primerGasto.id_fondo_efectivo;
+    const todosMismoEstado = gastosParaReconsolidar.value.every(g => g.estado === primerEstado);
+    if (!todosMismoEstado) {
+        Swal.fire('Estados Inconsistentes', 'Todos los gastos seleccionados deben tener el mismo estado.', 'error');
+        return;
+    }
+    const todosMismoFondo = gastosParaReconsolidar.value.every(g => g.id_fondo_efectivo === primerFondoId);
+    if (!todosMismoFondo) {
+        Swal.fire('Fondos Mixtos', 'No puedes consolidar gastos que pertenecen a diferentes fondos de caja chica.', 'error');
+        return;
+    }
+
     mostrarModalReconsolidar.value = true;
 };
 
@@ -332,17 +390,21 @@ const handleDjReconsolidada = () => {
 // --- WATCHERS ---
 // Observa cambios en los filtros para recargar los gastos
 watch(filtros, () => {
-    // Cuando los filtros cambian, la lista de gastos filtrados se actualiza automáticamente.
-    // También limpiamos la selección para evitar inconsistencias.
     gastosSeleccionados.value = [];
 }, { deep: true }); // Observación profunda para detectar cambios en las propiedades del objeto filtros
 
-// Opcional: Si quieres que la búsqueda por texto tenga un debounce
-// watch(() => filtros.value.busqueda, (newValue) => {
-//   // Implementar debounce si es necesario
-//   // clearTimeout(debounceTimeout);
-//   // debounceTimeout = setTimeout(() => { /* lógica de búsqueda */ }, 300);
-// });
+watch(gastosSeleccionados, (nuevosSeleccionados) => {
+    if (nuevosSeleccionados.length > 0) {
+        // Si hay gastos seleccionados, encuentra el primero y establece su fondo como el "activo".
+        const primerGastoSeleccionado = gastos.value.find(g => g.id === nuevosSeleccionados[0]);
+        if (primerGastoSeleccionado) {
+            fondoActivoParaConsolidacion.value = primerGastoSeleccionado.id_fondo_efectivo;
+        }
+    } else {
+        // Si no hay nada seleccionado, se libera el bloqueo.
+        fondoActivoParaConsolidacion.value = null;
+    }
+}, { deep: true });
 </script>
 
 <style scoped>

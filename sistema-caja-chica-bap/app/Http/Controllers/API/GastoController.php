@@ -243,6 +243,14 @@ class GastoController extends Controller
                     ? $montosProyectadosOriginales->get($gastoData['id_gasto_proyectado'])->pivot->monto_estimado
                     : 0;
 
+                $calculosSaldo = Gasto::calculateExceededAmountAndAvailableBalance(
+                    $gastoData['monto_total'],
+                    $gastoData['id_gasto_proyectado'],
+                    $fondo->id_fondo,
+                    $montoOriginal
+                );
+                $montoExcedido = $calculosSaldo['monto_excedido'];
+                $saldoDisponibleAlRegistrar = $calculosSaldo['saldo_disponible'];
                 // --- Creación del Gasto con la estructura final ---
                 $gasto = Gasto::create(array_merge($gastoData, [
                     'id_fondo_efectivo' => $fondo->id_fondo,
@@ -254,6 +262,8 @@ class GastoController extends Controller
                     'id_validador_adm' => $idValidadorAdm,
                     'id_cuenta_contable' => $idCuentaContable,
                     'monto_proyectado_original' => $montoOriginal,
+                    'monto_excedido_al_registrar' => $montoExcedido,
+                    'saldo_disponible_al_registrar' => $saldoDisponibleAlRegistrar,
                 ]));
 
                 // --- Lógica post-creación  ---
@@ -454,9 +464,20 @@ class GastoController extends Controller
                 $validatedData['ruta_evidencia'] = $request->file('evidencia')->store('evidencias_gastos', 'public');
             }
             // Capturamos los datos originales ANTES de la actualización
-            $datosOriginales = $gasto->only(['monto_total', 'glosa', 'fecha_documento']);
+            $datosOriginales = $gasto->only(['monto_total', 'glosa', 'fecha_documento', 'tipo_documento', 'serie_documento', 'correlativo_documento']);
             // Almacenamos los cambios para el historial
             $cambiosParaHistorial = [];
+            // Recalcular el monto excedido para el gasto corregido.
+            $calculosSaldo = Gasto::calculateExceededAmountAndAvailableBalance(
+                $validatedData['monto_total'],
+                $gasto->id_gasto_proyectado,
+                $gasto->id_fondo_efectivo,
+                $gasto->monto_proyectado_original, // Usar el monto proyectado original del gasto
+                $gasto->id // Excluir el gasto actual de la suma de gastos existentes
+            );
+            $validatedData['monto_excedido_al_registrar'] = $calculosSaldo['monto_excedido'];
+            $validatedData['saldo_disponible_al_registrar'] = $calculosSaldo['saldo_disponible'];
+            
             // 3.2. Actualizar el gasto con los datos validados.
             $gasto->update($validatedData);
             // Comparamos cada campo para registrar los cambios
@@ -516,35 +537,53 @@ class GastoController extends Controller
 
         $user = Auth::user();
         $gastosIds = $validated['gastos_ids'];
+        $gastosAConsolidar = Gasto::whereIn('id', $gastosIds)->get();
+        // --- Validaciones de Seguridad y Lógica de Negocio ---
+        if ($gastosAConsolidar->isEmpty()) {
+            return response()->json(['message' => 'No se encontraron los gastos especificados.'], 404);
+        }
+        $primerGasto = $gastosAConsolidar->first();
+        $primerEstado = $primerGasto->estado;
+        $primerFondoId = $primerGasto->id_fondo_efectivo;
+        $estadosValidos = ['Pendiente de Aprobación', 'Pendiente de Validación Contable'];
 
-        return DB::transaction(function () use ($gastosIds, $user, $request) {
-            // 1. Usamos el Query Scope 'readyForConsolidation' que creamos en el modelo Gasto.
-            $gastosAConsolidar = Gasto::readyForConsolidation($user->id)->whereIn('id', $gastosIds)->get();
-
-            // 2. Verificar que todos los gastos solicitados son válidos para este usuario y estado.
-            if (count($gastosAConsolidar) !== count($gastosIds)) {
-                return response()->json(['message' => 'Algunos de los gastos seleccionados no pueden ser consolidados. Verifique que le pertenecen y están en un estado válido.'], 409);
+        foreach ($gastosAConsolidar as $gasto) {
+            // 1. Verificar permisos (que el gasto pertenezca al usuario)
+            if ($gasto->id_registrador !== $user->id) {
+                return response()->json(['message' => 'No tienes permiso para consolidar uno de los gastos seleccionados.'], 403);
             }
-
-            // 3. Crear el nuevo registro de DJ Consolidada.
+            // 2. Verificar consistencia de estado
+            if ($gasto->estado !== $primerEstado) {
+                return response()->json(['message' => 'Error: No se pueden consolidar gastos con estados diferentes.'], 409);
+            }
+            if ($gasto->id_fondo_efectivo !== $primerFondoId) {
+                return response()->json(['message' => 'Error: No se pueden consolidar gastos que pertenecen a diferentes fondos de caja chica.'], 409);
+            }
+        }
+        // Verificar que el estado del grupo sea válido
+        if (!in_array($primerEstado, $estadosValidos)) {
+            return response()->json(['message' => 'Los gastos no se encuentran en un estado válido para ser consolidados.'], 409);
+        }
+        return DB::transaction(function () use ($gastosAConsolidar, $user, $request) {
             $pathDj = $request->file('dj_consolidada_file')->store('djs_consolidadas', 'public');
             $djConsolidada = DjConsolidada::create([
                 'ruta_documento' => $pathDj,
                 'id_uploader' => $user->id,
             ]);
 
-            // 4. Vincular los gastos y actualizar su estado.
+            $nuevoEstado = $user->hasAnyRole(['jefe_area', 'gerente_general']) ? 'Pendiente de Validación DJ' : 'Pendiente de Aprobación';
+
             foreach ($gastosAConsolidar as $gasto) {
                 $estadoAnterior = $gasto->estado;
                 $gasto->update([
                     'id_dj_consolidada' => $djConsolidada->id_dj_consolidada,
-                    'estado' => 'Pendiente de Validación DJ'
+                    'estado' => $nuevoEstado
                 ]);
 
                 $this->registrarHistorial(
                     $gasto,
                     $estadoAnterior,
-                    'Pendiente de Validación DJ',
+                    $nuevoEstado,
                     $user->id,
                     "Gasto agrupado en la DJ Consolidada #{$djConsolidada->id_dj_consolidada}."
                 );

@@ -30,6 +30,8 @@ return new class extends Migration
 
             // --- Lógica de Montos y Moneda (Adaptado) ---
             $table->decimal('monto_total', 10, 2);
+            $table->decimal('monto_excedido_al_registrar', 10, 2)->nullable();
+            $table->decimal('saldo_disponible_al_registrar', 10, 2)->nullable();
             $table->decimal('monto_proyectado_original', 10, 2)->nullable();
             $table->string('moneda', 3)->default('PEN');
             $table->decimal('tipo_cambio_referencial', 8, 4)->nullable();
