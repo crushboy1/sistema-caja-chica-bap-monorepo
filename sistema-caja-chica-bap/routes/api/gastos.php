@@ -19,6 +19,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('documentos')->name('documentos.')->group(function () {
         Route::post('/generar-dj-consolidada', [DocumentoController::class, 'generarDjConsolidada'])
             ->name('generarDjConsolidada');
+        Route::post('/generar-dj-nuevos', [DocumentoController::class, 'generarDjNuevos'])
+            ->name('generarDjNuevos');
     });
 
     // --- RUTAS DE GASTOS ---

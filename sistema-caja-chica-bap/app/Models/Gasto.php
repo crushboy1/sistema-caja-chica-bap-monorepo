@@ -39,6 +39,8 @@ class Gasto extends Model
         'serie_documento',
         'correlativo_documento',
         'monto_total',
+        'monto_excedido_al_registrar',
+        'saldo_disponible_al_registrar',
         'monto_proyectado_original',
         'moneda',
         'id_gasto_proyectado',
@@ -63,6 +65,8 @@ class Gasto extends Model
         'fecha_documento' => 'date',
         'monto_total' => 'decimal:2',
         'es_declaracion_jurada' => 'boolean',
+        'monto_excedido_al_registrar' => 'decimal:2',
+        'saldo_disponible_al_registrar' => 'decimal:2',
     ];
 
     /**
@@ -171,9 +175,17 @@ class Gasto extends Model
     */
     public function scopeReadyForConsolidation(Builder $query, int $userId): Builder
     {
+        // Definimos los estados válidos para que un gasto de tipo DJ pueda ser seleccionado para una nueva consolidación.
+        $validStates = [
+            'Observado',
+            'Pendiente de Aprobación',
+            'Pendiente de Validación Contable'
+        ];
+
         return $query->whereNull('id_dj_consolidada')
             ->where('id_registrador', $userId)
-            ->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación Contable']);
+            ->where('es_declaracion_jurada', true) // Aseguramos que solo se puedan seleccionar gastos que son DJ
+            ->whereIn('estado', $validStates);
     }
     /*
     |--------------------------------------------------------------------------
@@ -192,5 +204,41 @@ class Gasto extends Model
             return Storage::url($this->ruta_evidencia);
         }
         return null;
+    }
+
+    // Calcula el monto por el cual un gasto excedería el saldo disponible de su proyección.
+    // Devuelve el monto excedido o null si no excede.
+    public static function calculateExceededAmountAndAvailableBalance(
+        float $currentGastoMonto,
+        int $gastoProyectadoId,
+        int $fondoEfectivoId,
+        float $originalProjectedAmount,
+        ?int $excludeGastoId = null
+    ): array {
+        // Sumar los montos de todos los gastos existentes asociados a esta misma proyección
+        // y fondo, excluyendo el gasto actual si se está actualizando.
+        // Solo se consideran gastos que ya están en el flujo (no observados ni rechazados)
+        // ya que son los que realmente "consumen" del saldo de la proyección.
+        $queryGastosExistentes = Gasto::where('id_gasto_proyectado', $gastoProyectadoId)
+            ->where('id_fondo_efectivo', $fondoEfectivoId)
+            ->whereNotIn('estado', ['Observado', 'Rechazado']);
+
+        if ($excludeGastoId) {
+            $queryGastosExistentes->where('id', '!=', $excludeGastoId);
+        }
+        $gastosAcumuladosPrevios = $queryGastosExistentes->sum('monto_total');
+        // Calcular el saldo disponible actual de la proyección
+        $saldoDisponible = round($originalProjectedAmount - $gastosAcumuladosPrevios, 2);
+        $montoExcedido = 0.00;
+        if ($currentGastoMonto > $saldoDisponible) {
+            $montoExcedido = round($currentGastoMonto - $saldoDisponible, 2);
+        }
+        // El saldo disponible que se guarda es el que realmente quedaba antes de este gasto.
+        // Puede ser negativo si el monto de los gastos previos ya excedía la proyección original.
+        $saldoRealAntesDeEsteGasto = $saldoDisponible;
+        return [
+            'monto_excedido' => $montoExcedido,
+            'saldo_disponible' => $saldoRealAntesDeEsteGasto, // Este es el saldo que había ANTES de este gasto
+        ];
     }
 }

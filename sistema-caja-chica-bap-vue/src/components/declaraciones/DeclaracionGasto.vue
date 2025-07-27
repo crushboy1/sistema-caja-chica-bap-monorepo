@@ -880,7 +880,7 @@ const handleDJConsolidadaFileChange = (event) => {
 const generarDJConsolidada = async () => {
     const gastosValidosParaDJ = gastosADeclarar.value.filter(g => g.es_declaracion_jurada && isGastoCompleto(g));
 
-    if (gastosValidosParaDJ.length < 1) {
+    if (gastosValidosParaDJ.length < 0) {
         Swal.fire('Gastos Insuficientes para DJ', 'Necesitas al menos 1 gastos marcados como "Declaración Jurada" y completos para generar la plantilla de DJ Consolidada.', 'info');
         return;
     }
@@ -888,7 +888,7 @@ const generarDJConsolidada = async () => {
     // Preparar FormData para enviar los datos de los gastos al backend
     const formDataForDJGen = new FormData();
     formDataForDJGen.append('id_fondo_efectivo', fondoSeleccionadoId.value);
-    formDataForDJGen.append('id_registrador', props.usuarioActual.id); // Asegurar que el ID del registrador se envía
+    formDataForDJGen.append('id_registrador', props.usuarioActual.id); 
 
     gastosValidosParaDJ.forEach((gasto, index) => {
         Object.keys(gasto).forEach(key => {
@@ -913,7 +913,7 @@ const generarDJConsolidada = async () => {
 
         // Enviar los datos completos de los gastos al backend para la generación de la plantilla
         // El backend VALIDARÁ estos datos y usará los que necesite para la plantilla PDF.
-        const response = await api.post('/v1/documentos/generar-dj-consolidada', formDataForDJGen, {
+        const response = await api.post('/v1/documentos/generar-dj-nuevos', formDataForDJGen, {
             responseType: 'blob', // Para manejar la descarga del archivo
             headers: { 'Content-Type': 'multipart/form-data' } // Importante para FormData, ya que incluye archivos
         });
