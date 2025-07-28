@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\FondoEfectivo;
 use App\Models\SolicitudFondo;
-use App\Models\HistorialReposicion;
+use App\Models\HistorialMovimientoFondo;
 use App\Models\Gasto;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -42,7 +42,8 @@ class FondoEfectivoController extends Controller
                 // Se asegura de seleccionar los campos necesarios, incluyendo las claves foráneas para las relaciones anidadas.
                 $q->select('id', 'codigo_solicitud', 'id_solicitante', 'id_revisor_adm', 'id_aprobador_gerente')
                     ->with(['solicitante:id,name,last_name', 'revisorAdm:id,name,last_name', 'aprobadorGerente:id,name,last_name', 'gastosProyectados', 'areasParticipantes']);
-            }
+            },
+            'solicitudCierreAprobada'
         ]);
 
         // Lógica de visibilidad por rol
@@ -94,6 +95,14 @@ class FondoEfectivoController extends Controller
 
         // Ordenamiento por código de fondo para mostrar los más recientes primero.
         $fondos = $query->orderBy('codigo_fondo', 'desc')->get();
+        /**
+         * Se itera sobre cada fondo para añadir una nueva propiedad que indica si tiene un cierre aprobado pendiente.
+         * Esto permitirá al frontend mostrar el checkbox de cierre en el modal de reposición/devolución.
+         */
+        $fondos->each(function ($fondo) {
+            // La relación 'solicitudCierreAprobada' ya fue cargada, por lo que esta comprobación es muy rápida.
+            $fondo->tiene_cierre_aprobado = $fondo->solicitudCierreAprobada !== null;
+        });
         return response()->json([
             'message' => 'Fondos de efectivo obtenidos exitosamente.',
             'fondos' => $fondos,
@@ -111,7 +120,7 @@ class FondoEfectivoController extends Controller
         // 2. Obtener la suma de todos los gastos ya declarados y no rechazados para este fondo,
         // agrupados por el id del gasto proyectado. Esto es muy eficiente.
         $gastosRealizados = Gasto::where('id_fondo_efectivo', $fondo->id_fondo)
-            ->where('estado', '!=', 'Rechazado')
+            ->whereNotIn('estado', ['Rechazado', 'Repuesto'])
             ->select('id_gasto_proyectado', DB::raw('SUM(monto_total) as total_gastado'))
             ->groupBy('id_gasto_proyectado')
             ->get()
@@ -230,27 +239,32 @@ class FondoEfectivoController extends Controller
                     'monto' => $solicitud->monto_solicitado,
                     'motivo' => $solicitud->motivo_detalle,
                     'usuario' => $solicitud->solicitante->name . ' ' . $solicitud->solicitante->last_name,
+                    'saldo_anterior' => null,
+                    'saldo_nuevo' => null,
+                    'ruta_comprobante' => null,
                 ];
             });
 
-        // 2. Obtener historial de reposiciones desde la nueva tabla
-        $historialReposiciones = $fondo->historialReposiciones()
+        // 2. Obtener historial de TODOS los movimientos del fondo (reposiciones, devoluciones, etc.)
+        $historialMovimientos = $fondo->historialMovimientos()
             ->with('usuarioAccion:id,name,last_name')
             ->get()
-            ->map(function ($reposicion) {
+            ->map(function ($movimiento) {
                 return [
-                    'id' => 'reposicion-' . $reposicion->id,
-                    'tipo' => 'Reposición',
-                    'fecha' => $reposicion->fecha_reposicion,
-                    'monto' => $reposicion->monto_repuesto,
-                    'motivo' => $reposicion->comentario ?? 'Reposición de gastos contabilizados.',
-                    'usuario' => $reposicion->usuarioAccion->name . ' ' . $reposicion->usuarioAccion->last_name,
-                    'ruta_comprobante' => $reposicion->ruta_comprobante,
+                    'id' => 'movimiento-' . $movimiento->id,
+                    'tipo' => $movimiento->tipo_movimiento,
+                    'fecha' => $movimiento->fecha_movimiento,
+                    'monto' => $movimiento->monto_movimiento,
+                    'motivo' => $movimiento->comentario,
+                    'usuario' => $movimiento->usuarioAccion->name . ' ' . $movimiento->usuarioAccion->last_name,
+                    'ruta_comprobante' => $movimiento->ruta_comprobante,
+                    'saldo_anterior' => $movimiento->saldo_anterior,
+                    'saldo_nuevo' => $movimiento->saldo_nuevo,
                 ];
             });
 
         // 3. Unificar y ordenar la línea de tiempo completa
-        $timeline = $historialSolicitudes->concat($historialReposiciones)->sortByDesc('fecha');
+        $timeline = $historialSolicitudes->concat($historialMovimientos)->sortByDesc('fecha');
 
         return response()->json(['timeline' => $timeline->values()->all()]);
     }
@@ -452,58 +466,65 @@ class FondoEfectivoController extends Controller
     {
         $user = Auth::user();
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
-            return response()->json(['message' => 'No tienes permiso para ver el resumen de reposición.'], 403);
+            return response()->json(['message' => 'No tienes permiso para ver este resumen.'], 403);
         }
 
-        // 1. Obtenemos la colección de gastos que están listos para ser repuestos.
-        $gastosContabilizados = $fondo->gastos()
-            ->where('estado', 'Contabilizado')
-            ->with('gastoProyectado:id_gasto_proyectado,descripcion')
-            ->get(['id', 'glosa', 'monto_total', 'id_gasto_proyectado']);
 
-        // 2. Calculamos el monto total a reponer a partir de la colección obtenida.
-        $montoAReponer = $gastosContabilizados->sum('monto_total');
+        $montoAReponer = 0;
+        $montoADevolver = 0;
+        $gastosContabilizados = $fondo->gastos()->where('estado', 'Contabilizado')->get();
+        $totalGastado = $gastosContabilizados->sum('monto_total');
 
-        // 3. Verificamos si existen gastos en estados intermedios.
+        if ($fondo->monto_disponible < 0) {
+            $montoAReponer = abs($fondo->monto_disponible);
+        } elseif ($fondo->monto_disponible > 0) { // <-- Condición simplificada
+            $montoADevolver = $fondo->monto_disponible;
+        }
+
         $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
         $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
-
+        $mensajeEstado = '';
+        if ($conteoGastosPendientes > 0) {
+            $mensajeEstado = "Tiene {$conteoGastosPendientes} gasto(s) en proceso de aprobación o validación.";
+        } elseif ($montoAReponer > 0) {
+            $mensajeEstado = 'Listo para reponer el excedente.';
+        } elseif ($montoADevolver > 0) {
+            $mensajeEstado = 'Listo para registrar la devolución del sobrante.';
+        } else {
+            $mensajeEstado = 'Sin gastos contabilizados para reponer o devolver.';
+        }
         // 4. Devolvemos un único objeto JSON con toda la información.
         return response()->json([
             'monto_asignado' => (float) $fondo->monto_aprobado,
             'saldo_disponible_actual' => (float) $fondo->monto_disponible,
             'monto_a_reponer' => (float) $montoAReponer,
-            'gastos_a_reponer' => $gastosContabilizados,
+            'monto_a_devolver' => (float) $montoADevolver,
+            'gastos_contabilizados' => $gastosContabilizados,
+            'total_gastado_contabilizado' => (float) $totalGastado,
             'tiene_gastos_pendientes' => $conteoGastosPendientes > 0,
             'conteo_gastos_pendientes' => $conteoGastosPendientes,
-            'mensaje_estado' => $conteoGastosPendientes > 0
-                ? "Tiene {$conteoGastosPendientes} gasto(s) en proceso."
-                : ($montoAReponer > 0 ? 'Listo para reponer.' : 'Sin gastos por reponer.')
+            'mensaje_estado' => $mensajeEstado,
         ]);
     }
 
+    //El método reponer ahora solo maneja el caso de excedentes (saldo negativo)
     public function reponer(Request $request, FondoEfectivo $fondo)
     {
-        // 1. VALIDACIÓN DE PERMISOS
         $user = Auth::user();
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
-            return response()->json(['message' => 'No tienes permiso para ejecutar la reposición de este fondo.'], 403);
-        }
-        // Validación del archivo del comprobante
-        $request->validate([
-            'comprobante_reposicion' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB Max
-        ], [
-            'comprobante_reposicion.required' => 'Es obligatorio adjuntar el comprobante de reposición.',
-            'comprobante_reposicion.mimes' => 'El comprobante debe ser un archivo PDF o una imagen (JPG, PNG).',
-            'comprobante_reposicion.max' => 'El archivo del comprobante no debe superar los 10MB.',
-        ]);
-        // 2. VALIDACIÓN DE ESTADO DEL FONDO: No se puede reponer un fondo que ya está cerrado.
-        if ($fondo->estado !== 'Activo') {
-            return response()->json(['message' => 'Solo se pueden reponer fondos que se encuentren en estado "Activo".'], 409);
+            return response()->json(['message' => 'No tienes permiso para ejecutar esta acción.'], 403);
         }
 
-        // 3. VALIDACIÓN CRÍTICA DE GASTOS PENDIENTES: No se puede reponer si hay gastos en CUALQUIER estado intermedio.
-        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado',];
+        $validated = $request->validate([
+            'comprobante_reposicion' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'ejecutar_cierre' => 'sometimes|boolean',
+        ]);
+
+        if ($fondo->estado !== 'Activo') {
+            return response()->json(['message' => 'Solo se pueden reponer fondos activos.'], 409);
+        }
+
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
         $gastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
         if ($gastosPendientes > 0) {
             return response()->json([
@@ -511,37 +532,160 @@ class FondoEfectivoController extends Controller
             ], 409);
         }
 
-        // 4. CÁLCULO SEGURO DEL MONTO A REPONER: Se calcula en el servidor y se valida que sea mayor a cero.
-        $montoAReponer = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
-        if ($montoAReponer <= 0) {
-            return response()->json(['message' => 'No hay monto para reponer. Asegúrate de que los gastos hayan sido marcados como "Contabilizado".'], 409);
+        // Validación crítica: No reponer si el saldo no es negativo.
+        if ($fondo->monto_disponible >= 0) {
+            return response()->json(['message' => 'Este fondo no tiene un excedente para reponer.'], 409);
         }
-        // 5. EJECUCIÓN DE LA REPOSICIÓN DENTRO DE UNA TRANSACCIÓN
-        return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request) {
+
+        // Cálculo seguro del monto a reponer (el excedente).
+        $montoAReponer = abs($fondo->monto_disponible);
+
+        return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request, $validated) {
             $saldoAnterior = $fondo->monto_disponible;
             $pathComprobante = $request->file('comprobante_reposicion')->store('evidencias_reposicion', 'public');
-            // RESTAURACIÓN DEL SALDO
+
+            // Paso 1: Se liquida el excedente, llevando el saldo a cero.
             $fondo->increment('monto_disponible', $montoAReponer);
 
-            // REGISTRO EN HISTORIAL PARA TRAZABILIDAD
-            HistorialReposicion::create([
+            // Se registra en el nuevo historial de movimientos.
+            HistorialMovimientoFondo::create([
                 'id_fondo_efectivo' => $fondo->id_fondo,
                 'id_usuario_accion' => $user->id,
-                'monto_repuesto' => $montoAReponer,
+                'tipo_movimiento' => 'Reposicion por Excedente',
+                'monto_movimiento' => $montoAReponer,
                 'saldo_anterior' => $saldoAnterior,
                 'saldo_nuevo' => $fondo->monto_disponible,
-                'comentario' => $request->input('comentario', 'Reposición automática del sistema.'),
+                'comentario' => $request->input('comentario', 'Reembolso de gasto excedente.'),
                 'ruta_comprobante' => $pathComprobante,
-                'fecha_reposicion' => now(),
+                'fecha_movimiento' => now(),
             ]);
 
-            // 6. Los gastos usados en esta reposición se marcan como "Repuesto".
-            $fondo->gastos()->where('estado', 'Contabilizado')->update(['estado' => 'Repuesto']);
+            $gastosLiquidadosIds = $fondo->gastos()->where('estado', 'Contabilizado')->pluck('id');
+            $ejecutarCierre = isset($validated['ejecutar_cierre']) && $validated['ejecutar_cierre'];
 
-            Log::info("Reposición de Fondo: El usuario {$user->name} ha repuesto S/. {$montoAReponer} al fondo '{$fondo->codigo_fondo}'.");
-
+            if ($ejecutarCierre) {
+                // Si se marca el check, se cierra el fondo permanentemente.
+                $fondo->estado = 'Cerrado';
+                $fondo->fecha_cierre = now();
+                $fondo->motivo_cierre = 'Cierre tras liquidación de excedente.';
+                $fondo->save();
+                Log::info("Cierre definitivo del fondo '{$fondo->codigo_fondo}' ejecutado tras reposición.");
+            } else {
+                // Si NO se marca el check (flujo mensual normal), se restaura el saldo para el siguiente mes.
+                $saldoPostLiquidacion = $fondo->monto_disponible;
+                $fondo->monto_disponible = $fondo->monto_aprobado;
+                $fondo->save();
+                // Se crea un segundo registro en el historial para la trazabilidad de la restauración.
+                HistorialMovimientoFondo::create([
+                    'id_fondo_efectivo' => $fondo->id_fondo,
+                    'id_usuario_accion' => $user->id,
+                    'tipo_movimiento' => 'Restauracion Mensual',
+                    'monto_movimiento' => $fondo->monto_aprobado,
+                    'saldo_anterior' => $saldoPostLiquidacion, // Saldo era 0
+                    'saldo_nuevo' => $fondo->monto_disponible, // Saldo es el monto aprobado
+                    'comentario' => 'Restauración del saldo para el nuevo período.',
+                    'ruta_comprobante' => null, // No hay comprobante para esta acción automática
+                    'fecha_movimiento' => now()->addSeconds(5),
+                ]);
+                Log::info("Fondo '{$fondo->codigo_fondo}' liquidado y restaurado para el siguiente período.");
+            }
+            // Se marcan los gastos liquidados como 'Repuesto' para que no afecten el siguiente período.
+            if ($gastosLiquidadosIds->isNotEmpty()) {
+                Gasto::whereIn('id', $gastosLiquidadosIds)->update(['estado' => 'Repuesto']);
+            }
             return response()->json([
-                'message' => "El fondo {$fondo->codigo_fondo} ha sido repuesto exitosamente.",
+                'message' => "La liquidación del fondo {$fondo->codigo_fondo} ha sido registrada exitosamente.",
+                'fondo' => $fondo->fresh()
+            ]);
+        });
+    }
+
+    // El método 'devolver' Registra la devolución de un sobrante de un fondo (saldo positivo).
+    public function devolver(Request $request, FondoEfectivo $fondo)
+    {
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'No tienes permiso para ejecutar esta acción.'], 403);
+        }
+
+        $validated = $request->validate([
+            'comprobante_devolucion' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'ejecutar_cierre' => 'sometimes|boolean',
+        ]);
+
+        if ($fondo->estado !== 'Activo') {
+            return response()->json(['message' => 'Solo se pueden registrar devoluciones de fondos activos.'], 409);
+        }
+        // No se puede registrar una devolución si hay gastos en proceso.
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
+        $gastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
+        if ($gastosPendientes > 0) {
+            return response()->json([
+                'message' => "No se puede registrar la devolución. El fondo tiene {$gastosPendientes} gasto(s) en proceso de aprobación o validación."
+            ], 409);
+        }
+
+        // Se calcula el sobrante real en el servidor.
+        $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
+        $montoADevolver = $fondo->monto_aprobado - $totalGastado;
+
+        if ($montoADevolver <= 0) {
+            return response()->json(['message' => 'Este fondo no tiene un saldo sobrante para devolver.'], 409);
+        }
+
+        return DB::transaction(function () use ($fondo, $montoADevolver, $user, $request, $validated) {
+            $saldoAnterior = $fondo->monto_disponible;
+            $pathComprobante = $request->hasFile('comprobante_devolucion')
+                ? $request->file('comprobante_devolucion')->store('evidencias_devolucion', 'public')
+                : null;
+
+            // Se descuenta el sobrante del saldo disponible.
+            $fondo->decrement('monto_disponible', $montoADevolver);
+
+            HistorialMovimientoFondo::create([
+                'id_fondo_efectivo' => $fondo->id_fondo,
+                'id_usuario_accion' => $user->id,
+                'tipo_movimiento' => 'Devolucion por Sobrante',
+                'monto_movimiento' => $montoADevolver,
+                'saldo_anterior' => $saldoAnterior,
+                'saldo_nuevo' => $fondo->monto_disponible,
+                'comentario' => $request->input('comentario', 'Devolución de saldo sobrante.'),
+                'ruta_comprobante' => $pathComprobante,
+                'fecha_movimiento' => now(),
+            ]);
+            $gastosLiquidadosIds = $fondo->gastos()->where('estado', 'Contabilizado')->pluck('id');
+            $ejecutarCierre = isset($validated['ejecutar_cierre']) && $validated['ejecutar_cierre'];
+
+            if ($ejecutarCierre) {
+                $fondo->estado = 'Cerrado';
+                $fondo->fecha_cierre = now();
+                $fondo->motivo_cierre = 'Cierre tras devolución de sobrante.';
+                $fondo->save();
+                Log::info("Cierre definitivo del fondo '{$fondo->codigo_fondo}' ejecutado tras devolución.");
+            } else {
+                $saldoPostLiquidacion = $fondo->monto_disponible;
+                $fondo->monto_disponible = $fondo->monto_aprobado;
+                $fondo->save();
+
+                HistorialMovimientoFondo::create([
+                    'id_fondo_efectivo' => $fondo->id_fondo,
+                    'id_usuario_accion' => $user->id,
+                    'tipo_movimiento' => 'Restauracion Mensual',
+                    'monto_movimiento' => $fondo->monto_aprobado,
+                    'saldo_anterior' => $saldoPostLiquidacion,
+                    'saldo_nuevo' => $fondo->monto_disponible,
+                    'comentario' => 'Restauración del saldo para el nuevo período.',
+                    'ruta_comprobante' => null,
+                    'fecha_movimiento' => now()->addSeconds(5),
+                ]);
+                Log::info("Fondo '{$fondo->codigo_fondo}' liquidado y restaurado para el siguiente período.");
+            }
+            Log::info("Devolución de Sobrante: Usuario {$user->name} registró devolución de S/. {$montoADevolver} del fondo '{$fondo->codigo_fondo}'.");
+            if ($gastosLiquidadosIds->isNotEmpty()) {
+                Gasto::whereIn('id', $gastosLiquidadosIds)->update(['estado' => 'Repuesto']);
+            }
+            return response()->json([
+                'message' => "La liquidación del fondo {$fondo->codigo_fondo} ha sido registrada exitosamente.",
                 'fondo' => $fondo->fresh()
             ]);
         });

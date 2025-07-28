@@ -274,8 +274,8 @@
     </div>
 
     <!-- Modal para el historial de estados de la solicitud de apertura -->
-    <HistorialFondoModal :mostrar="mostrarHistorialFondoModal" :fondo="fondoParaHistorial"
-      @close="cerrarHistorialFondoModal" />
+    <HistorialFondoModal :mostrar="mostrarHistorialFondoModal" :fondoId="fondoParaHistorial?.id_fondo"
+      :fondoCodigo="fondoParaHistorial?.codigo_fondo" @close="cerrarHistorialFondoModal" />
     <ReposicionFondoModal :mostrar="mostrarReposicionModal" :fondo-prop="fondoParaReposicion"
       @close="cerrarModalReposicion" @fondoRepuesto="handleFondoRepuesto" />
   </div>
@@ -286,7 +286,6 @@ import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { useRouter } from 'vue-router';
-// Asumiendo que ya tienes este modal:
 import HistorialFondoModal from './HistorialFondoModal.vue';
 import ReposicionFondoModal from './ReposicionFondoModal.vue';
 const formatearFechaSinHora = (fechaString) => {
@@ -584,8 +583,8 @@ watch(() => filtro.value.area_id, () => {
 // --- Ciclo de Vida ---
 onMounted(() => {
   obtenerUsuarioAutenticado();
-  obtenerAreas(); // Carga las áreas para el filtro
-  obtenerFondos(); // Carga inicial de todos los fondos
+  obtenerAreas();
+  obtenerFondos();
 });
 </script>
 
