@@ -5,8 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Log; // Importar para logging
-use Illuminate\Validation\ValidationException; // Para lanzar excepciones de validación si es necesario
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use App\Models\SolicitudFondo;
 
 class FondoEfectivo extends Model
@@ -77,9 +79,25 @@ class FondoEfectivo extends Model
         // El segundo es la clave foránea en la tabla 'gastos' que apunta a este fondo.
         return $this->hasMany(Gasto::class, 'id_fondo_efectivo', 'id_fondo');
     }
-    public function historialReposiciones()
+    public function historialMovimientos(): HasMany
     {
-        return $this->hasMany(HistorialReposicion::class, 'id_fondo_efectivo', 'id_fondo');
+        return $this->hasMany(HistorialMovimientoFondo::class, 'id_fondo_efectivo', 'id_fondo');
+    }
+    /**
+     * Se añade una nueva relación para conectar directamente un Fondo con su solicitud de cierre aprobada.
+     * Esto nos permitirá verificar fácilmente si un fondo está pendiente de cierre.
+     *
+     * La relación funciona así:
+     * - Busca en la tabla 'solicitudes_fondos'.
+     * - Compara el campo 'id_solicitud_original' de la solicitud de cierre...
+     * - ...con el campo 'id_solicitud_apertura' de este fondo.
+     * - Y filtra para traer solo la que sea de tipo 'Cierre' y esté 'Aprobada'.
+     */
+    public function solicitudCierreAprobada(): HasOne
+    {
+        return $this->hasOne(SolicitudFondo::class, 'id_solicitud_original', 'id_solicitud_apertura')
+            ->where('tipo_solicitud', 'Cierre')
+            ->where('estado', 'Aprobada');
     }
     /**
      * Genera un código único secuencial para los fondos de efectivo.

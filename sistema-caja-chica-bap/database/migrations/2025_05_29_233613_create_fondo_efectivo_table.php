@@ -21,19 +21,19 @@ return new class extends Migration
             $table->text('motivo_cierre')->nullable(); // Motivo del cierre del fondo, si aplica
             $table->enum('tipo_fondo', ['Regular', 'Proyecto', 'Excepcional'])->default('Regular');
             $table->decimal('monto_disponible', 10, 2)->default(0.00);
-            
+
             $table->foreignId('id_solicitud_apertura') // FK: Referencia a la solicitud de Apertura que originó este fondo
-                  ->constrained('solicitudes_fondos')
-                  ->onDelete('cascade'); // Si la solicitud de apertura se elimina, el fondo también
+                ->constrained('solicitudes_fondos')
+                ->onDelete('cascade'); // Si la solicitud de apertura se elimina, el fondo también
 
             $table->foreignId('id_responsable') // FK: Usuario responsable actual del fondo (Jefe de Área)
-                  ->constrained('users')
-                  ->onDelete('restrict'); // No permitir eliminar usuario si es responsable de un fondo activo
+                ->constrained('users')
+                ->onDelete('restrict'); // No permitir eliminar usuario si es responsable de un fondo activo
 
             $table->foreignId('id_area') // FK: Área a la que pertenece este fondo
-                  ->constrained('areas')
-                  ->onDelete('cascade');
-            
+                ->constrained('areas')
+                ->onDelete('cascade');
+
             //Relación opcional con un proyecto.
             $table->foreignId('id_proyecto')->nullable()->constrained('proyectos', 'id_proyecto');
 

@@ -6,21 +6,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+
     public function up(): void
     {
-        Schema::create('historial_reposiciones', function (Blueprint $table) {
+        // Se renombra la tabla para reflejar su nuevo propósito.
+        Schema::create('historial_movimientos_fondos', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('id_fondo_efectivo')->constrained('fondo_efectivo', 'id_fondo')->cascadeOnDelete();
+            $table->foreignId('id_fondo_efectivo')->constrained('fondo_efectivo', 'id_fondo');
             $table->foreignId('id_usuario_accion')->constrained('users', 'id');
-            $table->decimal('monto_repuesto', 10, 2);
+            $table->enum('tipo_movimiento', ['Reposicion por Excedente', 'Devolucion por Sobrante','Restauracion Mensual', 'Ajuste Manual']);
+            $table->decimal('monto_movimiento', 10, 2);
             $table->decimal('saldo_anterior', 10, 2);
             $table->decimal('saldo_nuevo', 10, 2);
             $table->text('comentario')->nullable();
             $table->string('ruta_comprobante')->nullable();
-            $table->timestamp('fecha_reposicion');
+            $table->timestamp('fecha_movimiento')->useCurrent();
+
             $table->timestamps();
         });
     }
@@ -30,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('historial_reposiciones');
+        Schema::dropIfExists('historial_movimientos_fondos');
     }
 };
