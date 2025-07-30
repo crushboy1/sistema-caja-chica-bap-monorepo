@@ -72,7 +72,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/reject', [GastoController::class, 'reject'])->name('reject');
 
         // Acción del registrador para corregir y reenviar un gasto observado.
-        Route::post('/actualizar-observado', [GastoController::class, 'actualizarGastoObservado'])->name('actualizarObservado');
+        Route::post('/actualizar-observado', [GastoController::class, 'actualizarGastoObservado'])
+            ->name('actualizarObservado')
+            ->middleware(['check.permission:declaraciones.resubmit', 'check.periodo.cerrado']);
     });
 
     // --- RUTAS DE REPORTES (NUEVAS) ---
@@ -83,5 +85,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     // --- RUTAS ESTÁNDAR CRUD ---
-    Route::apiResource('gastos', GastoController::class);
+    /**
+     * 1. Se define explícitamente la ruta POST para crear gastos (la acción 'store').
+     * 2. Se le aplican dos middlewares: el de permiso y el nuevo 'check.periodo.cerrado'.
+     * 3. Se modifica la línea de 'apiResource' para que excluya la ruta 'store' y así evitar conflictos.
+     */
+    Route::post('/gastos', [GastoController::class, 'store'])
+        ->name('gastos.store')
+        ->middleware(['check.permission:declaraciones.create', 'check.periodo.cerrado']);
+    Route::apiResource('gastos', GastoController::class)->except(['store']);
 });

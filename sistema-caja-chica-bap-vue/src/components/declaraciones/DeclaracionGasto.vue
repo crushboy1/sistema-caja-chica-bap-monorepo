@@ -1070,21 +1070,29 @@ const enviarFormulario = async () => {
         emit('close');
     } catch (error) {
         console.error("Error al registrar la declaración:", error);
-        const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
-        const errors = error.response?.data?.errors;
-        let htmlError = `<p>${errorMessage}</p>`;
-        if (errors) {
-            htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
-            for (const key in errors) {
-                htmlError += `<li>${errors[key][0]}</li>`;
+        if (error.response && error.response.status === 403) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Acción No Permitida',
+                html: `<p>No se puede registrar el gasto.</p><p class="mt-2 text-sm">${error.response.data.message || 'El período contable para una de las fechas seleccionadas ya ha sido cerrado.'}</p>`
+            });
+        } else {            
+            const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
+            const errors = error.response?.data?.errors;
+            let htmlError = `<p>${errorMessage}</p>`;
+            if (errors) {
+                htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
+                for (const key in errors) {
+                    htmlError += `<li>${errors[key][0]}</li>`;
+                }
+                htmlError += '</ul>';
             }
-            htmlError += '</ul>';
+            Swal.fire({
+                icon: 'error',
+                title: 'Error al Registrar',
+                html: htmlError
+            });
         }
-        Swal.fire({
-            icon: 'error',
-            title: 'Error al Registrar',
-            html: htmlError
-        });
     } finally {
         enviando.value = false;
     }
