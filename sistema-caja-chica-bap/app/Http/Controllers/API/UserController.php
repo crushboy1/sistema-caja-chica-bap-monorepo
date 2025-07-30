@@ -13,22 +13,6 @@ use Illuminate\Validation\Rules\Password;
 class UserController extends Controller
 {
     /**
-     * Muestra una lista de todos los usuarios para el panel de administración.
-     */
-    public function index()
-    {
-        if (!Auth::user()->hasRole('super_admin')) {
-            return response()->json(['message' => 'Acción no autorizada.'], 403);
-        }
-
-        $users = User::with(['role:id,display_name', 'area:id,name'])
-            ->orderBy('last_name')
-            ->get();
-
-        return response()->json(['users' => $users]);
-    }
-
-    /**
      * Almacena un nuevo usuario en la base de datos.
      */
     public function store(Request $request)
@@ -96,6 +80,23 @@ class UserController extends Controller
             'message' => 'Usuario actualizado exitosamente.',
             'user' => $user->load(['role', 'area'])
         ]);
+    }
+    /**
+     * método seguro y ligero para obtener una lista de usuarios
+     * para los menús desplegables (selects) en el frontend.
+     * * - Seguridad: Solo devuelve los campos no sensibles (id, name, last_name).
+     */
+    public function listForSelect()
+    {
+        if (!Auth::user()->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
+
+        $users = User::where('activo', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'last_name']);
+
+        return response()->json($users);
     }
 
     /**

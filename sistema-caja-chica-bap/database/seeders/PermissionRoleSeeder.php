@@ -34,12 +34,12 @@ class PermissionRoleSeeder extends Seeder
                 'navigate.fondos',
                 // Solicitudes
                 'solicitudes.view.all',
-                'solicitudes.create', // Puede crear sus propias solicitudes
+                'solicitudes.create', 
                 'solicitudes.approve.grte',
                 'solicitudes.submit.descargo',
                 // Declaraciones
                 'declaraciones.view.all',
-                'declaraciones.create', // Puede declarar sus propios gastos
+                'declaraciones.create', 
                 'declaraciones.resubmit',
             ],
 
@@ -52,10 +52,11 @@ class PermissionRoleSeeder extends Seeder
                 'navigate.administracion',
                 // Administración
                 'admin.catalogos.manage',
-                'admin.system.settings',
+                'admin.cierres.manage',
+                'admin.excepciones.manage',
                 // Solicitudes
                 'solicitudes.view.all',
-                'solicitudes.create', 
+                'solicitudes.create',
                 'solicitudes.approve.adm',
                 'solicitudes.submit.descargo',
                 // Declaraciones

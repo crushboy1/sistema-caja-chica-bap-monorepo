@@ -30,7 +30,8 @@ class PermissionSeeder extends Seeder
             // === PERMISOS DE ADMINISTRACIÓN DEL SISTEMA ===
             ['name' => 'admin.users.manage', 'display_name' => 'Gestionar Usuarios y Roles', 'description' => 'Permite crear, editar y eliminar usuarios y sus roles.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'admin.catalogos.manage', 'display_name' => 'Gestionar Catálogos', 'description' => 'Permite gestionar listas maestras (proyectos, cuentas contables, gastos proyectados).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'admin.system.settings', 'display_name' => 'Configuraciones del Sistema', 'description' => 'Permite configurar parámetros generales del sistema (ej. bloqueo de fechas).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'admin.cierres.manage', 'display_name' => 'Gestionar Cierres Mensuales', 'description' => 'Permite abrir y cerrar períodos contables para el registro de gastos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'admin.excepciones.manage', 'display_name' => 'Gestionar Excepciones de Cierre', 'description' => 'Permite otorgar permisos especiales a usuarios para registrar gastos en períodos cerrados.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
             // === PERMISOS: MÓDULO DE SOLICITUDES DE FONDOS ===
             ['name' => 'solicitudes.view.all', 'display_name' => 'Ver Todas las Solicitudes', 'description' => 'Permite ver todas las solicitudes de todos los usuarios.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],

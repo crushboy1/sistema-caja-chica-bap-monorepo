@@ -636,22 +636,30 @@ const enviarCorreccionFinal = async () => {
 
     } catch (error) {
         console.error("Error al corregir el gasto:", error);
-        const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
-        const errors = error.response?.data?.errors;
-        let htmlError = `<p>${errorMessage}</p>`;
-        if (errors) {
-            htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
-            for (const key in errors) {
-                const fieldName = key.replace(/gastos\.(\d+)\.(\w+)/, (match, gastoIndex, field) => `Gasto #${parseInt(gastoIndex) + 1} (${field.replace(/_/g, ' ')})`);
-                htmlError += `<li>${fieldName}: ${errors[key][0]}</li>`;
+        if (error.response && error.response.status === 403) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Acción No Permitida',
+                html: `<p>No se puede actualizar el gasto.</p><p class="mt-2 text-sm">${error.response.data.message || 'La fecha seleccionada corresponde a un período contable que ya ha sido cerrado.'}</p>`
+            });
+        } else {
+            const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
+            const errors = error.response?.data?.errors;
+            let htmlError = `<p>${errorMessage}</p>`;
+            if (errors) {
+                htmlError += '<ul class="text-left mt-2 list-disc list-inside">';
+                for (const key in errors) {
+                    const fieldName = key.replace(/gastos\.(\d+)\.(\w+)/, (match, gastoIndex, field) => `Gasto #${parseInt(gastoIndex) + 1} (${field.replace(/_/g, ' ')})`);
+                    htmlError += `<li>${fieldName}: ${errors[key][0]}</li>`;
+                }
+                htmlError += '</ul>';
             }
-            htmlError += '</ul>';
+            Swal.fire({
+                icon: 'error',
+                title: 'Error al Corregir',
+                html: htmlError
+            });
         }
-        Swal.fire({
-            icon: 'error',
-            title: 'Error al Corregir',
-            html: htmlError
-        });
     } finally {
         enviando.value = false;
     }
