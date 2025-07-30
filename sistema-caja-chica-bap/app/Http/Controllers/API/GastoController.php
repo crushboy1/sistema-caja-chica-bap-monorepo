@@ -1051,37 +1051,47 @@ class GastoController extends Controller
 
         $gastosParaExportar = $query->orderBy('created_at', 'desc')->get();
 
-        // Preparar los datos para el exportador.
-        // Cada gasto es una fila en el Excel. Si es parte de una DJ, se incluye el ID de la DJ.
-        $dataForExport = $gastosParaExportar->map(function ($gasto) {
-            return [
-                'ID Gasto' => $gasto->id,
-                'Código Gasto' => $gasto->codigo_gasto,
-                'Glosa' => $gasto->glosa,
-                'Monto Total' => number_format($gasto->monto_total, 2, '.', ''), // Formato numérico
-                'Estado' => $gasto->estado,
-                'Registrador' => $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
-                'Rol Registrador' => $gasto->registrador->role->display_name ?? 'N/A',
-                'Área Registrador' => $gasto->registrador->area->name ?? 'N/A',
-                'Fondo Afectado' => $gasto->fondoEfectivo->codigo_fondo ?? 'N/A',
-                'Cuenta Contable' => $gasto->cuentaContable->codigo_cuenta ?? 'N/A',
-                'Descripción Proyectado' => $gasto->gastoProyectado->descripcion ?? 'N/A',
-                'Fecha Documento' => $gasto->fecha_documento ? $gasto->fecha_documento->format('Y-m-d') : 'N/A',
-                'Fecha Registro' => $gasto->created_at ? $gasto->created_at->format('Y-m-d H:i:s') : 'N/A',
-                'Es Declaración Jurada' => $gasto->es_declaracion_jurada ? 'Sí' : 'No',
-                'ID DJ Consolidada' => $gasto->id_dj_consolidada ?? 'N/A',
-                'Tipo Documento' => $gasto->tipo_documento ?? 'N/A',
-                'Serie Documento' => $gasto->serie_documento ?? 'N/A',
-                'Correlativo Documento' => $gasto->correlativo_documento ?? 'N/A',
-                'Motivo Observación' => $gasto->motivo_observacion_adm ?? '',
-                'Motivo Rechazo' => $gasto->motivo_rechazo ?? '',
-                // Puedes añadir más campos según sea necesario para tu reporte
-            ];
-        });
+        $headings = [
+            'Tipo',
+            'Código',
+            'Glosa',
+            'Cód. Cuenta',
+            'Desc. Cuenta',
+            'Tipo Documento',
+            'Serie',
+            'Correlativo',
+            'Fecha Doc.',
+            'Monto Total',
+            'Estado',
+            'Registrador',
+            'Área',
+            'Comentario Adicional',
+            'Correo Electrónico',
+            'Evidencia URL',
+        ];
 
-        // Usar Maatwebsite/Laravel-Excel para generar el archivo
-        // Asegúrate de que la clase App\Exports\GastosReportExport exista.
-        return Excel::download(new GastosReportExport($dataForExport->toArray()), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
+        $data = $gastosParaExportar->map(function ($gasto) {
+            return [
+                $gasto->es_declaracion_jurada ? 'DJ' : 'Individual',
+                $gasto->id_dj_consolidada ? 'DJ-' . $gasto->id_dj_consolidada : $gasto->codigo_gasto,
+                $gasto->glosa,
+                $gasto->cuentaContable->codigo_cuenta ?? 'N/A',
+                $gasto->cuentaContable->descripcion ?? 'N/A',
+                $gasto->tipo_documento ?? 'N/A',
+                $gasto->serie_documento ?? 'N/A',
+                $gasto->correlativo_documento ?? 'N/A',
+                $gasto->fecha_documento ? $gasto->fecha_documento->format('d/m/Y') : 'N/A',
+                number_format($gasto->monto_total, 2, '.', ''),
+                $gasto->estado,
+                $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
+                $gasto->registrador->area->name ?? 'N/A',
+                $gasto->comentario ?? 'N/A',
+                $gasto->registrador->email,
+                $gasto->evidencia_url ?? 'N/A',
+            ];
+        })->toArray();
+
+        return Excel::download(new GastosReportExport($data, $headings), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     /**

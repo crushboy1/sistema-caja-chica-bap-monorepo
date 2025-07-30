@@ -76,6 +76,10 @@ class Gasto extends Model
      */
     protected $appends = ['evidencia_url'];
 
+
+
+
+
     /**
      * El método "booted" del modelo.
      */

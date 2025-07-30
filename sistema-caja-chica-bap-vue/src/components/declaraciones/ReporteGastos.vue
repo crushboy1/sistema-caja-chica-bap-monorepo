@@ -137,14 +137,24 @@
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-100">
                         <tr class="text-gray-700 uppercase text-xs leading-normal">
-                            <th scope="col" class="py-3 px-4 text-center font-semibold"></th>
+                            <th scope="col" class="py-3 px-4 text-center font-semibold"></th> <!-- Expander -->
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Tipo</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Código</th>
-                            <th class="py-3 px-4 text-center font-semibold">Glosa / Descripción</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Monto</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold w-48">Estado</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Registrador</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Fecha Registro</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Glosa / Código</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Cód. Cuenta</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Desc. Cuenta</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Fondo</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Proyección Gasto</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Tipo Documento</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Serie</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Correlativo</th>
+                            <th scope="col" class="py-3 px-4 text-center font-semibold">Fecha</th>
+                            <th scope="col" class="py-3 px-4 text-right font-semibold">Monto</th>
+                            <th scope="col" class="py-3 px-4 text-center font-semibold">Estado</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Registrador</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Área</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Comentario Adicional</th>
+                            <th scope="col" class="py-3 px-4 text-left font-semibold">Correo Electrónico</th>
+                            <th scope="col" class="py-3 px-4 text-center font-semibold">Evidencia</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Acciones</th>
                         </tr>
                     </thead>
@@ -187,29 +197,25 @@
                                     </div>
                                 </td>
                                 <td class="py-3 px-2">
-                                    <div class="font-mono text-sm font-medium text-blue-800">DJ-{{
-                                        item.id_dj_consolidada }}</div>
+                                    <div class="font-mono text-sm font-medium text-blue-800">DJ-{{ item.id_dj_consolidada }}</div>
                                     <div class="text-xs text-blue-600">Consolidada</div>
                                 </td>
-                                <td class="py-3 px-2">
-                                    <div class="text-sm text-gray-700 font-medium text-center">Gastos consolidados</div>
-                                    <div class="text-xs text-gray-500 text-center">Múltiples conceptos de gasto</div>
-                                </td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500" colspan="7">Múltiples valores (ver detalle)</td>
+                                <td class="py-3 px-2 text-center text-xs text-gray-500">Múltiples fechas</td>
+                                <td class="py-3 px-2 text-right font-mono font-bold text-blue-800">{{ currencyFormatter.format(item.monto_total_grupo || 0) }}</td>
                                 <td class="py-3 px-2 text-center">
-                                    <div class="font-bold text-lg text-blue-800">{{
-                                        currencyFormatter.format(item.monto_total_grupo || 0) }}</div>
-                                    <div class="text-xs text-gray-500">Total consolidado</div>
+                                    <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
+                                        :class="getClassesForAuditoriaBadge(item.estado_grupo)">
+                                        {{ item.estado_grupo }}
+                                    </span>
                                 </td>
-                                <td class="py-3 px-2 text-center">
-                                    <span :class="getClassesForAuditoriaBadge(item.estado_grupo)">{{ item.estado_grupo
-                                        }}</span>
+                                <td class="py-3 px-2 text-left">
+                                    <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }} {{ item.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-center">
-                                    <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
-                                    <div class="text-xs text-gray-500">{{ item.registrador?.last_name }}</div>
-                                </td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}
-                                </td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500">Múltiples valores</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.registrador?.email">{{ item.registrador?.email }}</td>
+                                <td class="py-3 px-2 text-center text-xs text-gray-500 italic">Ver en detalle</td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="flex justify-center">
                                         <!-- Botón "Ver Detalles" para el grupo (para ver los gastos individuales dentro) -->
@@ -238,26 +244,55 @@
                                     <td class="py-3 px-2 text-center text-gray-600">
                                         <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}
+                                    <td class="py-3 px-2 text-left max-w-[200px] truncate" :title="gasto.glosa">
+                                        <div class="font-mono text-xs text-gray-500">{{ gasto.codigo_gasto }}</div>
+                                        <div>{{ gasto.glosa }}</div>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-700">{{ gasto.glosa }}</td>
-                                    <td class="py-3 px-2 text-center text-gray-800 font-semibold">
-                                        {{ currencyFormatter.format(parseFloat(gasto.monto_total || 0)) }}
+                                    <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
+                                        {{ gasto.cuenta_contable?.codigo_cuenta }}
                                     </td>
+                                    <td class="py-3 px-2 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
+                                        {{ gasto.cuenta_contable?.descripcion }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">
+                                        {{ gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
+                                        {{ gasto.gasto_proyectado?.descripcion || 'N/A' }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.tipo_documento }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.serie_documento || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.correlativo_documento || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
+                                    <td class="py-3 px-2 text-right font-mono">{{ currencyFormatter.format(gasto.monto_total) }}</td>
                                     <td class="py-3 px-2 text-center">
-                                        <span class="text-xs text-gray-500">-</span>
+                                        <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
+                                            :class="getClassesForAuditoriaBadge(gasto.estado)">
+                                            {{ gasto.estado }}
+                                        </span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-500">-</td>
-                                    <td class="py-3 px-2 text-center text-gray-500">-</td>
+                                    <td class="py-3 px-2 text-left">
+                                        <div class="text-sm font-medium text-gray-900">{{ gasto.registrador?.name }} {{ gasto.registrador?.last_name }}</div>
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.comentario || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="gasto.registrador?.email">{{ gasto.registrador?.email }}</td>
+                                    <td class="py-3 px-2 text-center">
+                                        <a v-if="gasto.evidencia_url" :href="gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
+                                            <!-- Icono para PDF -->
+                                            <svg v-if="isPdf(gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                            <!-- Icono para Imagen -->
+                                            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        </a>
+                                        <span v-else class="text-xs text-gray-400">N/A</span>
+                                    </td>
                                     <td class="py-3 px-2 text-center">
                                         <div class="flex space-x-1 justify-center">
                                             <button @click="verDetalles(gasto)"
-                                                class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition-colors"
+                                                class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors"
                                                 title="Ver Detalle Individual">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
                                             </button>
@@ -298,31 +333,53 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3 px-2">
-                                    <div class="font-mono text-sm font-medium text-verde-bap-dark">{{
-                                        item.gasto?.codigo_gasto }}</div>
-                                    <div class="text-xs text-verde-bap">Código único</div>
+                                <td class="py-3 px-2 text-left max-w-[200px] truncate" :title="item.gasto.glosa">
+                                    <div class="font-mono text-xs text-gray-500">{{ item.gasto.codigo_gasto }}</div>
+                                    <div>{{ item.gasto.glosa }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
-                                <td class="py-3 px-2 text-center font-semibold text-lg text-verde-bap-dark">
-                                    {{ currencyFormatter.format(parseFloat(item.gasto?.monto_total || 0)) }}
+                                <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
+                                    {{ item.gasto.cuenta_contable?.codigo_cuenta }}
                                 </td>
+                                <td class="py-3 px-2 text-left text-xs" :title="item.gasto.cuenta_contable?.descripcion">
+                                    {{ item.gasto.cuenta_contable?.descripcion }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs">
+                                    {{ item.gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
+                                    {{ item.gasto.gasto_proyectado?.descripcion || 'N/A' }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.tipo_documento }}</td>
+                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.serie_documento || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.correlativo_documento || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-center">{{ formatDate(item.gasto.fecha_gasto) }}</td>
+                                <td class="py-3 px-2 text-right font-mono">{{ currencyFormatter.format(item.gasto.monto_total) }}</td>
                                 <td class="py-3 px-2 text-center">
-                                    <span :class="getClassesForAuditoriaBadge(item.gasto?.estado)">{{ item.gasto?.estado
-                                        }}</span>
+                                    <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
+                                        :class="getClassesForAuditoriaBadge(item.gasto.estado)">
+                                        {{ item.gasto.estado }}
+                                    </span>
                                 </td>
+                                <td class="py-3 px-2 text-left">
+                                    <div class="text-sm font-medium text-gray-900">{{ item.gasto.registrador?.name }} {{ item.gasto.registrador?.last_name }}</div>
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.comentario || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.gasto.registrador?.email">{{ item.gasto.registrador?.email }}</td>
                                 <td class="py-3 px-2 text-center">
-                                    <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
-                                    </div>
-                                    <div class="text-xs text-gray-500">{{ item.gasto?.registrador?.last_name }}</div>
-                                </td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.created_at) }}
+                                    <a v-if="item.gasto.evidencia_url" :href="item.gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
+                                        <!-- Icono para PDF -->
+                                        <svg v-if="isPdf(item.gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <!-- Icono para Imagen -->
+                                        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    </a>
+                                    <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="flex space-x-1 justify-center">
                                         <button @click="verDetalles(item.gasto)"
                                             class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors"
-                                            title="Ver Detalles">
+                                            title="Ver Detalle Individual">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -429,6 +486,10 @@ const formatDate = (dateString) => {
     const date = new Date(dateString);
     if (isNaN(date)) return 'N/A';
     return date.toLocaleDateString('es-PE');
+};
+
+const isPdf = (url) => {
+    return url && typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
 };
 
 // --- PROPIEDADES COMPUTADAS ---
