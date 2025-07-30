@@ -72,7 +72,8 @@ return new class extends Migration
 
             // Guarda el motivo del rechazo final.
             $table->text('motivo_rechazo')->nullable();
-
+            $table->date('fecha_limite_rendicion')->nullable();
+            $table->date('fecha_rendicion')->nullable();
             $table->timestamps();
         });
     }

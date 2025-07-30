@@ -219,6 +219,7 @@ class SolicitudFondoController extends Controller
 
             // Usamos el nombre del rol desde la relación: $user->role->name
             $userRoleName = $user->role->name;
+
             $tipoFondoParaGuardar = $request->tipo_solicitud === 'Apertura'
                 ? $request->tipo_fondo_solicitado
                 : ($fondoOriginal ? $fondoOriginal->tipo_fondo : null);
@@ -239,7 +240,7 @@ class SolicitudFondoController extends Controller
                 $revisorAdmId = $user->id;
 
                 // NUEVA LÓGICA: Flujo especial para Decremento/Cierre iniciado por un Administrador
-            } elseif (in_array($request->tipo_solicitud, ['Decremento', 'Cierre']) && ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin')) {
+            } elseif (in_array($request->tipo_solicitud, ['Decremento']) && ($userRoleName === 'jefe_administracion' || $userRoleName === 'super_admin')) {
                 $initialStateInDB = 'Pendiente Aprobación GRTE';
                 $initialHistorialObservation = 'enviada directamente a Gerencia General';
                 $revisorAdmId = $user->id;
@@ -256,7 +257,10 @@ class SolicitudFondoController extends Controller
                 }
                 // Si es jefe_area o colaborador, se mantiene el estado por defecto: 'Pendiente Aprobación ADM'
             }
-
+            if ($request->tipo_solicitud === 'Cierre' && in_array($userRoleName, ['jefe_area', 'gerente_general'])) {
+                $initialStateInDB = 'Pendiente Aprobación ADM';
+                $initialHistorialObservation = 'enviada para aprobación final de Administración';
+            }
             $solicitud = SolicitudFondo::create([
                 'id_solicitante' => $user->id,
                 'id_area' => $user->area_id,
@@ -544,26 +548,39 @@ class SolicitudFondoController extends Controller
                     $solicitud->motivo_descargo = null;
                     $historialState = 'Aprobada ADM';
 
-                    $solicitanteIsAdmin = in_array($solicitanteRoleName, ['jefe_administracion', 'super_admin']);
-                    $solicitanteIsRegularUser = in_array($solicitanteRoleName, ['jefe_area', 'colaborador']);
-
-                    if (in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento']) || ($isDecrementoCierre && $solicitanteIsAdmin)) {
-                        $newState = 'Pendiente Aprobación GRTE';
-                        $observacionesHistorial = 'Solicitud aprobada por Administración. Pasa a pendiente de aprobación de Gerencia General.';
-                        $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.';
-                    } else if ($isDecrementoCierre && $solicitanteIsRegularUser) {
+                    if ($solicitud->tipo_solicitud === 'Cierre') {
+                        // Si es un Cierre, la aprobación de ADM es la final.
                         $newState = 'Aprobada';
-                        $solicitud->id_aprobador_gerente = $user->id;
-                        $observacionesHistorial = 'Solicitud de ' . $solicitud->tipo_solicitud . ' aprobada finalmente por Administración.';
+                        $solicitud->id_aprobador_gerente = $user->id; // El admin actúa como aprobador final.
+                        $observacionesHistorial = 'Solicitud de Cierre aprobada finalmente por Administración.';
 
                         $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
                         if ($managedFondo) {
                             $managedFondoCodigo = $managedFondo->codigo_fondo;
-                            $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada por Administración. El fondo " . $managedFondoCodigo . " ha sido " . ($solicitud->tipo_solicitud === 'Cierre' ? 'cerrado.' : 'actualizado.');
+                            $responseMessage = "¡Éxito! Solicitud de Cierre aprobada. El fondo {$managedFondoCodigo} ha sido cerrado.";
                         }
                     } else {
-                        DB::rollBack();
-                        return response()->json(['message' => 'Lógica de aprobación de ADM no cubierta para este tipo de solicitud y solicitante.'], 400);
+                        // LÓGICA ORIGINAL: Para Apertura, Incremento y Decremento, se mantiene el flujo existente.
+                        $solicitanteIsAdmin = in_array($solicitanteRoleName, ['jefe_administracion', 'super_admin']);
+
+                        if (in_array($solicitud->tipo_solicitud, ['Apertura', 'Incremento', 'Decremento']) && $solicitanteIsAdmin) {
+                            $newState = 'Pendiente Aprobación GRTE';
+                            $observacionesHistorial = 'Solicitud aprobada por Administración. Pasa a pendiente de aprobación de Gerencia General.';
+                            $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.';
+                        } elseif ($solicitud->tipo_solicitud === 'Decremento') {
+                            $newState = 'Aprobada';
+                            $solicitud->id_aprobador_gerente = $user->id;
+                            $observacionesHistorial = 'Solicitud de ' . $solicitud->tipo_solicitud . ' aprobada finalmente por Administración.';
+                            $managedFondo = $this->manageFondoEfectivo($solicitud, $user);
+                            if ($managedFondo) {
+                                $managedFondoCodigo = $managedFondo->codigo_fondo;
+                                $responseMessage = "¡Éxito! Solicitud de " . $solicitud->tipo_solicitud . " aprobada por Administración. El fondo " . $managedFondoCodigo . " ha sido " . ($solicitud->tipo_solicitud === 'Cierre' ? 'cerrado.' : 'actualizado.');
+                            }
+                        } else { // Este 'else' ahora solo aplica a Apertura e Incremento para no-admins.
+                            $newState = 'Pendiente Aprobación GRTE';
+                            $observacionesHistorial = 'Solicitud aprobada por Administración. Pasa a pendiente de aprobación de Gerencia General.';
+                            $responseMessage = 'Solicitud aprobada por Administración. Enviada a Gerencia General.';
+                        }
                     }
                     break;
 
