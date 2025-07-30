@@ -468,17 +468,22 @@ class FondoEfectivoController extends Controller
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para ver este resumen.'], 403);
         }
-
-
         $montoAReponer = 0;
         $montoADevolver = 0;
         $gastosContabilizados = $fondo->gastos()->where('estado', 'Contabilizado')->get();
-        $totalGastado = $gastosContabilizados->sum('monto_total');
-
-        if ($fondo->monto_disponible < 0) {
-            $montoAReponer = abs($fondo->monto_disponible);
-        } elseif ($fondo->monto_disponible > 0) { // <-- Condición simplificada
+        // Se calculan los gastos que ya están finalizados y afectan el saldo.
+        $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
+        // El saldo real disponible para liquidar se calcula sobre el monto aprobado, no el disponible.
+        $saldoRealParaLiquidar = $fondo->monto_aprobado - $totalGastado;
+        // Verificar si el fondo tiene una solicitud de cierre aprobada
+        $tieneCierreAprobado = $fondo->solicitudCierreAprobada()->exists();
+        if ($saldoRealParaLiquidar < 0) {
+            $montoAReponer = abs($saldoRealParaLiquidar);
+        } else if ($saldoRealParaLiquidar >= 0 && $tieneCierreAprobado) {
+            // Si tiene un cierre aprobado y saldo 0 o positivo, se debe devolver el saldo disponible actual.
             $montoADevolver = $fondo->monto_disponible;
+        } else if ($saldoRealParaLiquidar > 0) {
+            $montoADevolver = $saldoRealParaLiquidar;
         }
 
         $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
@@ -520,8 +525,9 @@ class FondoEfectivoController extends Controller
             'ejecutar_cierre' => 'sometimes|boolean',
         ]);
 
-        if ($fondo->estado !== 'Activo') {
-            return response()->json(['message' => 'Solo se pueden reponer fondos activos.'], 409);
+        $tieneCierreAprobado = $fondo->solicitudCierreAprobada()->exists();
+        if ($fondo->estado !== 'Activo' && !$tieneCierreAprobado) {
+            return response()->json(['message' => 'Solo se pueden reponer fondos activos o con cierre aprobado.'], 409);
         }
 
         $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
@@ -536,9 +542,15 @@ class FondoEfectivoController extends Controller
         if ($fondo->monto_disponible >= 0) {
             return response()->json(['message' => 'Este fondo no tiene un excedente para reponer.'], 409);
         }
-
+        
         // Cálculo seguro del monto a reponer (el excedente).
-        $montoAReponer = abs($fondo->monto_disponible);
+        $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
+        $saldoReal = $fondo->monto_aprobado - $totalGastado;
+
+        if ($saldoReal >= 0) {
+            return response()->json(['message' => 'Este fondo no tiene un excedente para reponer.'], 409);
+        }
+        $montoAReponer = abs($saldoReal);
 
         return DB::transaction(function () use ($fondo, $montoAReponer, $user, $request, $validated) {
             $saldoAnterior = $fondo->monto_disponible;
@@ -609,12 +621,13 @@ class FondoEfectivoController extends Controller
         }
 
         $validated = $request->validate([
-            'comprobante_devolucion' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'comprobante_devolucion' => 'sometimes|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'ejecutar_cierre' => 'sometimes|boolean',
         ]);
 
-        if ($fondo->estado !== 'Activo') {
-            return response()->json(['message' => 'Solo se pueden registrar devoluciones de fondos activos.'], 409);
+        $tieneCierreAprobado = $fondo->solicitudCierreAprobada()->exists();
+        if ($fondo->estado !== 'Activo' && !$tieneCierreAprobado) {
+            return response()->json(['message' => 'Solo se pueden liquidar fondos activos o con cierre aprobado.'], 409);
         }
         // No se puede registrar una devolución si hay gastos en proceso.
         $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
@@ -629,7 +642,9 @@ class FondoEfectivoController extends Controller
         $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
         $montoADevolver = $fondo->monto_aprobado - $totalGastado;
 
-        if ($montoADevolver <= 0) {
+        if ($montoADevolver <= 0 && $tieneCierreAprobado && $fondo->monto_disponible > 0) {
+            $montoADevolver = $fondo->monto_disponible;
+        } elseif ($montoADevolver <= 0) {
             return response()->json(['message' => 'Este fondo no tiene un saldo sobrante para devolver.'], 409);
         }
 

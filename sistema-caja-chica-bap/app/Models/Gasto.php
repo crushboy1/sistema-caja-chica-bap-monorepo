@@ -54,6 +54,8 @@ class Gasto extends Model
         'id_dj_consolidada',
         'id_observador_adm',
         'comentario_subsanacion',
+        'fecha_limite_rendicion',
+        'fecha_rendicion',
     ];
 
     /**
@@ -67,6 +69,8 @@ class Gasto extends Model
         'es_declaracion_jurada' => 'boolean',
         'monto_excedido_al_registrar' => 'decimal:2',
         'saldo_disponible_al_registrar' => 'decimal:2',
+        'fecha_limite_rendicion' => 'date',
+        'fecha_rendicion' => 'date',
     ];
 
     /**

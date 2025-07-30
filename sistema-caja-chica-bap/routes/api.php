@@ -33,4 +33,5 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     require base_path('routes/api/users.php');
     require base_path('routes/api/roles.php');
     require base_path('routes/api/admin.php');
+    require base_path('routes/api/dashboard.php');
 });

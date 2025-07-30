@@ -215,8 +215,6 @@ class FondoEfectivo extends Model
                 $fondoOriginal->estado = 'Cerrado';
                 $fondoOriginal->fecha_cierre = now()->toDateString();
                 $fondoOriginal->motivo_cierre = $solicitud->motivo_detalle; // Usar el motivo de la solicitud de cierre
-                $fondoOriginal->monto_aprobado = 0.00; // Cuando un fondo se cierra, su monto aprobado debe ser 0.
-                $fondoOriginal->monto_disponible = 0.00;
                 Log::info('FondoEfectivo cerrado por solicitud.', ['fondo_id' => $fondoOriginal->id_fondo, 'motivo_cierre' => $fondoOriginal->motivo_cierre]);
             }
 

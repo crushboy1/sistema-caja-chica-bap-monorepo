@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use App\Exports\GastosReportExport;
 use Maatwebsite\Excel\Facades\Excel;
-
+use Carbon\Carbon;
 /**
  * GastoController se encarga de todo el ciclo de vida de las declaraciones de gastos.
  * Esta versión refactorizada utiliza endpoints de acción específicos (approve, observe, etc.)
@@ -326,6 +326,8 @@ class GastoController extends Controller
             $gasto->fondoEfectivo()->decrement('monto_disponible', $gasto->monto_total);
 
             $estadoAnterior = $gasto->estado;
+            $gasto->fecha_rendicion = now();
+            $gasto->fecha_limite_rendicion = Carbon::parse($gasto->fecha_documento)->endOfMonth();
             $gasto->estado = 'Contabilizado';
             $gasto->id_validador_adm = $user->id;
             $gasto->save();
@@ -616,7 +618,7 @@ class GastoController extends Controller
         }
 
         // 2. Ejecución de la lógica.
-        return DB::transaction(function () use ($gasto, $user, $validated) {
+        return DB::transaction(function () use ($gasto, $user, $validated, $isJefeArea) {
             $estadoAnterior = $gasto->estado;
             $gasto->estado = 'Rechazado';
             $gasto->motivo_rechazo = $validated['comentario'];

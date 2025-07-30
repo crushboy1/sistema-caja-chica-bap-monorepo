@@ -207,7 +207,7 @@ onMounted(() => {
 
     <main class="bg-verde-bap-light flex-grow p-8">
       <div class="max-w-7xl mx-auto glass rounded-2xl shadow-soft p-8 animate-fade-in-up">
-        <router-view :user="user" />
+        <router-view v-if="user" :user="user" />
       </div>
     </main>
 

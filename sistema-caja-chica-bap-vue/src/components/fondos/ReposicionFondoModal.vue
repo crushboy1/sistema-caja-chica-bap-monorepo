@@ -167,7 +167,12 @@ const ejecutarDevolucion = async () => {
     formData.append('ejecutar_cierre', props.fondoProp.tiene_cierre_aprobado || ejecutarCierre.value ? '1' : '0');
 
     try {
-        const response = await api.post(`/v1/fondos-efectivo/${props.fondoProp.id_fondo}/devolver`, formData);
+
+        const response = await api.post(`/v1/fondos-efectivo/${props.fondoProp.id_fondo}/devolver`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
         await Swal.fire('¡Éxito!', response.data.message, 'success');
         emit('fondoRepuesto');
         emit('close');
@@ -233,6 +238,9 @@ watch(() => props.mostrar, (newVal) => {
                             <div class="p-4 bg-gray-100 border-l-4 border-verde-bap rounded-r-lg">
                                 <h4 class="font-bold text-gray-700 mb-2">Resumen de Reposición por Excedente</h4>
                                 <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <span class="text-gray-600">Monto Aprobado Original:</span>
+                                    <span class="font-semibold text-right">{{
+                                        currencyFormatter.format(reposicionSummary.monto_asignado) }}</span>
                                     <span class="text-gray-600">Saldo Actual:</span>
                                     <span class="font-semibold text-right text-rojo-bap">{{
                                         currencyFormatter.format(reposicionSummary.saldo_disponible_actual) }}</span>
@@ -257,6 +265,9 @@ watch(() => props.mostrar, (newVal) => {
                             <div class="p-4 bg-gray-100 border-l-4 border-orange-400 rounded-r-lg">
                                 <h4 class="font-bold text-gray-700 mb-2">Resumen de Devolución de Sobrante</h4>
                                 <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <span class="text-gray-600">Monto Aprobado Original:</span>
+                                    <span class="font-semibold text-right">{{
+                                        currencyFormatter.format(reposicionSummary.monto_asignado) }}</span>
                                     <span class="text-gray-600">Saldo Disponible Actual:</span>
                                     <span class="font-semibold text-right">{{
                                         currencyFormatter.format(reposicionSummary.saldo_disponible_actual) }}</span>
