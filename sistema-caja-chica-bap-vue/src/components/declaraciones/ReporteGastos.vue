@@ -489,7 +489,10 @@ const formatDate = (dateString) => {
 };
 
 const isPdf = (url) => {
-    return url && typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+    console.log('isPdf called with:', url);
+    const result = url && typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+    console.log('isPdf result:', result);
+    return result;
 };
 
 // --- PROPIEDADES COMPUTADAS ---
