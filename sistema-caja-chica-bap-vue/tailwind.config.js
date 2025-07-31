@@ -58,6 +58,38 @@ export default {
         'glass-white': 'rgba(255, 255, 255, 0.85)',
         'glass-border': 'rgba(255, 255, 255, 0.2)',
         'backdrop-dark': 'rgba(0, 0, 0, 0.6)',
+        cyan: {
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          600: '#0891b2',
+          700: '#0e7490',
+          900: '#164e63',
+        },
+        teal: {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          600: '#0d9488',
+          700: '#0f766e',
+          900: '#134e4a',
+        },
+        indigo: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          600: '#4f46e5',
+          700: '#4338ca',
+          900: '#312e81',
+        },
+        pink: {
+          50: '#fdf2f8',
+          100: '#fce7f3',
+          200: '#fbcfe8',
+          600: '#db2777',
+          700: '#be185d',
+          900: '#831843',
+        },
       },
 
       // 🎨 ANIMACIONES MODERNAS
@@ -68,7 +100,7 @@ export default {
         'fade-in-down': 'fadeInDown 0.6s ease-out forwards', // Añadido forwards
         'slide-in-right': 'slideInRight 0.5s ease-out forwards', // Añadido forwards
         'slide-in-left': 'slideInLeft 0.5s ease-out forwards', // Añadido forwards
-
+        'slide-down': 'slideDown 0.3s ease-out forwards',
         // Animaciones de hover y interacción
         'bounce-gentle': 'bounceGentle 0.6s ease-in-out infinite', // Añadido infinite
         'pulse-soft': 'pulseSoft 2s infinite ease-in-out', // Ajustado timing-function
@@ -105,6 +137,10 @@ export default {
         },
         fadeInDown: {
           '0%': { opacity: '0', transform: 'translateY(-30px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideDown: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         slideInRight: {
@@ -306,6 +342,35 @@ export default {
           '&:hover': {
             transform: 'translateY(-4px) scale(1.02)',
             boxShadow: theme('boxShadow.card-modern'),
+          },
+        },
+        '.btn-primary': {
+          padding: '.5rem 1rem',
+          borderRadius: theme('borderRadius.lg'),
+          backgroundColor: theme('colors.verde-bap'),
+          color: '#fff',
+          fontWeight: '600',
+          boxShadow: theme('boxShadow.soft'),
+          transition: 'all 0.2s ease-in-out',
+          '&:hover': {
+            backgroundColor: theme('colors.verde-bap-dark'),
+            boxShadow: theme('boxShadow.medium'),
+            transform: 'translateY(-2px)',
+          },
+        },
+        '.btn-secondary': {
+          padding: '.5rem 1rem',
+          borderRadius: theme('borderRadius.lg'),
+          backgroundColor: '#fff',
+          color: theme('colors.gray.700'),
+          border: `1px solid ${theme('colors.gray.300')}`,
+          fontWeight: '600',
+          boxShadow: theme('boxShadow.soft'),
+          transition: 'all 0.2s ease-in-out',
+          '&:hover': {
+            backgroundColor: theme('colors.gray.100'),
+            borderColor: theme('colors.gray.400'),
+            boxShadow: theme('boxShadow.medium'),
           },
         },
         // Card moderna con hover (ya no se usa directamente en SolicitudFondoView, pero se mantiene por si acaso)

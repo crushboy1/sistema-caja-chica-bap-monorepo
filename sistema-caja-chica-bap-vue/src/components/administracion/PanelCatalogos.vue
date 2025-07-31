@@ -56,7 +56,7 @@ const catalogConfig = {
             { key: 'descripcion', label: 'Descripción' },
         ],
         fields: [
-            // [MODIFICADO] Se añade 'disabledOnEdit' para que el código no sea editable.
+            // Se añade 'disabledOnEdit' para que el código no sea editable.
             { key: 'codigo_cuenta', label: 'Código de Cuenta', type: 'text', required: true, disabledOnEdit: true },
             { key: 'descripcion', label: 'Descripción de la Cuenta', type: 'text', required: true },
         ]
