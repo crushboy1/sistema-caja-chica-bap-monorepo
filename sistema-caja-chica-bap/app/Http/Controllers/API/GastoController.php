@@ -975,30 +975,31 @@ class GastoController extends Controller
         // para mantener la estructura esperada por el frontend.
         $gastosAgrupados = $gastos->groupBy('id_dj_consolidada');
 
-        // Procesamos el resultado para el formato esperado por el frontend.
-        $resultadoFinal = $gastosAgrupados->flatMap(function ($gastosDelGrupo, $djId) {
-            if (is_null($djId)) {
-                // Gastos individuales
-                return $gastosDelGrupo->map(fn($gasto) => [
-                    'es_grupo' => false,
-                    'gasto' => $gasto
-                ]);
-            } else {
-                // Grupos de DJ consolidada
-                return collect([[
+        $resultado = collect();
+
+        foreach ($gastosAgrupados as $djId => $grupo) {
+            if ($djId) {
+                $resultado->push([
                     'es_grupo' => true,
                     'id_dj_consolidada' => $djId,
-                    'estado_grupo' => $gastosDelGrupo->first()->estado,
-                    'monto_total_grupo' => $gastosDelGrupo->sum('monto_total'),
-                    'registrador' => $gastosDelGrupo->first()->registrador,
-                    'fecha_registro' => $gastosDelGrupo->first()->created_at,
-                    'dj_consolidada' => $gastosDelGrupo->first()->djConsolidada,
-                    'gastos' => $gastosDelGrupo->values(),
-                ]]);
+                    'estado_grupo' => $grupo->first()->estado,
+                    'monto_total_grupo' => $grupo->sum('monto_total'),
+                    'registrador' => $grupo->first()->registrador,
+                    'fecha_registro' => $grupo->first()->created_at,
+                    'dj_consolidada' => $grupo->first()->djConsolidada,
+                    'gastos' => $grupo->values(),
+                ]);
+            } else {
+                foreach ($grupo as $gasto) {
+                    $resultado->push([
+                        'es_grupo' => false,
+                        'gasto' => $gasto,
+                    ]);
+                }
             }
-        })->values(); // Re-indexar el array final.
+        }
 
-        return response()->json($resultadoFinal);
+        return response()->json($resultado->values());
     }
 
     /**
@@ -1049,36 +1050,49 @@ class GastoController extends Controller
             $query->whereDate('created_at', '<=', $request->fecha_fin);
         }
 
-        $gastosParaExportar = $query->orderBy('created_at', 'desc')->get();
+        $gastosParaExportar = $query->orderBy('id', 'asc')->get();
 
         $headings = [
-            'Dirección de correo',
+            'Numero Correlativo',
+            'Serie SAP',
+            'Fecha de Contabilización',
             'Fecha del Documento',
+            'Dirección de correo',
             'Moneda del Documento',
             'Total del Documento',
             'Glosa para el Asiento',
             'Tipo de Documento',
             'Serie del Documento',
             'Correlativo del Documento',
+            'Referencia de documento',
             'Desc. Cuenta',
             'Personal que realizó el gasto',
             'Evidencia',
             'Comentarios',
         ];
 
-        $data = $gastosParaExportar->map(function ($gasto) {
+        $data = $gastosParaExportar->map(function ($gasto, $djs_consolidadas) {
+            $tipo = $gasto->tipo_documento ?? 'N/A';
+    $serie = $gasto->serie_documento ?? 'N/A';
+    $correlativo = $gasto->correlativo_documento ?? 'N/A';
+
+    $documentoCompleto = "{$tipo}-{$serie}-{$correlativo}";
             return [
-                $gasto->registrador->email,
+                $gasto->id,
+                '323',
+                $gasto->created_at ? $gasto->created_at->format('d/m/Y') : 'N/A',
                 $gasto->fecha_documento ? $gasto->fecha_documento->format('d/m/Y') : 'N/A',
+                $gasto->registrador->email,
                 'SOL',
                 number_format($gasto->monto_total, 2, '.', ''),
                 $gasto->glosa,
                 $gasto->tipo_documento ?? 'N/A',
                 $gasto->serie_documento ?? 'N/A',
                 $gasto->correlativo_documento ?? 'N/A',
+                $documentoCompleto,
                 $gasto->cuentaContable->descripcion ?? 'N/A',
                 $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
-                $gasto->evidencia_url ?? 'N/A',
+                $gasto->djConsolidada ? \Illuminate\Support\Facades\Storage::url($gasto->djConsolidada->ruta_documento) : ($gasto->evidencia_url ?? 'N/A'),
                 $gasto->comentario ?? 'N/A',
             ];
         })->toArray();
