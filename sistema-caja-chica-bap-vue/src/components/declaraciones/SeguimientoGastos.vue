@@ -21,6 +21,151 @@
             </transition>
         </div>
 
+        <!-- Panel de Contadores Globales -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Monto Asignado al Fondo</p>
+                    <p class="text-3xl font-bold text-gray-800">
+                        {{ fondoActivoDetalles ? currencyFormatter.format(fondoActivoDetalles.monto_asignado) : 'Seleccione un gasto' }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Monto total del fondo activo.</p>
+            </div>
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Saldo Disponible</p>
+                    <p class="text-3xl font-bold text-verde-bap">
+                        {{ saldoFondoActivo !== null ? currencyFormatter.format(saldoFondoActivo) : 'Seleccione un gasto' }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Balance actual del fondo activo.</p>
+            </div>
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Monto Total (Filtrado)</p>
+                    <p class="text-3xl font-bold text-gray-800">
+                        {{ currencyFormatter.format(contadores.montos.total) }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Suma de gastos en la vista actual.</p>
+            </div>
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Monto Proyectado (Filtrado)</p>
+                    <p class="text-3xl font-bold text-gray-800">
+                        {{ currencyFormatter.format(contadores.montos.proyectado) }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Suma de montos proyectados.</p>
+            </div>
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Monto Original (Filtrado)</p>
+                    <p class="text-3xl font-bold text-gray-800">
+                        {{ currencyFormatter.format(contadores.montos.original) }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Suma de montos originales.</p>
+            </div>
+            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500"># Gastos (Filtrado)</p>
+                    <p class="text-3xl font-bold text-gray-800">
+                        {{ contadores.estados.total }}
+                    </p>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Cantidad de gastos en la vista actual.</p>
+            </div>
+        </div>
+
+        <!-- Divisor -->
+        <div class="border-t border-gray-200 my-6"></div>
+
+        <!-- Panel de Contadores por Estado -->
+        <div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Desglose por Estado (Resultados Filtrados)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Pendiente de Aprobación -->
+                <div class="p-4 bg-yellow-100 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-yellow-600 font-bold">Pend. Aprobación</p>
+                        <p class="text-xl font-bold text-yellow-800">{{ contadores.estados.pendientesAprobacion }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-yellow-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesAprobacion.total) }}</span></p>
+                        <p class="text-xs text-yellow-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesAprobacion.proyectado) }}</p>
+                        <p class="text-xs text-yellow-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesAprobacion.original) }}</p>
+                    </div>
+                </div>
+
+                <!-- Pendiente de Validación DJ -->
+                <div class="p-4 bg-orange-100 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-orange-600 font-bold">Pend. Val. DJ</p>
+                        <p class="text-xl font-bold text-orange-800">{{ contadores.estados.pendientesValidacionDJ }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-orange-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.total) }}</span></p>
+                        <p class="text-xs text-orange-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.proyectado) }}</p>
+                        <p class="text-xs text-orange-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.original) }}</p>
+                    </div>
+                </div>
+
+                <!-- Pendiente de Validación Contable -->
+                <div class="p-4 bg-purple-100 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-purple-600 font-bold">Pend. Val. Contable</p>
+                        <p class="text-xl font-bold text-purple-800">{{ contadores.estados.pendientesValidacionContable }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-purple-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.total) }}</span></p>
+                        <p class="text-xs text-purple-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.proyectado) }}</p>
+                        <p class="text-xs text-purple-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.original) }}</p>
+                    </div>
+                </div>
+
+                <!-- Observado -->
+                <div class="p-4 bg-red-100 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-red-600 font-bold">Observados</p>
+                        <p class="text-xl font-bold text-red-800">{{ contadores.estados.observados }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-red-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.observados.total) }}</span></p>
+                        <p class="text-xs text-red-700">Proy: {{ currencyFormatter.format(contadores.montos.observados.proyectado) }}</p>
+                        <p class="text-xs text-red-700">Orig: {{ currencyFormatter.format(contadores.montos.observados.original) }}</p>
+                    </div>
+                </div>
+
+                <!-- Rechazado -->
+                <div class="p-4 bg-gray-200 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-gray-600 font-bold">Rechazados</p>
+                        <p class="text-xl font-bold text-gray-800">{{ contadores.estados.rechazados }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-gray-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.rechazados.total) }}</span></p>
+                        <p class="text-xs text-gray-700">Proy: {{ currencyFormatter.format(contadores.montos.rechazados.proyectado) }}</p>
+                        <p class="text-xs text-gray-700">Orig: {{ currencyFormatter.format(contadores.montos.rechazados.original) }}</p>
+                    </div>
+                </div>
+
+                <!-- Contabilizado -->
+                <div class="p-4 bg-green-100 rounded-lg shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-green-600 font-bold">Contabilizados</p>
+                        <p class="text-xl font-bold text-green-800">{{ contadores.estados.contabilizados }}</p>
+                    </div>
+                    <div class="mt-2 text-right">
+                        <p class="text-sm text-green-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.contabilizados.total) }}</span></p>
+                        <p class="text-xs text-green-700">Proy: {{ currencyFormatter.format(contadores.montos.contabilizados.proyectado) }}</p>
+                        <p class="text-xs text-green-700">Orig: {{ currencyFormatter.format(contadores.montos.contabilizados.original) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Barra de Filtros y Búsqueda -->
         <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-200 shadow-soft">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -59,7 +204,7 @@
                     <thead class="bg-gray-50 ">
                         <tr>
                             <th scope="col" class="p-4 w-12 ">
-                                <input type="checkbox" @change="seleccionarTodos" :checked="todosSeleccionados"
+                                <input type="checkbox" v-model="todosSeleccionados"
                                     class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
                             </th>
                             <th scope="col"
@@ -92,9 +237,9 @@
                         <tr v-for="gasto in gastosFiltrados" :key="gasto.id"
                             class="hover:bg-verde-bap-extralight transition-colors duration-200">
                             <td class="p-4 align-middle">
-                                <input v-if="esConsolidable(gasto)" type="checkbox" v-model="gastosSeleccionados"
-                                    :value="gasto.id"
-                                    class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
+                                <input type="checkbox" v-model="gastosSeleccionados" :value="gasto.id"
+                                    :disabled="esCheckboxDeshabilitado(gasto)"
+                                    class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light disabled:bg-gray-200 disabled:cursor-not-allowed">
                             </td>
                             <td
                                 class="px-4 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900 align-middle">
@@ -164,7 +309,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, onUpdated } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
@@ -186,6 +331,7 @@ const cargando = ref(true);
 const filtros = ref({ busqueda: '', estado: '' });
 const gastosSeleccionados = ref([]); // IDs de gastos seleccionados para re-consolidar
 const fondoActivoParaConsolidacion = ref(null);
+const fondoActivoDetalles = ref(null); // Detalles del fondo de caja chica activo
 // Modales
 const gastoSeleccionado = ref(null); // Gasto actual para ver detalle/corrección
 const mostrarModalDetalle = ref(false);
@@ -193,6 +339,31 @@ const mostrarModalCorreccion = ref(false);
 const mostrarModalReconsolidar = ref(false);
 
 const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+
+// --- LÓGICA DE DATOS Y COMPUTADAS ADICIONALES ---
+const fetchFondoDetalles = async (fondoId) => {
+    if (!fondoId) {
+        fondoActivoDetalles.value = null;
+        return;
+    }
+    try {
+        const response = await api.get(`/v1/fondos/${fondoId}`);
+        fondoActivoDetalles.value = response.data.data; // Asumiendo que la API devuelve el objeto del fondo en `data`
+    } catch (error) {
+        console.error(`Error al obtener los detalles del fondo ${fondoId}:`, error);
+        fondoActivoDetalles.value = null;
+        Swal.fire('Error', 'No se pudieron cargar los detalles del fondo de caja chica.', 'error');
+    }
+};
+
+const saldoFondoActivo = computed(() => {
+    if (!fondoActivoDetalles.value) {
+        return null;
+    }
+    // Usar el saldo_disponible que ya viene calculado del backend
+    return parseFloat(fondoActivoDetalles.value.saldo_disponible);
+});
+
 
 // --- LÓGICA DE DATOS ---
 onMounted(() => {
@@ -234,60 +405,127 @@ const gastosFiltrados = computed(() => {
     return gastosFiltrados;
 });
 
+const contadores = computed(() => {
+    const createInitialMontos = () => ({ total: 0, proyectado: 0, original: 0 });
+
+    const initial = {
+        estados: {
+            total: 0,
+            pendientesAprobacion: 0,
+            pendientesValidacionDJ: 0,
+            pendientesValidacionContable: 0,
+            observados: 0,
+            rechazados: 0,
+            contabilizados: 0,
+        },
+        montos: {
+            total: 0,
+            proyectado: 0,
+            original: 0,
+            pendientesAprobacion: createInitialMontos(),
+            pendientesValidacionDJ: createInitialMontos(),
+            pendientesValidacionContable: createInitialMontos(),
+            observados: createInitialMontos(),
+            rechazados: createInitialMontos(),
+            contabilizados: createInitialMontos(),
+        }
+    };
+
+    return gastosFiltrados.value.reduce((acc, gasto) => {
+        const monto = parseFloat(gasto.monto_total) || 0;
+        const montoProyectado = parseFloat(gasto.monto_proyectado) || 0;
+        const montoOriginal = parseFloat(gasto.monto_original) || 0;
+
+        // Contadores generales
+        acc.estados.total++;
+        acc.montos.total += monto;
+        acc.montos.proyectado += montoProyectado;
+        acc.montos.original += montoOriginal;
+
+        const updateMontos = (estado) => {
+            estado.total += monto;
+            estado.proyectado += montoProyectado;
+            estado.original += montoOriginal;
+        };
+
+        // Contadores por estado
+        switch (gasto.estado) {
+            case 'Pendiente de Aprobación':
+                acc.estados.pendientesAprobacion++;
+                updateMontos(acc.montos.pendientesAprobacion);
+                break;
+            case 'Pendiente de Validación DJ':
+                acc.estados.pendientesValidacionDJ++;
+                updateMontos(acc.montos.pendientesValidacionDJ);
+                break;
+            case 'Pendiente de Validación Contable':
+                acc.estados.pendientesValidacionContable++;
+                updateMontos(acc.montos.pendientesValidacionContable);
+                break;
+            case 'Observado':
+                acc.estados.observados++;
+                updateMontos(acc.montos.observados);
+                break;
+            case 'Rechazado':
+                acc.estados.rechazados++;
+                updateMontos(acc.montos.rechazados);
+                break;
+            case 'Contabilizado':
+                acc.estados.contabilizados++;
+                updateMontos(acc.montos.contabilizados);
+                break;
+        }
+        return acc;
+    }, initial);
+});
+
+
 // Determina si todos los gastos consolidables visibles están seleccionados
 const todosSeleccionados = computed({
     get() {
-        // Si no hay fondo activo, no puede estar marcado
-        if (!fondoActivoParaConsolidacion.value) return false;
-        // Filtra solo los gastos que son consolidables, pertenecen al fondo activo y están visibles
-        const consolidablesDelFondoActivo = gastosFiltrados.value.filter(g =>
-            esConsolidable(g) &&
-            g.id_fondo_efectivo === fondoActivoParaConsolidacion.value &&
-            !esCheckboxDeshabilitado(g)
+        let targetFondoId = fondoActivoParaConsolidacion.value;
+        // Si no hay fondo activo, intenta determinarlo desde los filtros
+        if (!targetFondoId) {
+            const primerConsolidable = gastosFiltrados.value.find(esConsolidable);
+            if (primerConsolidable) {
+                targetFondoId = primerConsolidable.id_fondo_efectivo;
+            }
+        }
+
+        const consolidablesDelFondo = gastosFiltrados.value.filter(g =>
+            esConsolidable(g) && g.id_fondo_efectivo === targetFondoId
         );
-        // Si no hay gastos consolidables del fondo activo, no puede estar marcado
-        if (consolidablesDelFondoActivo.length === 0) return false;
-        // Solo se marca si TODOS los gastos consolidables del fondo activo están seleccionados
-        return consolidablesDelFondoActivo.every(g => gastosSeleccionados.value.includes(g.id));
+
+        if (consolidablesDelFondo.length === 0) return false;
+
+        return consolidablesDelFondo.every(g => gastosSeleccionados.value.includes(g.id));
     },
     set(value) {
+        let targetFondoId = fondoActivoParaConsolidacion.value;
+
         if (value) {
-            // Al marcar, primero determina cuál es el fondo activo
-            let fondoTarget = fondoActivoParaConsolidacion.value;
-            if (!fondoTarget) {
+            // Si se marca y no hay fondo activo, se determina a partir del primer gasto consolidable
+            if (!targetFondoId) {
                 const primerGasto = gastosFiltrados.value.find(esConsolidable);
-                if (primerGasto) fondoTarget = primerGasto.id_fondo_efectivo;
+                if (primerGasto) {
+                    targetFondoId = primerGasto.id_fondo_efectivo;
+                }
             }
-            // Luego, selecciona TODOS y ÚNICAMENTE los gastos de ESE fondo
-            gastosSeleccionados.value = gastosFiltrados.value
-                .filter(g => esConsolidable(g) && g.id_fondo_efectivo === fondoTarget)
-                .map(g => g.id);
+
+            if (targetFondoId) {
+                const idsParaSeleccionar = gastosFiltrados.value
+                    .filter(g => esConsolidable(g) && g.id_fondo_efectivo === targetFondoId)
+                    .map(g => g.id);
+                // Reemplaza la selección actual con solo los del fondo target
+                gastosSeleccionados.value = idsParaSeleccionar;
+            }
         } else {
-            // Al desmarcar, limpia la selección
+            // Si se desmarca, limpia toda la selección
             gastosSeleccionados.value = [];
         }
     }
 });
-// Hook para evitar el bug del auto-check al seleccionar el único item.
-onUpdated(() => {
-    // Solo proceder si hay un fondo activo
-    if (!fondoActivoParaConsolidacion.value) return;
 
-    // Encontrar los gastos consolidables del fondo activo que están visibles
-    const consolidablesDelFondoActivo = gastosFiltrados.value.filter(g =>
-        esConsolidable(g) &&
-        g.id_fondo_efectivo === fondoActivoParaConsolidacion.value &&
-        !esCheckboxDeshabilitado(g)
-    );
-    // Verificar si todos están seleccionados
-    const todosEstanSeleccionados = consolidablesDelFondoActivo.length > 0 &&
-        consolidablesDelFondoActivo.every(g => gastosSeleccionados.value.includes(g.id));
-    // Actualizar el checkbox principal si es necesario
-    const masterCheckbox = document.querySelector('th input[type="checkbox"]');
-    if (masterCheckbox && masterCheckbox.checked !== todosEstanSeleccionados) {
-        masterCheckbox.checked = todosEstanSeleccionados;
-    }
-});
 // Prepara la lista de gastos a pasar al modal de re-consolidación
 const gastosParaReconsolidar = computed(() => {
     return gastos.value.filter(g => gastosSeleccionados.value.includes(g.id));
@@ -295,8 +533,6 @@ const gastosParaReconsolidar = computed(() => {
 
 // Habilita el botón "Crear DJ Consolidada"
 const puedeReconsolidarDJ = computed(() => {
-    // Solo se habilita si hay al menos dos gastos seleccionados Y todos son consolidables.
-    // La validación más estricta de que sean "tipo DJ" se hace en esConsolidable.
     return gastosSeleccionados.value.length >= 1 &&
         gastosParaReconsolidar.value.every(g => esConsolidable(g));
 });
@@ -327,18 +563,12 @@ const esConsolidable = (gasto) => {
     return estadosValidos.includes(gasto.estado) && noEstaEnDj && esTipoDj && esDelUsuario;
 };
 const esCheckboxDeshabilitado = (gasto) => {
+    // Siempre deshabilita si el gasto no es consolidable en primer lugar
+    if (!esConsolidable(gasto)) return true;
+    // Si no hay nada seleccionado, nada está deshabilitado (excepto los no consolidables)
     if (gastosSeleccionados.value.length === 0) return false;
+    // Si hay selección, deshabilita los de otros fondos
     return gasto.id_fondo_efectivo !== fondoActivoParaConsolidacion.value;
-};
-// Selecciona/deselecciona todos los gastos consolidables visibles que no estan deshabilitados
-const seleccionarTodos = (event) => {
-    if (event.target.checked) {
-        gastosSeleccionados.value = gastosFiltrados.value
-            .filter(g => esConsolidable(g) && !esCheckboxDeshabilitado(g))
-            .map(g => g.id);
-    } else {
-        gastosSeleccionados.value = [];
-    }
 };
 
 const abrirModalReconsolidacion = () => {
@@ -393,18 +623,23 @@ watch(filtros, () => {
     gastosSeleccionados.value = [];
 }, { deep: true }); // Observación profunda para detectar cambios en las propiedades del objeto filtros
 
-watch(gastosSeleccionados, (nuevosSeleccionados) => {
-    if (nuevosSeleccionados.length > 0) {
-        // Si hay gastos seleccionados, encuentra el primero y establece su fondo como el "activo".
+watch(gastosSeleccionados, (nuevosSeleccionados, viejosSeleccionados) => {
+    // Si la selección pasa de 0 a 1, se define el fondo activo.
+    if (viejosSeleccionados.length === 0 && nuevosSeleccionados.length > 0) {
         const primerGastoSeleccionado = gastos.value.find(g => g.id === nuevosSeleccionados[0]);
-        if (primerGastoSeleccionado) {
+        if (primerGastoSeleccionado && esConsolidable(primerGastoSeleccionado)) {
             fondoActivoParaConsolidacion.value = primerGastoSeleccionado.id_fondo_efectivo;
         }
-    } else {
-        // Si no hay nada seleccionado, se libera el bloqueo.
+    } else if (nuevosSeleccionados.length === 0) {
+        // Si la selección se vacía, se resetea el fondo activo.
         fondoActivoParaConsolidacion.value = null;
     }
 }, { deep: true });
+
+// Observa cambios en el fondo activo para buscar sus detalles
+watch(fondoActivoParaConsolidacion, (nuevoFondoId) => {
+    fetchFondoDetalles(nuevoFondoId);
+});
 </script>
 
 <style scoped>
