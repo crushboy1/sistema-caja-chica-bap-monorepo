@@ -11,27 +11,83 @@
 // Asocia una palabra clave de estado con su tema de color y su ícono.
 // Esta es la base para todos los demás estilos.
 const masterStatusConfig = new Map([
-    ['pendiente de validación dj', { theme: 'validacionDj', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }],
-    ['pendiente de aprobación', { theme: 'alerta', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['descargo enviado', { theme: 'alerta', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z' }],
-    ['pendiente de validación contable', { theme: 'info', icon: 'M12 4.5v15m7.5-7.5h-15' }],
-    ['creada', { theme: 'info', icon: 'M12 4.5v15m7.5-7.5h-15' }],
-    ['pendiente aprobación', { theme: 'alerta', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['observada', { theme: 'advertencia', icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z' }],
-    ['observado', { theme: 'advertencia', icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z' }],
-    ['aprobada', { theme: 'exito', icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['contabilizado', { theme: 'exito', icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['rechazada', { theme: 'error', icon: 'M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['repuesto', { theme: 'neutro', icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z' }],
-    ['cerrado', { theme: 'neutro', icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z' }],
-]);
+  [
+    'pendiente de validación dj',
+    {
+      theme: 'validacionDj',
+      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+  ],
+  [
+    'pendiente de aprobación',
+    { theme: 'alerta', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ],
+  [
+    'descargo enviado',
+    {
+      theme: 'alerta',
+      icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
+    },
+  ],
+  ['pendiente de validación contable', { theme: 'info', icon: 'M12 4.5v15m7.5-7.5h-15' }],
+  ['creada', { theme: 'info', icon: 'M12 4.5v15m7.5-7.5h-15' }],
+  [
+    'pendiente aprobación',
+    { theme: 'alerta', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ],
+  [
+    'observada',
+    {
+      theme: 'advertencia',
+      icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+  ],
+  [
+    'observado',
+    {
+      theme: 'advertencia',
+      icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+  ],
+  [
+    'aprobada',
+    { theme: 'exito', icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ],
+  [
+    'contabilizado',
+    { theme: 'exito', icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ],
+  [
+    'rechazada',
+    { theme: 'error', icon: 'M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  ],
+  [
+    'repuesto',
+    {
+      theme: 'neutro',
+      icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
+    },
+  ],
+  [
+    'cerrado',
+    {
+      theme: 'neutro',
+      icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
+    },
+  ],
+  ['activo', { theme: 'exito', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' }],
+  [
+    'inactivo',
+    { theme: 'neutro', icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636' },
+  ],
+])
 
 const defaultConfig = {
   theme: 'default',
   icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
 }
 
-function getMasterConfig(estado) {
+export function getMasterConfig(estado) {
   if (!estado) return defaultConfig
   const estadoNormalizado = estado.toLowerCase()
   for (const [keyword, config] of masterStatusConfig.entries()) {
@@ -54,15 +110,19 @@ const badgeThemes = {
   exito: 'bg-estado-exito-bg text-estado-exito-text border-green-300',
   error: 'bg-estado-error-bg text-estado-error-text border-red-300',
   neutro: 'bg-estado-neutro-bg text-estado-neutro-text border-gray-300',
+  cyan: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  teal: 'bg-teal-100 text-teal-800 border-teal-300',
+  indigo: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+  pink: 'bg-pink-100 text-pink-800 border-pink-300',
   default: 'bg-gray-100 text-gray-500 border-gray-200',
 }
 
 const solicitudHistorialCardThemes = {
   validacionDj: {
-        card: 'bg-purple-50 text-purple-700 border-purple-300/20',
-        revisadoPor: 'text-purple-700 bg-purple-100/30',
-        userIcon: 'text-purple-600 bg-purple-100/20',
-    },
+    card: 'bg-purple-50 text-purple-700 border-purple-300/20',
+    revisadoPor: 'text-purple-700 bg-purple-100/30',
+    userIcon: 'text-purple-600 bg-purple-100/20',
+  },
   alerta: {
     card: 'bg-estado-alerta-bg text-estado-alerta-text border-yellow-300/20',
     revisadoPor: 'text-estado-alerta-text bg-estado-alerta-bg/30',
@@ -109,21 +169,24 @@ const textColorThemes = {
   exito: 'text-estado-exito-text',
   error: 'text-estado-error-text',
   neutro: 'text-estado-neutro-text',
+  cyan: 'text-cyan-800',
+  teal: 'text-teal-800',
+  indigo: 'text-indigo-800',
+  pink: 'text-pink-800',
   default: 'text-gray-600',
 }
-
 
 /**
  * [ETIQUETA: ACTION_BUTTON]
  * Define los estilos para los botones de acción principales.
  */
 const actionButtonThemes = {
-    exito: 'bg-verde-bap hover:bg-verde-bap-dark text-white',
-    error: 'bg-rojo-bap hover:bg-rojo-bap-dark text-white',
-    advertencia: 'bg-orange-500 hover:bg-orange-600 text-white',
-    info: 'bg-blue-500 hover:bg-blue-600 text-white', 
-    default: 'bg-gray-500 hover:bg-gray-600 text-white'
-};
+  exito: 'bg-verde-bap hover:bg-verde-bap-dark text-white',
+  error: 'bg-rojo-bap hover:bg-rojo-bap-dark text-white',
+  advertencia: 'bg-orange-500 hover:bg-orange-600 text-white',
+  info: 'bg-blue-500 hover:bg-blue-600 text-white',
+  default: 'bg-gray-500 hover:bg-gray-600 text-white',
+}
 // ===================================================================
 // FUNCIONES EXPORTABLES PARA USAR EN LOS COMPONENTES
 // ===================================================================
@@ -152,7 +215,7 @@ export function getClassesForBadge(estado) {
  */
 export function getClassesForAuditoriaBadge(estado) {
   // Clases base específicas para los badges de la tabla de auditoría.
-  const baseClasses = 'py-2 px-3 rounded-full text-xs font-semibold inline-block border'
+  const baseClasses = 'py-1 px-3 rounded-full text-xs font-semibold inline-block border'
   const config = getMasterConfig(estado)
   const themeClasses = badgeThemes[config.theme] || badgeThemes.default
   return `${baseClasses} ${themeClasses}`
@@ -186,7 +249,7 @@ export function getTextClassForState(estado) {
   const config = getMasterConfig(estado)
   return textColorThemes[config.theme] || textColorThemes.default
 }
-  /**
+/**
  * --- ¡NUEVA FUNCIÓN! ---
  * [ETIQUETA: ACTION_BUTTON]
  * Para: Botones de acción principales (Aprobar, Rechazar, Observar).
@@ -195,7 +258,8 @@ export function getTextClassForState(estado) {
  * @returns {string} Una cadena de clases de Tailwind para el botón.
  */
 export function getClassesForActionButton(theme) {
-    const baseClasses = 'px-4 py-2 rounded-md transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed';
-    const themeClasses = actionButtonThemes[theme] || actionButtonThemes.default;
-    return `${baseClasses} ${themeClasses}`;
+  const baseClasses =
+    'px-4 py-2 rounded-md transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed'
+  const themeClasses = actionButtonThemes[theme] || actionButtonThemes.default
+  return `${baseClasses} ${themeClasses}`
 }

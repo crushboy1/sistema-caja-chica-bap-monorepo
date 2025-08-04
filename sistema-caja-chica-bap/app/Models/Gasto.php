@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-
+use Carbon\Carbon;
 class Gasto extends Model
 {
     use HasFactory;
@@ -217,15 +217,22 @@ class Gasto extends Model
         int $gastoProyectadoId,
         int $fondoEfectivoId,
         float $originalProjectedAmount,
+        string $fechaDocumentoActual,
         ?int $excludeGastoId = null
     ): array {
         // Sumar los montos de todos los gastos existentes asociados a esta misma proyección
         // y fondo, excluyendo el gasto actual si se está actualizando.
         // Solo se consideran gastos que ya están en el flujo (no observados ni rechazados)
         // ya que son los que realmente "consumen" del saldo de la proyección.
+        // 1. Determinar el rango del mes actual basado en la fecha del documento.
+        $fecha = Carbon::parse($fechaDocumentoActual);
+        $inicioMes = $fecha->startOfMonth()->toDateString();
+        $finMes = $fecha->endOfMonth()->toDateString();
+        // 2. Sumar los montos de los gastos existentes DENTRO DEL MISMO PERÍODO MENSUAL.
         $queryGastosExistentes = Gasto::where('id_gasto_proyectado', $gastoProyectadoId)
             ->where('id_fondo_efectivo', $fondoEfectivoId)
-            ->whereNotIn('estado', ['Observado', 'Rechazado']);
+            ->whereNotIn('estado', ['Observado', 'Rechazado', 'Repuesto'])
+            ->whereBetween('fecha_documento', [$inicioMes, $finMes]);
 
         if ($excludeGastoId) {
             $queryGastosExistentes->where('id', '!=', $excludeGastoId);

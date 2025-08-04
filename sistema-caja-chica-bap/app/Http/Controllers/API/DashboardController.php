@@ -219,7 +219,7 @@ class DashboardController extends Controller
         $totalGastos = $gastosDelPeriodo->count();
         $rendicionesATiempo = 0;
         $rendicionesFueraPlazo = 0;
-        // COMENTARIO BAP: Se definen los estados que se consideran "pendientes".
+        // Se definen los estados que se consideran "pendientes".
         $estadosPendientes = [
             'Pendiente de Aprobación',
             'Pendiente de Validación DJ',
@@ -257,7 +257,11 @@ class DashboardController extends Controller
     private function getAlertas($gastoQuery, $fondoQuery)
     {
         $alertas = [];
-
+        $user = Auth::user();
+        $estadosAccionables = [
+            'Pendiente de Validación DJ',
+            'Pendiente de Validación Contable'
+        ];
         // 1. Alertas de sobregiro
         $fondosConSobregiro = $fondoQuery->where('estado', 'Activo')
             ->withSum(['gastos' => fn($q) => $q->where('estado', '!=', 'Rechazado')], 'monto_total')
@@ -275,17 +279,28 @@ class DashboardController extends Controller
                         'codigo_fondo' => $fondo->codigo_fondo,
                         'monto_aprobado' => (float) $fondo->monto_aprobado,
                         'monto_gastado' => (float) $fondo->gastos_sum_monto_total,
-                        'exceso' => (float) ($fondo->gastos_sum_monto_total - $fondo->monto_aprobado)
+                        'exceso' => (float) ($fondo->gastos_sum_monto_total - $fondo->monto_aprobado),
+                        'es_accionable' => $fondo->estado === 'Activo',
                     ];
-                })
+                })->values()
             ];
         }
+        // 2. Alertas por montos inusuales
 
-        // 2. Alertas por montos inusuales (gastos que superan 3 veces el promedio)
-        $promedioGastos = $gastoQuery->where('estado', '!=', 'Rechazado')->avg('monto_total') ?? 0;
-        $limiteSuperior = $promedioGastos * 3;
-
-        $gastosInusuales = $gastoQuery->where('estado', '!=', 'Rechazado')
+        // a) Primero, calculamos un promedio HISTÓRICO y ESTABLE.
+        $queryPromedio = Gasto::query();
+        // Aplicamos el mismo scope de rol para que el promedio sea relevante para el usuario.
+        if ($user->hasRole('jefe_area')) {
+            $queryPromedio->whereHas('fondoEfectivo', fn($q) => $q->where('id_area', $user->area_id));
+        } elseif ($user->hasRole('colaborador')) {
+            $queryPromedio->where('id_registrador', $user->id);
+        }
+        $promedioGastosHistorico = $queryPromedio->where('estado', '!=', 'Rechazado')
+            ->where('fecha_documento', '>=', Carbon::now()->subDays(90))
+            ->avg('monto_total') ?? 0;
+        $limiteSuperior = $promedioGastosHistorico > 0 ? $promedioGastosHistorico * 3 : 0;
+        // b) Ahora, buscamos gastos DENTRO DEL PERÍODO FILTRADO por el usuario
+        $gastosInusuales = (clone $gastoQuery)
             ->where('monto_total', '>', $limiteSuperior)
             ->with(['registrador:id,name,last_name', 'fondoEfectivo.area:id,name'])
             ->get();
@@ -295,17 +310,20 @@ class DashboardController extends Controller
                 'tipo' => 'monto_inusual',
                 'mensaje' => 'Hay ' . $gastosInusuales->count() . ' gastos con montos inusuales',
                 'cantidad' => $gastosInusuales->count(),
-                'promedio_normal' => round($promedioGastos, 2),
+                'promedio_normal' => round($promedioGastosHistorico, 2),
                 'limite_alerta' => round($limiteSuperior, 2),
-                'gastos' => $gastosInusuales->map(function ($gasto) {
+                'gastos' => $gastosInusuales->map(function ($gasto) use ($estadosAccionables) {
                     return [
                         'id' => $gasto->id,
+                        'codigo_gasto' => $gasto->codigo_gasto,
                         'monto' => (float) $gasto->monto_total,
-                        'usuario' => $gasto->registrador->name . ' ' . $gasto->registrador->last_name ?? 'N/A',
-                        'area' => $gasto->fondoEfectivo->area->name ?? 'N/A',
-                        'fecha' => $gasto->fecha_documento
+                        'usuario' => optional($gasto->registrador)->name . ' ' . optional($gasto->registrador)->last_name,
+                        'area' => optional($gasto->fondoEfectivo->area)->name ?? 'N/A',
+                        'fecha' => $gasto->fecha_documento,
+                        'estado' => $gasto->estado,
+                        'es_accionable' => in_array($gasto->estado, $estadosAccionables),
                     ];
-                })
+                })->values()
             ];
         }
 
@@ -320,7 +338,7 @@ class DashboardController extends Controller
                 'tipo' => 'rendicion_fuera_plazo',
                 'mensaje' => 'Hay ' . $rendicionesFueraPlazo->count() . ' rendiciones fuera de plazo',
                 'cantidad' => $rendicionesFueraPlazo->count(),
-                'gastos' => $rendicionesFueraPlazo->map(function ($gasto) {
+                'gastos' => $rendicionesFueraPlazo->map(function ($gasto) use ($estadosAccionables) {
                     $diasRetraso = Carbon::parse($gasto->fecha_rendicion)
                         ->diffInDays(Carbon::parse($gasto->fecha_limite_rendicion));
                     return [
@@ -329,9 +347,11 @@ class DashboardController extends Controller
                         'area' => $gasto->fondoEfectivo->area->name ?? 'N/A',
                         'dias_retraso' => $diasRetraso,
                         'fecha_limite' => $gasto->fecha_limite_rendicion,
-                        'fecha_rendicion' => $gasto->fecha_rendicion
+                        'fecha_rendicion' => $gasto->fecha_rendicion,
+                        'estado' => $gasto->estado,
+                        'es_accionable' => in_array($gasto->estado, $estadosAccionables),
                     ];
-                })
+                })->values()
             ];
         }
 

@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use App\Exports\GastosReportExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Carbon\Carbon;
+
 
 /**
  * GastoController se encarga de todo el ciclo de vida de las declaraciones de gastos.
@@ -247,7 +249,8 @@ class GastoController extends Controller
                     $gastoData['monto_total'],
                     $gastoData['id_gasto_proyectado'],
                     $fondo->id_fondo,
-                    $montoOriginal
+                    $montoOriginal,
+                    $gastoData['fecha_documento']
                 );
                 $montoExcedido = $calculosSaldo['monto_excedido'];
                 $saldoDisponibleAlRegistrar = $calculosSaldo['saldo_disponible'];
@@ -473,11 +476,12 @@ class GastoController extends Controller
                 $gasto->id_gasto_proyectado,
                 $gasto->id_fondo_efectivo,
                 $gasto->monto_proyectado_original, // Usar el monto proyectado original del gasto
+                $validatedData['fecha_documento'],
                 $gasto->id // Excluir el gasto actual de la suma de gastos existentes
             );
             $validatedData['monto_excedido_al_registrar'] = $calculosSaldo['monto_excedido'];
             $validatedData['saldo_disponible_al_registrar'] = $calculosSaldo['saldo_disponible'];
-            
+
             // 3.2. Actualizar el gasto con los datos validados.
             $gasto->update($validatedData);
             // Comparamos cada campo para registrar los cambios
@@ -769,12 +773,21 @@ class GastoController extends Controller
             // Un colaborador u otro rol no debería acceder a esta bandeja.
             return response()->json(['message' => 'No tienes permiso para acceder a esta bandeja.'], 403);
         }
-
+        //logica para manejar filtro con 'codigo_gasto' para la redireccion desde dashboard
+        if ($request->filled('codigo_gasto')) {
+            // Se comprueba si el string contiene comas.
+            if (strpos($request->codigo_gasto, ',') !== false) {
+                // Si contiene comas, se convierte en un array y se usa whereIn.
+                $codigos = explode(',', $request->codigo_gasto);
+                $query->whereIn('codigo_gasto', $codigos);
+            } else {
+                // Si no contiene comas, se mantiene la búsqueda original con LIKE.
+                $query->where('codigo_gasto', 'like', '%' . $request->codigo_gasto . '%');
+            }
+        }
         $gastos = $query->orderBy('created_at', 'desc')->get();
-
         // Agrupar los gastos por DJ consolidada.
         $gastosAgrupados = $gastos->groupBy('id_dj_consolidada');
-
         // Procesamos el resultado
         $resultado = collect();
 
@@ -914,10 +927,13 @@ class GastoController extends Controller
                 $gasto->fondoEfectivo()->decrement('monto_disponible', $gasto->monto_total);
 
                 $estadoAnterior = $gasto->estado;
-                $gasto->update([
+                $updateData = [
                     'estado' => 'Contabilizado',
                     'id_validador_adm' => $user->id,
-                ]);
+                    'fecha_rendicion' => now(),
+                    'fecha_limite_rendicion' => Carbon::parse($gasto->fecha_documento)->endOfMonth(),
+                ];
+                $gasto->update($updateData);
 
                 $this->registrarHistorial($gasto, $estadoAnterior, $gasto->estado, $user->id, $request->input('comentario', 'Gasto de grupo DJ validado y contabilizado.'));
             }

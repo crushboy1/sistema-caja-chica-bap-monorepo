@@ -3,7 +3,7 @@
         <!-- Controles del gráfico -->
         <div v-if="showControls" class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
-                
+
                 <!-- Selector de período -->
                 <div class="flex items-center gap-2">
                     <label class="text-sm font-medium text-gray-600">Período:</label>
@@ -47,7 +47,8 @@
         </div>
 
         <!-- Gráfico -->
-        <div class="relative" style="height: 320px;"> <Line v-if="datosGrafico.datasets[0].data.length > 0" :data="datosGrafico" :options="chartOptions" />
+        <div class="relative w-full h-full">
+            <Line v-if="datosGrafico.datasets[0].data.length > 0" :data="datosGrafico" :options="chartOptions" />
             <div v-else class="flex items-center justify-center h-full text-gray-400">
                 <div class="text-center">
                     <BarChart3 class="w-12 h-12 mx-auto mb-2" />
@@ -330,5 +331,13 @@ const aplicarFiltro = () => {
 /* Hover effects para controles */
 select:hover {
     border-color: var(--color-verde-bap, #10b981);
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    display: block;
 }
 </style>

@@ -21,12 +21,14 @@
 
           <!-- Quick Actions -->
           <div class="flex gap-3">
-            <button @click="exportarDatos" class="btn-secondary">
-              📊 Exportar
-            </button>
-            <button @click="fetchDashboardData" class="btn-primary">
-              🔄 Actualizar
-            </button>
+            <div class="flex gap-3">
+              <button @click="exportarDatos" class="btn-secondary">
+                📊 Exportar
+              </button>
+              <button @click="fetchDashboardData" class="btn-primary">
+                🔄 Actualizar
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -139,7 +141,7 @@
               <GraficoCircular v-if="datosGraficoEstados" :chart-data="datosGraficoEstados" />
             </ChartCard>
 
-            <ChartCard title="Evolución Mensual de Gastos">
+            <ChartCard title="Evolución Mensual de Gastos" height="h-[420px]">
               <GraficoEvolucionMensual v-if="datosEvolucionMensual && datosEvolucionMensual.length > 0"
                 :chart-data="datosEvolucionMensual" :show-controls="true" :show-summary="true" :default-period="12"
                 @period-changed="actualizarPeriodoEvolucion" />
@@ -297,8 +299,9 @@
           </div>
 
           <!-- Detalle de Alertas -->
-          <div class="space-y-6">
-            <AlertPanel v-for="alerta in dashboardData.alertas" :key="alerta.tipo" :alerta="alerta" />
+          <div class="grid grid-cols-1 gap-6">
+            <AlertPanel v-for="alerta in dashboardData.alertas" :key="alerta.tipo" :alerta="alerta"
+              @action-clicked="handleAlertaAction" />
           </div>
         </section>
 
@@ -337,6 +340,7 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { TrendingUp, BarChart3, FileClock, CheckCircle2 } from 'lucide-vue-next';
 import api from '@/plugins/axios';
+import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import KpiCard from '@/components/dashboard/KpiCard.vue';
 import GraficoBarras from '@/components/dashboard/GraficoBarras.vue';
@@ -350,11 +354,9 @@ const props = defineProps({
   user: {
     type: Object,
     required: true,
-
   }
-
 });
-
+const router = useRouter();
 // Estado
 const cargando = ref(true);
 const dashboardData = ref(null);
@@ -527,6 +529,42 @@ const getPercentageWidth = (valor, maximo) => {
   return (valor / maximo) * 100;
 };
 
+//Captura evento de click de los botones de alertas.
+const handleAlertaAction = (alerta) => {
+  switch (alerta.tipo) {
+    case 'sobregiro': {
+      // Se filtran los fondos para quedarse solo con los que son accionables.
+      const fondosAccionables = alerta.fondos.filter(fondo => fondo.es_accionable);
+      if (fondosAccionables.length === 0) return; // Si no hay nada que accionar, no hacer nada.
+
+      const codigos = fondosAccionables.map(fondo => fondo.codigo_fondo).join(',');
+
+      router.push({
+        path: '/dashboard/fondos',
+        query: { alerta: 'sobregiro', codigos }
+      });
+      break;
+    }
+
+    case 'monto_inusual':
+    case 'rendicion_fuera_plazo': {
+      // Se aplica la misma lógica de filtrado para los gastos.
+      const gastosAccionables = alerta.gastos.filter(gasto => gasto.es_accionable);
+      if (gastosAccionables.length === 0) return;
+
+      const codigos = gastosAccionables.map(gasto => gasto.codigo_gasto).join(',');
+
+      router.push({
+        path: '/dashboard/declaraciones',
+        // Se redirige a la bandeja de aprobaciones/validación para la acción.
+        query: { tab: 'validacionContable', alerta: alerta.tipo, codigos }
+      });
+      break;
+    }
+    default:
+      console.warn('Acción no definida para el tipo de alerta:', alerta.tipo);
+  }
+};
 // Lifecycle
 onMounted(() => {
   fetchDashboardData();

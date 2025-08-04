@@ -218,6 +218,17 @@
                           clip-rule="evenodd" />
                       </svg>
                     </button>
+                    <button
+                      v-if="usuarioActual && ['jefe_administracion', 'super_admin'].includes(usuarioActual.role.name) && parseFloat(fondo.monto_disponible) === 0 && fondo.estado === 'Activo'"
+                      @click="confirmarCierreMensual(fondo)"
+                      class="w-8 h-8 rounded-full bg-indigo-200 hover:bg-indigo-300 flex items-center justify-center text-indigo-700 transition-colors duration-200"
+                      title="Cierre y Restauración Mensual">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -285,27 +296,9 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import HistorialFondoModal from './HistorialFondoModal.vue';
 import ReposicionFondoModal from './ReposicionFondoModal.vue';
-const formatearFechaSinHora = (fechaString) => {
-  if (!fechaString) return '';
-
-  try {
-    // Para fechas que vienen como "2025-07-04" sin hora
-    const [año, mes, dia] = fechaString.split('-');
-    const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
-
-    return fechaLocal.toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  } catch (error) {
-    console.error('Error al formatear fecha sin hora:', error);
-    return '';
-  }
-};
 
 // --- Variables de Estado ---
 const usuarioActual = ref(null);
@@ -333,13 +326,14 @@ const filtro = ref({
 let debounceTimeout = null;
 const DEBOUNCE_DELAY = 800; // Aumentado para mejor UX
 const MIN_SEARCH_LENGTH = 3;
-
+let llamadaEnProceso = false;
 // --- Variables para Paginación ---
 const paginaActual = ref(1);
 const registrosPorPagina = ref(10);
 
-const router = useRouter(); // Para redirección si no hay autenticación
-
+const router = useRouter();
+const route = useRoute();
+const inicializacionCompleta = ref(false);
 // --- Propiedades Computadas ---
 
 const rolUsuario = computed(() => {
@@ -396,6 +390,15 @@ const obtenerUsuarioAutenticado = async () => {
 };
 
 const obtenerFondos = async () => {
+  // Evitar llamadas duplicadas - retornar si ya hay una llamada en proceso
+  if (llamadaEnProceso) {
+    console.log('🔄 Llamada a obtenerFondos bloqueada - ya hay una en proceso');
+    return;
+  }
+
+  // Marcar que hay una llamada en proceso
+  llamadaEnProceso = true;
+
   if (!buscandoFondos.value) {
     cargandoFondos.value = true;
   }
@@ -403,7 +406,7 @@ const obtenerFondos = async () => {
   try {
     const params = {};
 
-    // Aplicar filtros de texto (solo si cumplen el mínimo de caracteres o están vacíos)
+    // Aplicar filtros de texto
     if (filtro.value.codigo_fondo.length >= MIN_SEARCH_LENGTH || filtro.value.codigo_fondo.length === 0) {
       params.codigo_fondo = filtro.value.codigo_fondo;
     }
@@ -438,7 +441,8 @@ const obtenerFondos = async () => {
         text: 'La API devolvió un formato de datos inesperado para los fondos de efectivo. Por favor, contacta a soporte.'
       });
     }
-    // Siempre resetear a la primera página cuando se aplican filtros/se recargan los datos
+
+    // Resetear a la primera página cuando se aplican filtros
     paginaActual.value = 1;
 
   } catch (error) {
@@ -454,7 +458,8 @@ const obtenerFondos = async () => {
     });
   } finally {
     cargandoFondos.value = false;
-    buscandoFondos.value = false; // Resetear indicador de búsqueda pendiente
+    buscandoFondos.value = false;
+    llamadaEnProceso = false; // Liberar el flag al finalizar
   }
 };
 
@@ -473,29 +478,95 @@ const obtenerAreas = async () => {
   }
 };
 
+const confirmarCierreMensual = async (fondo) => {
+  const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+
+  const result = await Swal.fire({
+    title: '¿Confirmar Cierre Mensual?',
+    html: `El saldo del fondo <strong>${fondo.codigo_fondo}</strong> se ha ejecutado completamente. <br><br>Esta acción restaurará el saldo a <strong>${currencyFormatter.format(fondo.monto_aprobado)}</strong> para el siguiente período.`,
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonColor: '#10B981', // Verde BAP
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Sí, cerrar y restaurar',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (result.isConfirmed) {
+    ejecutarCierreMensual(fondo);
+  }
+};
+const ejecutarCierreMensual = async (fondo) => {
+  cargandoFondos.value = true;
+  try {
+    const response = await api.post(`/v1/fondos-efectivo/${fondo.id_fondo}/cierre-mensual`);
+    await Swal.fire('¡Éxito!', response.data.message, 'success');
+    await obtenerFondos(); // Recargar la lista de fondos para reflejar los cambios
+  } catch (error) {
+    console.error("Error al ejecutar el cierre mensual:", error);
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo procesar el cierre mensual.', 'error');
+  } finally {
+    cargandoFondos.value = false;
+  }
+};
+
+const formatearFechaSinHora = (fechaString) => {
+  if (!fechaString) return '';
+
+  try {
+    // Para fechas que vienen como "2025-07-04" sin hora
+    const [año, mes, dia] = fechaString.split('-');
+    const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+
+    return fechaLocal.toLocaleDateString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error al formatear fecha sin hora:', error);
+    return '';
+  }
+};
 // --- Funciones de Filtrado y Búsqueda ---
 const triggerSearchWithDebounce = () => {
-  buscandoFondos.value = true; // Indicar que hay una búsqueda pendiente
+  if (!inicializacionCompleta.value || llamadaEnProceso) return;
+  buscandoFondos.value = true;
   clearTimeout(debounceTimeout);
   debounceTimeout = setTimeout(() => {
-    obtenerFondos();
+    if (!llamadaEnProceso) { // Verificar nuevamente antes de ejecutar
+      obtenerFondos();
+    }
   }, DEBOUNCE_DELAY);
 };
 
-const aplicarFiltros = () => {
-  clearTimeout(debounceTimeout); // Limpiar cualquier debounce pendiente
-  buscandoFondos.value = false; // Resetear indicador de búsqueda pendiente
-  obtenerFondos(); // Vuelve a llamar a la API con los filtros actuales
+const aplicarFiltrosDesdeURL = () => {
+  const query = route.query;
+  if (query.alerta === 'sobregiro' && query.codigos) {
+    filtro.value.codigo_fondo = query.codigos;
+    filtro.value.estado = 'Activo';
+    router.replace({ query: {} });
+    return true;
+  }
+  return false;
 };
+const aplicarFiltros = () => {
+  if (llamadaEnProceso) return;
 
+  clearTimeout(debounceTimeout);
+  buscandoFondos.value = false;
+  obtenerFondos();
+};
 const limpiarFiltros = () => {
+  if (llamadaEnProceso) return;
   filtro.value.codigo_fondo = '';
   filtro.value.responsable_name = '';
   filtro.value.estado = 'Todos';
   filtro.value.area_id = '';
-  clearTimeout(debounceTimeout); // Limpiar cualquier debounce pendiente
-  buscandoFondos.value = false; // Resetear indicador de búsqueda pendiente
-  obtenerFondos(); // Vuelve a llamar a la API sin filtros
+  clearTimeout(debounceTimeout);
+  buscandoFondos.value = false;
+  router.replace({ query: {} });
+  obtenerFondos();
 };
 
 // --- Funciones de Paginación ---
@@ -549,42 +620,42 @@ const handleFondoRepuesto = () => {
 
 // --- Watchers ---
 // Watchers para filtros de texto (debounced, con lógica de longitud mínima)
-watch(() => filtro.value.codigo_fondo, (newValue) => {
-  if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
-    triggerSearchWithDebounce();
-  } else {
-    // Si no cumple la longitud mínima, pero hay algo escrito, mostrar como "buscando"
-    // Esto evita llamadas a la API innecesarias para cadenas muy cortas
-    buscandoFondos.value = true;
-  }
-});
+watch(() => [filtro.value.codigo_fondo, filtro.value.responsable_name],
+  ([nuevoCodigo, nuevoResponsable]) => {
+    if (!inicializacionCompleta.value) return;
 
-watch(() => filtro.value.responsable_name, (newValue) => {
-  if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
-    triggerSearchWithDebounce();
-  } else {
-    buscandoFondos.value = true;
-  }
-});
+    const codigoCumple = nuevoCodigo.length >= MIN_SEARCH_LENGTH || nuevoCodigo.length === 0;
+    const responsableCumple = nuevoResponsable.length >= MIN_SEARCH_LENGTH || nuevoResponsable.length === 0;
 
-// Watchers para filtros de selección (disparan búsqueda inmediata)
-watch(() => filtro.value.estado, () => {
+    if (codigoCumple && responsableCumple) {
+      triggerSearchWithDebounce();
+    } else {
+      buscandoFondos.value = true;
+    }
+  }
+);
+// Watcher para filtros de selección (sin debounce)
+watch(() => [filtro.value.estado, filtro.value.area_id], () => {
+  if (!inicializacionCompleta.value) return;
   clearTimeout(debounceTimeout);
   buscandoFondos.value = false;
   obtenerFondos();
 });
-
-watch(() => filtro.value.area_id, () => {
-  clearTimeout(debounceTimeout);
-  buscandoFondos.value = false;
-  obtenerFondos();
-});
-
 // --- Ciclo de Vida ---
-onMounted(() => {
-  obtenerUsuarioAutenticado();
-  obtenerAreas();
-  obtenerFondos();
+onMounted(async () => {
+  try {
+    // Cargar datos iniciales
+    await obtenerUsuarioAutenticado();
+    await obtenerAreas();
+    // Aplicar filtros desde URL si existen
+    aplicarFiltrosDesdeURL();
+    // Marcar inicialización como completa ANTES de la primera carga de fondos
+    inicializacionCompleta.value = true;
+    // Una sola llamada a obtenerFondos
+    await obtenerFondos();
+  } catch (error) {
+    console.error('Error durante la inicialización:', error);
+  }
 });
 </script>
 

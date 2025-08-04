@@ -81,14 +81,13 @@
 </template>
 
 <script setup>
-import { ref, computed, shallowRef, defineProps } from 'vue';
-
-// Importar los componentes de los submódulos
+import { ref, computed, shallowRef, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import DeclaracionGasto from '@/components/declaraciones/DeclaracionGasto.vue';
 import SeguimientoGastos from '@/components/declaraciones/SeguimientoGastos.vue';
 import BandejaAprobacionArea from '@/components/declaraciones/BandejaAprobacionArea.vue';
 import BandejaValidacionContable from '@/components/declaraciones/BandejaValidacionContable.vue';
-import ReporteGastos from '@/components/declaraciones/ReporteGastos.vue'; // NUEVO: Importar el componente de reportes
+import ReporteGastos from '@/components/declaraciones/ReporteGastos.vue';
 
 // --- PROPS ---
 // Se recibe el objeto 'user' desde el componente padre (MainLayout.vue)
@@ -98,17 +97,21 @@ const props = defineProps({
     default: () => null
   }
 });
-
 // --- ESTADO ---
 const activeTab = ref('');
 const activeComponent = shallowRef(null);
-
+const route = useRoute();
 // --- LÓGICA DE PERMISOS ---
-const hasPermission = (permissionName) => {
+const hasPermission = (permission) => {
   if (!props.user?.role?.permissions) {
     return false;
   }
-  return props.user.role.permissions.some(p => p.name === permissionName);
+  // Si 'permission' es un array, verificamos si el usuario tiene AL MENOS UNO de los permisos.
+  if (Array.isArray(permission)) {
+    return permission.some(p => props.user.role.permissions.some(userPerm => userPerm.name === p));
+  }
+  // Si 'permission' es un string (comportamiento original), se mantiene la misma lógica.
+  return props.user.role.permissions.some(p => p.name === permission);
 };
 
 // --- CONFIGURACIÓN ESTÁTICA DE CARDS ---
@@ -194,7 +197,6 @@ const visibleCards = computed(() => {
 // --- MÉTODOS ---
 const cambiarTab = (tab) => {
   if (activeTab.value === tab) {
-    // Si se hace clic en la pestaña activa, la desactiva
     activeTab.value = '';
     activeComponent.value = null;
   } else {
@@ -212,7 +214,7 @@ const cambiarTab = (tab) => {
       case 'validacionContable':
         activeComponent.value = BandejaValidacionContable;
         break;
-      case 'reportes': // NUEVO: Caso para el componente de reportes
+      case 'reportes':
         activeComponent.value = ReporteGastos;
         break;
       default:
@@ -242,10 +244,17 @@ const getCardClasses = (tab) => {
       glowClass = 'hover:shadow-glow-purple'; // Asumiendo un color púrpura para el glow
       break;
   }
-
   return `${baseClass} ${glowClass}`;
 };
-
+onMounted(() => {
+  const tabFromUrl = route.query.tab;
+  if (tabFromUrl) {
+    const cardTarget = visibleCards.value.find(card => card.tab === tabFromUrl || (tabFromUrl === 'aprobaciones' && card.tab === 'validacionContable'));
+    if (cardTarget) {
+      cambiarTab(cardTarget.tab);
+    }
+  }
+});
 </script>
 
 <style scoped>

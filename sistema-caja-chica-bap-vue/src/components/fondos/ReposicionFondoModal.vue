@@ -241,6 +241,10 @@ watch(() => props.mostrar, (newVal) => {
                                     <span class="text-gray-600">Monto Aprobado Original:</span>
                                     <span class="font-semibold text-right">{{
                                         currencyFormatter.format(reposicionSummary.monto_asignado) }}</span>
+                                    <span class="text-gray-600">Total Gastado (Contabilizado):</span>
+                                    <span class="font-semibold text-right">{{
+                                        currencyFormatter.format(reposicionSummary.total_gastado_contabilizado)
+                                    }}</span>
                                     <span class="text-gray-600">Saldo Actual:</span>
                                     <span class="font-semibold text-right text-rojo-bap">{{
                                         currencyFormatter.format(reposicionSummary.saldo_disponible_actual) }}</span>
@@ -268,6 +272,10 @@ watch(() => props.mostrar, (newVal) => {
                                     <span class="text-gray-600">Monto Aprobado Original:</span>
                                     <span class="font-semibold text-right">{{
                                         currencyFormatter.format(reposicionSummary.monto_asignado) }}</span>
+                                    <span class="text-gray-600">Total Gastado (Contabilizado):</span>
+                                    <span class="font-semibold text-right">{{
+                                        currencyFormatter.format(reposicionSummary.total_gastado_contabilizado)
+                                        }}</span>
                                     <span class="text-gray-600">Saldo Disponible Actual:</span>
                                     <span class="font-semibold text-right">{{
                                         currencyFormatter.format(reposicionSummary.saldo_disponible_actual) }}</span>
@@ -287,7 +295,42 @@ watch(() => props.mostrar, (newVal) => {
                                     comprobanteFile.name }}</p>
                             </div>
                         </div>
-
+                        <div v-if="reposicionSummary.gastos_contabilizados && reposicionSummary.gastos_contabilizados.length > 0"
+                            class="border-t pt-4">
+                            <details class="group">
+                                <summary class="flex justify-between items-center font-medium cursor-pointer list-none">
+                                    <span class="text-gray-800">Ver Desglose de Gastos Contabilizados ({{
+                                        reposicionSummary.gastos_contabilizados.length }})</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <svg fill="none" height="24" shape-rendering="geometricPrecision"
+                                            stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="1.5" viewBox="0 0 24 24" width="24">
+                                            <path d="M6 9l6 6 6-6"></path>
+                                        </svg>
+                                    </span>
+                                </summary>
+                                <div class="mt-4 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-gray-100">
+                                            <tr>
+                                                <th class="px-3 py-2 text-left font-semibold">Código</th>
+                                                <th class="px-3 py-2 text-left font-semibold">Glosa/Descripcion del Gasto</th>
+                                                <th class="px-3 py-2 text-right font-semibold">Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y">
+                                            <tr v-for="gasto in reposicionSummary.gastos_contabilizados"
+                                                :key="gasto.id">
+                                                <td class="px-3 py-2 whitespace-nowrap">{{ gasto.codigo_gasto }}</td>
+                                                <td class="px-3 py-2">{{ gasto.glosa }}</td>
+                                                <td class="px-3 py-2 text-right font-mono">{{
+                                                    currencyFormatter.format(gasto.monto_total) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        </div>
                         <div v-else
                             class="p-4 bg-estado-alerta-bg border-l-4 border-amarillo-bap-dark text-estado-alerta-text rounded-lg">
                             <p class="font-bold">Este fondo no requiere acción.</p>
@@ -351,3 +394,21 @@ watch(() => props.mostrar, (newVal) => {
         </div>
     </Transition>
 </template>
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+</style>

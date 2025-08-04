@@ -163,9 +163,9 @@ const goToPage = (page) => {
             <table class="min-w-full bg-white shadow-md rounded-lg">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <th class="py-3 px-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Nombre Completo</th>
-                        <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <th class="py-3 px-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Email</th>
                         <th class="py-3 px-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Rol</th>
@@ -179,8 +179,8 @@ const goToPage = (page) => {
                 </thead>
                 <tbody class="text-gray-700">
                     <tr v-for="user in paginatedUsers" :key="user.id" class="border-b border-gray-200 hover:bg-gray-50">
-                        <td class="py-3 px-4">{{ user.name }} {{ user.last_name }}</td>
-                        <td class="py-3 px-4">{{ user.email }}</td>
+                        <td class="py-3 px-4 text-center">{{ user.name }} {{ user.last_name }}</td>
+                        <td class="py-3 px-4 text-center">{{ user.email }}</td>
                         <td class="py-3 px-4 text-center">{{ user.role?.display_name || 'N/A' }}</td>
                         <td class="py-3 px-4 text-center">{{ user.area?.name || 'N/A' }}</td>
                         <td class="py-3 px-4 text-center">

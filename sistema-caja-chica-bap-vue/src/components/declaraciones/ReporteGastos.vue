@@ -216,7 +216,7 @@
                                         <div>
                                             <div class="font-bold text-blue-800 text-sm">DJ Grupal</div>
                                             <div class="text-xs text-blue-600 font-medium">{{ item.gastos?.length || 0
-                                                }} gastos</div>
+                                            }} gastos</div>
                                         </div>
                                     </div>
                                 </td>
@@ -236,7 +236,7 @@
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.estado_grupo)">{{ item.estado_grupo
-                                        }}</span>
+                                    }}</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
@@ -343,7 +343,7 @@
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.gasto?.estado)">{{ item.gasto?.estado
-                                        }}</span>
+                                    }}</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
@@ -414,6 +414,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
+import { useRoute, useRouter } from 'vue-router';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
 
@@ -431,14 +432,16 @@ const areas = ref([]);
 const cargando = ref(true);
 const buscando = ref(false);
 const exportando = ref(false);
-
+const router = useRouter();
+const route = useRoute();
+const inicializacionCompleta = ref(false);
 // --- ESTADO DE FILTROS ---
 const filtros = ref({
-    texto: '', // Para buscar por código o glosa
+    texto: '',
     registrador_name: '',
     fecha_inicio: '',
     fecha_fin: '',
-    estado: 'Todos', // Permite filtrar por todos los estados posibles
+    estado: 'Todos',
     area_id: '',
 });
 
@@ -624,7 +627,24 @@ const fetchGastos = async () => {
         buscando.value = false;
     }
 };
+const aplicarFiltrosDesdeURL = () => {
+    const query = route.query;
+    if (query.alerta && query.codigos) {
+        // Se asignan los códigos de la URL al filtro de texto.
+        // El backend ya está preparado para buscar por una lista de códigos en este campo.
+        filtros.value.texto = query.codigos;
 
+        Swal.fire({
+            title: 'Filtro Aplicado desde Alerta',
+            text: `Mostrando los gastos que requieren atención.`,
+            icon: 'info',
+            showConfirmButton: true
+        });
+
+        // Limpiamos la URL después de aplicar los filtros.
+        router.replace({ query: {} });
+    }
+};
 const triggerSearchWithDebounce = () => {
     buscando.value = true;
     clearTimeout(debounceTimeout);
@@ -643,7 +663,7 @@ const limpiarFiltros = () => {
         estado: 'Todos',
         area_id: '',
     };
-    // El watcher principal se encargará de llamar a fetchGastos y resetear la paginación
+    router.replace({ query: {} });
 };
 
 const verDetalles = (gasto) => {
@@ -723,17 +743,24 @@ const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) pag
 // --- WATCHERS Y LIFECYCLE ---
 // Watcher principal para filtros que reinicia la paginación y dispara la búsqueda
 watch(filtros, () => {
+    if (!inicializacionCompleta.value) return;
     triggerSearchWithDebounce();
-}, { deep: true }); // 'deep: true' para observar cambios en propiedades anidadas de 'filtros'
+}, { deep: true });
 
 // Los watchers individuales para campos de texto con debounce y longitud mínima
 // ya no son estrictamente necesarios si el watcher 'filtros' con deep:true y debounce
 // ya maneja todos los cambios y reinicia la paginación.
 // Se mantienen los MIN_SEARCH_LENGTH para la validación visual, pero la lógica de filtrado
 // en itemsFiltrados ya no los usa para descartar la búsqueda (solo para mostrar el mensaje).
+onMounted(async () => {
+    // 1. Se aplican los filtros que puedan venir de la URL PRIMERO.
+    aplicarFiltrosDesdeURL();
 
-onMounted(() => {
-    fetchGastos();
-    fetchAreas();
+    // 2. Luego se cargan los datos iniciales.
+    await fetchGastos();
+    await fetchAreas();
+
+    // 3. Finalmente, se marca la inicialización como completa para activar los watchers.
+    inicializacionCompleta.value = true;
 });
 </script>

@@ -1,5 +1,5 @@
 <template>
-    <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+    <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 animate-fade-in-up">
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
@@ -43,7 +43,7 @@
         </div>
 
         <!-- Chart Content -->
-        <div class="relative" :class="chartContainerClass">
+        <div class="bg-white rounded-xl shadow-sm p-4 overflow-hidden relative" :class="height">
             <!-- Loading overlay -->
             <div v-if="loading"
                 class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
@@ -62,13 +62,14 @@
                     </svg>
                 </div>
                 <p class="text-gray-500 mb-2">{{ errorMessage || 'Error al cargar el gráfico' }}</p>
-                <button @click="refreshChart" class="text-sm text-verde-bap hover:text-green-600 underline">
+                <button @click="refreshChart"
+                    class="text-sm text-verde-bap hover:text-green-600 underline transition-colors">
                     Reintentar
                 </button>
             </div>
 
             <!-- Empty state -->
-            <div v-else-if="isEmpty && !$slots.default" class="chart-placeholder">
+            <div v-else-if="!hasContent" class="chart-placeholder">
                 <div class="text-gray-400 mb-2">
                     <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -98,111 +99,112 @@
     </div>
 </template>
 
-<script>
-export default {
-    name: 'ChartCard',
-    props: {
-        title: {
-            type: String,
-            required: true
-        },
-        subtitle: {
-            type: String,
-            default: null
-        },
-        loading: {
-            type: Boolean,
-            default: false
-        },
-        loadingText: {
-            type: String,
-            default: 'Cargando datos...'
-        },
-        error: {
-            type: Boolean,
-            default: false
-        },
-        errorMessage: {
-            type: String,
-            default: null
-        },
-        isEmpty: {
-            type: Boolean,
-            default: false
-        },
-        emptyMessage: {
-            type: String,
-            default: null
-        },
-        emptySubtext: {
-            type: String,
-            default: null
-        },
-        showActions: {
-            type: Boolean,
-            default: true
-        },
-        allowFullscreen: {
-            type: Boolean,
-            default: false
-        },
-        allowExport: {
-            type: Boolean,
-            default: false
-        },
-        allowRefresh: {
-            type: Boolean,
-            default: true
-        },
-        showFooter: {
-            type: Boolean,
-            default: false
-        },
-        footerText: {
-            type: String,
-            default: null
-        },
-        lastUpdated: {
-            type: [String, Date],
-            default: null
-        },
-        height: {
-            type: String,
-            default: 'h-80'
-        }
-    },
-    emits: ['refresh', 'export', 'fullscreen'],
-    computed: {
-        chartContainerClass() {
-            return [
-                this.height,
-                'flex items-center justify-center'
-            ]
-        }
-    },
-    methods: {
-        refreshChart() {
-            this.$emit('refresh')
-        },
-        exportChart() {
-            this.$emit('export')
-        },
-        toggleFullscreen() {
-            this.$emit('fullscreen')
-        },
-        formatDate(date) {
-            if (!date) return ''
+<script setup>
+import { computed, useSlots } from 'vue'
 
-            const dateObj = typeof date === 'string' ? new Date(date) : date
-            return dateObj.toLocaleString('es-PE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            })
-        }
+// Props
+const props = defineProps({
+    title: {
+        type: String,
+        required: true
+    },
+    subtitle: {
+        type: String,
+        default: null
+    },
+    loading: {
+        type: Boolean,
+        default: false
+    },
+    loadingText: {
+        type: String,
+        default: 'Cargando datos...'
+    },
+    error: {
+        type: Boolean,
+        default: false
+    },
+    errorMessage: {
+        type: String,
+        default: null
+    },
+    emptyMessage: {
+        type: String,
+        default: null
+    },
+    emptySubtext: {
+        type: String,
+        default: null
+    },
+    showActions: {
+        type: Boolean,
+        default: true
+    },
+    allowFullscreen: {
+        type: Boolean,
+        default: false
+    },
+    allowExport: {
+        type: Boolean,
+        default: false
+    },
+    allowRefresh: {
+        type: Boolean,
+        default: true
+    },
+    showFooter: {
+        type: Boolean,
+        default: false
+    },
+    footerText: {
+        type: String,
+        default: null
+    },
+    lastUpdated: {
+        type: [String, Date],
+        default: null
+    },
+    height: {
+        type: String,
+        default: 'h-80'
     }
+})
+
+// Emits
+const emit = defineEmits(['refresh', 'export', 'fullscreen'])
+
+// Slots
+const slots = useSlots()
+
+// Computed properties
+const hasContent = computed(() => {
+    return slots.default && slots.default().length > 0
+})
+
+// Methods
+const refreshChart = () => {
+    emit('refresh')
+}
+
+const exportChart = () => {
+    emit('export')
+}
+
+const toggleFullscreen = () => {
+    emit('fullscreen')
+}
+
+const formatDate = (date) => {
+    if (!date) return ''
+
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    return dateObj.toLocaleString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
 }
 </script>
 
@@ -213,37 +215,5 @@ export default {
 
 .chart-placeholder {
     @apply flex flex-col items-center justify-center text-center py-12;
-}
-
-/* Asegurar que el color verde-bap esté disponible */
-.text-verde-bap {
-    color: var(--color-verde-bap, #10b981);
-}
-
-.hover\:text-verde-bap:hover {
-    color: var(--color-verde-bap, #10b981);
-}
-
-.border-verde-bap {
-    border-color: var(--color-verde-bap, #10b981);
-}
-
-/* Scrollbar personalizado para mantener consistencia */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 2px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 2px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
 }
 </style>

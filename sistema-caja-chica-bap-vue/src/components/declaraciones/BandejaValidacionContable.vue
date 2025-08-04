@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
+import { useRoute, useRouter } from 'vue-router';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
 
@@ -28,6 +29,9 @@ const areas = ref([]);
 const cargando = ref(true);
 const buscando = ref(false);
 const exportando = ref(false);
+const router = useRouter();
+const route = useRoute();
+const inicializacionCompleta = ref(false);
 
 // --- ESTADO DE FILTROS ---
 const filtros = ref({
@@ -225,7 +229,24 @@ const fetchGastos = async () => {
         buscando.value = false;
     }
 };
+const aplicarFiltrosDesdeURL = () => {
+    const query = route.query;
+    // Se busca específicamente la alerta de 'monto_inusual' y los códigos.
+    if (query.alerta === 'monto_inusual' && query.codigos) {
+        filtros.value.codigo_gasto = query.codigos;
 
+        // Opcional: Mostrar un mensaje al usuario para darle contexto.
+        Swal.fire({
+            title: 'Filtro Aplicado',
+            text: `Mostrando los gastos con montos inusuales detectados.`,
+            icon: 'info',
+            showConfirmButton: true
+        });
+
+        // Limpiamos la URL después de aplicar los filtros para que el usuario no vea los parámetros.
+        router.replace({ query: {} });
+    }
+};
 const triggerSearchWithDebounce = () => {
     buscando.value = true;
     clearTimeout(debounceTimeout);
@@ -243,7 +264,9 @@ const limpiarFiltros = () => {
         fecha_fin: '',
         estado: 'Todos',
         area_id: '',
+
     };
+    router.replace({ query: {} });
     // El watcher se encargará de llamar a fetchGastos y resetear la paginación
 };
 
@@ -465,8 +488,9 @@ const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) pag
 // --- WATCHERS Y LIFECYCLE ---
 // Watcher principal para filtros que reinicia la paginación y dispara la búsqueda
 watch(filtros, () => {
+    if (!inicializacionCompleta.value) return;
     triggerSearchWithDebounce();
-}, { deep: true }); // 'deep: true' para observar cambios en propiedades anidadas de 'filtros'
+}, { deep: true });
 
 // Watchers individuales para campos de texto con debounce y longitud mínima
 watch(() => filtros.value.codigo_gasto, (newValue) => {
@@ -483,9 +507,14 @@ watch(() => filtros.value.registrador_name, (newValue) => {
     }
 });
 
-onMounted(() => {
-    fetchGastos();
-    fetchAreas();
+onMounted(async () => {
+    // Primero se aplican los filtros que puedan venir de la URL.
+    aplicarFiltrosDesdeURL();
+    // Luego se cargan los datos iniciales (que ya respetarán los filtros pre-cargados).
+    await fetchGastos();
+    await fetchAreas();
+    // Finalmente, se marca la inicialización como completa para activar los watchers.
+    inicializacionCompleta.value = true;
 });
 </script>
 

@@ -12,6 +12,19 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
+    public function index()
+    {
+        // Se mantiene tu lógica de permisos, solo el super_admin puede ver la lista completa.
+        if (!Auth::user()->hasRole('super_admin')) {
+            return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
+
+        $users = User::with(['role:id,display_name', 'area:id,name'])
+            ->orderBy('last_name')
+            ->get();
+
+        return response()->json(['users' => $users]);
+    }
     /**
      * Almacena un nuevo usuario en la base de datos.
      */
