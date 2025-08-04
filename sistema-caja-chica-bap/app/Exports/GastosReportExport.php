@@ -2,39 +2,38 @@
 
 namespace App\Exports;
 
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize; // Opcional: para autoajustar el ancho de las columnas
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class GastosReportExport implements FromCollection, WithHeadings, ShouldAutoSize
+class GastosReportExport implements FromArray, WithHeadings, WithStyles, ShouldAutoSize
 {
     protected $data;
+    protected $headings;
 
-    public function __construct(array $data)
+    public function __construct(array $data, array $headings)
     {
-        $this->data = new Collection($data);
+        $this->data = $data;
+        $this->headings = $headings;
     }
 
-    /**
-     * @return \Illuminate\Support\Collection
-     */
-    public function collection()
+    public function array(): array
     {
         return $this->data;
     }
 
-    /**
-     * @return array
-     */
     public function headings(): array
     {
-        // Define los encabezados de tu archivo Excel.
-        // Deben coincidir con las claves de los arrays que pasas en el constructor.
-        if ($this->data->isEmpty()) {
-            return [];
-        }
-        // Tomar las claves del primer elemento como encabezados
-        return array_keys($this->data->first()->toArray());
+        return $this->headings;
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        // Aplica estilo de negrita a la primera fila (cabeceras).
+        return [
+            1 => ['font' => ['bold' => true]],
+        ];
     }
 }

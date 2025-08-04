@@ -7,6 +7,40 @@
             </p>
         </div>
 
+        <!-- Panel de Contadores -->
+        <div class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 text-center">
+                <div class="p-4 bg-blue-100 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-800">{{ contadoresEstado.total }}</p>
+                    <p class="text-sm text-blue-600">Total</p>
+                </div>
+                <div class="p-4 bg-yellow-100 rounded-lg">
+                    <p class="text-2xl font-bold text-yellow-800">{{ contadoresEstado.pendientesAprobacion }}</p>
+                    <p class="text-sm text-yellow-600">Pend. Aprobación</p>
+                </div>
+                <div class="p-4 bg-orange-100 rounded-lg">
+                    <p class="text-2xl font-bold text-orange-800">{{ contadoresEstado.pendientesValidacionDJ }}</p>
+                    <p class="text-sm text-orange-600">Pend. Val. DJ</p>
+                </div>
+                <div class="p-4 bg-purple-100 rounded-lg">
+                    <p class="text-2xl font-bold text-purple-800">{{ contadoresEstado.pendientesValidacionContable }}</p>
+                    <p class="text-sm text-purple-600">Pend. Val. Contable</p>
+                </div>
+                <div class="p-4 bg-red-100 rounded-lg">
+                    <p class="text-2xl font-bold text-red-800">{{ contadoresEstado.observados }}</p>
+                    <p class="text-sm text-red-600">Observados</p>
+                </div>
+                <div class="p-4 bg-gray-200 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800">{{ contadoresEstado.rechazados }}</p>
+                    <p class="text-sm text-gray-600">Rechazados</p>
+                </div>
+                <div class="p-4 bg-green-100 rounded-lg">
+                    <p class="text-2xl font-bold text-green-800">{{ contadoresEstado.contabilizados }}</p>
+                    <p class="text-sm text-green-600">Contabilizados</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Panel de Filtros -->
         <div class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -526,6 +560,43 @@ const paginasVisibles = computed(() => {
         return [1, '...', totalPaginas.value - 4, totalPaginas.value - 3, totalPaginas.value - 2, totalPaginas.value - 1, totalPaginas.value];
     }
     return [1, '...', paginaActual.value - 1, paginaActual.value, paginaActual.value + 1, '...', totalPaginas.value];
+});
+
+const contadoresEstado = computed(() => {
+    const contadores = {
+        total: itemsFiltrados.value.length,
+        pendientesAprobacion: 0,
+        pendientesValidacionDJ: 0,
+        pendientesValidacionContable: 0,
+        observados: 0,
+        rechazados: 0,
+        contabilizados: 0,
+    };
+
+    for (const item of itemsFiltrados.value) {
+        const estado = item.es_grupo ? item.estado_grupo : item.gasto?.estado;
+        switch (estado) {
+            case 'Pendiente de Aprobación':
+                contadores.pendientesAprobacion++;
+                break;
+            case 'Pendiente de Validación DJ':
+                contadores.pendientesValidacionDJ++;
+                break;
+            case 'Pendiente de Validación Contable':
+                contadores.pendientesValidacionContable++;
+                break;
+            case 'Observado':
+                contadores.observados++;
+                break;
+            case 'Rechazado':
+                contadores.rechazados++;
+                break;
+            case 'Contabilizado':
+                contadores.contabilizados++;
+                break;
+        }
+    }
+    return contadores;
 });
 
 

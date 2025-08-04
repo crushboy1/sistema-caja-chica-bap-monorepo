@@ -332,16 +332,18 @@
                       <label :for="'gasto_proyectado_' + index" class="block text-sm font-medium text-gray-700 mb-2">
                         Tipo de Gasto <span class="text-red-500">*</span>
                       </label>
-                      <select :id="'gasto_proyectado_' + index" v-model="gasto.gasto_proyectado_id"
-                        class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                        required>
-                        <option value="">Selecciona un tipo de gasto</option>
-                        <option v-for="gastoProyectado in gastosProyectadosCatalogo"
-                          :key="gastoProyectado.id_gasto_proyectado" :value="gastoProyectado.id_gasto_proyectado"
-                          :disabled="esOpcionDeshabilitada(gastoProyectado.id_gasto_proyectado, gasto.gasto_proyectado_id)">
-                          {{ gastoProyectado.descripcion }}
-                        </option>
-                      </select>
+                      <v-select
+                        :id="'gasto_proyectado_' + index"
+                        v-model="gasto.gasto_proyectado_id"
+                        :options="gastosProyectadosCatalogo"
+                        label="descripcion"
+                        :reduce="gastoProyectado => gastoProyectado.id_gasto_proyectado"
+                        placeholder="Selecciona un tipo de gasto"
+                        class="mt-1"
+                        required
+                        :selectable="gastoProyectado => !esOpcionDeshabilitada(gastoProyectado.id_gasto_proyectado, gasto.gasto_proyectado_id)"
+                      />
+
                     </div>
                     <div>
                       <label :for="'monto_estimado_' + index" class="block text-sm font-medium text-gray-700 mb-2">
