@@ -1,7 +1,7 @@
 <template>
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <h2 class="text-xl font-bold text-gray-800">{{ title }}</h2>
+            <h2 class="text-2xl font-bold text-gray-800 text-shadow">{{ title }}</h2>
             <div v-if="subtitle" class="hidden sm:block">
                 <span class="text-gray-400">•</span>
                 <span class="text-sm text-gray-500 ml-2">{{ subtitle }}</span>
@@ -30,43 +30,28 @@
     <div v-if="showDivider" class="border-b border-gray-100 mb-6"></div>
 </template>
 
-<script>
-export default {
-    name: 'SectionHeader',
-    props: {
-        title: {
-            type: String,
-            required: true
-        },
-        subtitle: {
-            type: String,
-            default: null
-        },
-        showRefresh: {
-            type: Boolean,
-            default: false
-        },
-        showDivider: {
-            type: Boolean,
-            default: false
-        },
-        loading: {
-            type: Boolean,
-            default: false
-        }
+<script setup>
+defineProps({
+    title: {
+        type: String,
+        required: true
     },
-    emits: ['refresh']
-}
+    subtitle: {
+        type: String,
+        default: null
+    },
+    showRefresh: {
+        type: Boolean,
+        default: false
+    },
+    showDivider: {
+        type: Boolean,
+        default: true
+    },
+    loading: {
+        type: Boolean,
+        default: false
+    }
+});
+defineEmits(['refresh']);
 </script>
-
-<style scoped>
-/* Asegurar que el color verde-bap esté disponible */
-.text-verde-bap {
-    color: var(--color-verde-bap, #10b981);
-    /* Fallback a green-500 si no está definido */
-}
-
-.hover\:text-verde-bap:hover {
-    color: var(--color-verde-bap, #10b981);
-}
-</style>

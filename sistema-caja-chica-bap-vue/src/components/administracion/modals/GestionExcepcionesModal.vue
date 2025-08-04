@@ -1,6 +1,6 @@
 <template>
     <Transition name="modal-fade">
-        <div v-if="mostrar" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
+        <div v-if="mostrar" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
             @click.self="closeModal">
             <div
                 class="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform transition-transform duration-300">

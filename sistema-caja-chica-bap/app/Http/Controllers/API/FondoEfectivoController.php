@@ -68,13 +68,22 @@ class FondoEfectivoController extends Controller
             // Por defecto, otros roles (como colaborador) no ven ningún fondo en esta vista.
             $query->whereRaw('1 = 0'); // Una forma segura de no devolver resultados.
         }
-
+        // Ahora puede aceptar un solo código (para búsqueda manual) o una lista de códigos
+        // separados por comas (para la redirección desde el dashboard).
+        if ($request->filled('codigo_fondo')) {
+            // Se comprueba si el string contiene comas.
+            if (strpos($request->codigo_fondo, ',') !== false) {
+                // Si contiene comas, se convierte en un array y se usa whereIn.
+                $codigos = explode(',', $request->codigo_fondo);
+                $query->whereIn('codigo_fondo', $codigos);
+            } else {
+                // Si no contiene comas, se mantiene la búsqueda original con LIKE.
+                $query->where('codigo_fondo', 'like', '%' . $request->codigo_fondo . '%');
+            }
+        }
         // Aplicar filtros adicionales de la request
         if ($request->filled('estado') && $request->estado !== 'Todos') {
             $query->where('estado', $request->estado);
-        }
-        if ($request->filled('codigo_fondo')) {
-            $query->where('codigo_fondo', 'like', '%' . $request->codigo_fondo . '%');
         }
         if ($request->filled('fecha_inicio')) {
             $query->whereDate('fecha_apertura', '>=', $request->fecha_inicio);
@@ -542,7 +551,7 @@ class FondoEfectivoController extends Controller
         if ($fondo->monto_disponible >= 0) {
             return response()->json(['message' => 'Este fondo no tiene un excedente para reponer.'], 409);
         }
-        
+
         // Cálculo seguro del monto a reponer (el excedente).
         $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
         $saldoReal = $fondo->monto_aprobado - $totalGastado;
@@ -701,6 +710,73 @@ class FondoEfectivoController extends Controller
             }
             return response()->json([
                 'message' => "La liquidación del fondo {$fondo->codigo_fondo} ha sido registrada exitosamente.",
+                'fondo' => $fondo->fresh()
+            ]);
+        });
+    }
+    public function cierreMensual(Request $request, FondoEfectivo $fondo)
+    {
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
+            return response()->json(['message' => 'No tienes permiso para ejecutar esta acción.'], 403);
+        }
+
+        // --- 1. Validaciones de Negocio ---
+
+        // a) El fondo debe estar activo para un cierre mensual normal.
+        if ($fondo->estado !== 'Activo') {
+            return response()->json(['message' => 'Solo se pueden cerrar mensualmente los fondos que están activos.'], 409);
+        }
+
+        // b) No debe haber gastos en estados intermedios.
+        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado'];
+        $gastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
+        if ($gastosPendientes > 0) {
+            return response()->json([
+                'message' => "El fondo no puede ser cerrado. Tiene {$gastosPendientes} gasto(s) en proceso."
+            ], 409);
+        }
+
+        // c) El saldo disponible debe ser exactamente cero.
+        if ((float)$fondo->monto_disponible !== 0.00) {
+            return response()->json([
+                'message' => "Esta acción solo aplica a fondos con un saldo disponible de S/ 0.00. Saldo actual: S/ " . number_format($fondo->monto_disponible, 2)
+            ], 409);
+        }
+
+        // --- 2. Ejecución de la Lógica ---
+
+        return DB::transaction(function () use ($fondo, $user) {
+            // a) Marcar todos los gastos 'Contabilizado' como 'Repuesto' para cerrar el ciclo.
+            $gastosLiquidadosIds = $fondo->gastos()->where('estado', 'Contabilizado')->pluck('id');
+            if ($gastosLiquidadosIds->isNotEmpty()) {
+                Gasto::whereIn('id', $gastosLiquidadosIds)->update(['estado' => 'Repuesto']);
+            }
+
+            // b) Guardar el saldo actual (que es 0) para el historial.
+            $saldoPostLiquidacion = $fondo->monto_disponible;
+
+            // c) Restaurar el monto disponible al monto aprobado original.
+            $fondo->monto_disponible = $fondo->monto_aprobado;
+            $fondo->save();
+
+            // d) Crear el registro en el historial para la trazabilidad de la restauración.
+            HistorialMovimientoFondo::create([
+                'id_fondo_efectivo' => $fondo->id_fondo,
+                'id_usuario_accion' => $user->id,
+                'tipo_movimiento' => 'Restauracion Mensual',
+                'monto_movimiento' => $fondo->monto_aprobado,
+                'saldo_anterior' => $saldoPostLiquidacion,
+                'saldo_nuevo' => $fondo->monto_disponible,
+                'comentario' => 'Cierre de período y restauración del saldo para el nuevo mes.',
+                'ruta_comprobante' => null,
+                'fecha_movimiento' => now(),
+            ]);
+
+            Log::info("Cierre Mensual: El fondo '{$fondo->codigo_fondo}' ha sido cerrado y restaurado para el siguiente período por el usuario {$user->name}.");
+
+            return response()->json([
+                'message' => "El cierre mensual del fondo {$fondo->codigo_fondo} ha sido registrado y su saldo ha sido restaurado para el siguiente período.",
                 'fondo' => $fondo->fresh()
             ]);
         });

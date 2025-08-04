@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\FondoEfectivoController;
+use App\Models\FondoEfectivo;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('fondos-efectivo', FondoEfectivoController::class)->parameters(['fondos-efectivo' => 'fondo']);
@@ -14,6 +15,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reposicion-summary', [FondoEfectivoController::class, 'getReposicionSummary']);
         Route::post('/reponer', [FondoEfectivoController::class, 'reponer']);
         Route::post('/devolver', [FondoEfectivoController::class, 'devolver']);
-        
+        Route::post('/cierre-mensual',[FondoEfectivoController::class, 'cierreMensual']);
     });
 });

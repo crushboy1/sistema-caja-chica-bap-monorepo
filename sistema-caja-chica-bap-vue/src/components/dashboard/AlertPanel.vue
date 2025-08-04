@@ -20,9 +20,10 @@
             <!-- Alertas de Sobregiro -->
             <template v-if="alerta.tipo === 'sobregiro'">
                 <div v-for="fondo in alerta.fondos" :key="fondo.id"
-                    class="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                    class="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg"
+                    :class="fondo.es_accionable ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200 opacity-60'">
                     <div>
-                        <p class="font-semibold text-gray-800">{{ fondo.nombre }}</p>
+                        <p class="font-semibold text-gray-800">{{ fondo.codigo_fondo }}</p>
                         <p class="text-sm text-gray-600">
                             Presupuesto: {{ currencyFormatter.format(fondo.monto_aprobado) }}
                         </p>
@@ -38,40 +39,52 @@
 
             <!-- Alertas de Montos Inusuales -->
             <template v-if="alerta.tipo === 'monto_inusual'">
-                <div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p class="text-sm text-gray-600">
-                        <strong>Promedio normal:</strong> {{ currencyFormatter.format(alerta.promedio_normal) }} |
-                        <strong>Límite de alerta:</strong> {{ currencyFormatter.format(alerta.limite_alerta) }}
-                    </p>
+                <div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-gray-600">
+                    <strong>Promedio normal:</strong> {{ currencyFormatter.format(alerta.promedio_normal) }} |
+                    <strong>Límite de alerta:</strong> {{ currencyFormatter.format(alerta.limite_alerta) }}
                 </div>
                 <div v-for="gasto in alerta.gastos" :key="gasto.id"
-                    class="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    class="flex items-center justify-between p-3 rounded-lg transition-opacity"
+                    :class="gasto.es_accionable ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200 opacity-70'">
                     <div>
-                        <p class="font-semibold text-gray-800">{{ gasto.usuario }}</p>
-                        <p class="text-sm text-gray-600">{{ gasto.area }} • {{ formatDate(gasto.fecha) }}</p>
+                        <p class="font-semibold text-gray-800">{{ gasto.usuario }} ({{ gasto.codigo_gasto }})</p>
+                        <p class="text-sm text-gray-600">{{ gasto.area }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Fecha Doc: {{ formatDate(gasto.fecha) }}</p>
                     </div>
                     <div class="text-right">
-                        <p class="font-bold text-orange-600">{{ currencyFormatter.format(gasto.monto) }}</p>
-                        <p class="text-xs text-orange-500">ID: {{ gasto.id }}</p>
+                        <p class="font-bold" :class="gasto.es_accionable ? 'text-orange-600' : 'text-gray-600'">
+                            {{ currencyFormatter.format(gasto.monto) }}
+                        </p>
+                        <span v-if="!gasto.es_accionable"
+                            class="text-xs text-white font-medium px-2 py-0.5 rounded-full bg-gray-400 mt-1 inline-block">
+                            {{ gasto.estado }}
+                        </span>
                     </div>
                 </div>
             </template>
-
-            <!-- Alertas de Rendiciones Fuera de Plazo -->
+            <!--fuera de plazo -->
             <template v-if="alerta.tipo === 'rendicion_fuera_plazo'">
                 <div v-for="gasto in alerta.gastos" :key="gasto.id"
-                    class="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    class="flex items-center justify-between p-3 rounded-lg transition-opacity"
+                    :class="gasto.es_accionable ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200 opacity-70'">
+
                     <div>
-                        <p class="font-semibold text-gray-800">{{ gasto.usuario }}</p>
+                        <p class="font-semibold text-gray-800">{{ gasto.usuario }} ({{ gasto.codigo_gasto }})</p>
                         <p class="text-sm text-gray-600">{{ gasto.area }}</p>
-                        <p class="text-xs text-gray-500">
-                            Límite: {{ formatDate(gasto.fecha_limite) }} •
-                            Rendido: {{ formatDate(gasto.fecha_rendicion) }}
+                        <p class="text-xs text-gray-500 mt-1">
+                            Periodo: <strong>{{ formatPeriodo(gasto.fecha_limite) }}</strong> | Límite: {{
+                                formatDate(gasto.fecha_limite) }}
                         </p>
                     </div>
+
                     <div class="text-right">
-                        <p class="font-bold text-yellow-600">{{ gasto.dias_retraso }} días</p>
-                        <p class="text-xs text-yellow-500">de retraso</p>
+                        <p class="font-bold" :class="gasto.es_accionable ? 'text-yellow-800' : 'text-gray-600'">
+                            {{ gasto.dias_retraso }} día(s) tarde
+                        </p>
+                        <span v-if="!gasto.es_accionable"
+                            class="text-xs text-white font-medium px-2 py-0.5 rounded-full bg-gray-400 mt-1 inline-block">
+                            {{ gasto.estado }}
+                        </span>
                     </div>
                 </div>
             </template>
@@ -79,8 +92,9 @@
 
         <!-- Footer con acción si es necesario -->
         <div v-if="alerta.cantidad > 0" class="mt-4 pt-4 border-t border-gray-200">
-            <button :class="actionButtonClasses"
-                class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+            <button @click="$emit('action-clicked', alerta)" :disabled="cantidadAccionable === 0"
+                :class="actionButtonClasses"
+                class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
                 {{ actionText }}
             </button>
         </div>
@@ -97,14 +111,24 @@ const props = defineProps({
         required: true
     }
 });
-
+const emit = defineEmits(['action-clicked']);
 const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('es-PE');
 };
-
+const formatPeriodo = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleString('es-PE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+};
+const cantidadAccionable = computed(() => {
+    if (props.alerta.tipo === 'sobregiro') {
+        return props.alerta.fondos.filter(f => f.es_accionable).length;
+    }
+    return props.alerta.gastos.filter(g => g.es_accionable).length;
+});
 const iconComponent = computed(() => {
     const iconMap = {
         'sobregiro': AlertTriangle,
@@ -152,10 +176,14 @@ const actionButtonClasses = computed(() => {
 
 const actionText = computed(() => {
     const textMap = {
-        'sobregiro': 'Revisar Fondos con Sobregiro',
-        'monto_inusual': 'Revisar Gastos Inusuales',
-        'rendicion_fuera_plazo': 'Gestionar Rendiciones Tardías'
+        'sobregiro': 'Revisar Fondos',
+        'monto_inusual': 'Revisar Gastos',
+        'rendicion_fuera_plazo': 'Gestionar Rendiciones'
     };
-    return textMap[props.alerta.tipo] || 'Ver Detalles';
+    const baseText = textMap[props.alerta.tipo] || 'Ver Detalles';
+    if (cantidadAccionable.value === 0) {
+        return 'No hay acciones pendientes';
+    }
+    return `${baseText} (${cantidadAccionable.value} Accionable${cantidadAccionable.value > 1 ? 's' : ''})`;
 });
 </script>
