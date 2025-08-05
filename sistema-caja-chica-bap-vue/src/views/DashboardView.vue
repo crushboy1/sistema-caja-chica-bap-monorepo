@@ -546,18 +546,32 @@ const handleAlertaAction = (alerta) => {
       break;
     }
 
-    case 'monto_inusual':
-    case 'rendicion_fuera_plazo': {
-      // Se aplica la misma lógica de filtrado para los gastos.
+    case 'monto_inusual': {
+      // Para montos inusuales, solo nos interesan los gastos que aún se pueden accionar.
       const gastosAccionables = alerta.gastos.filter(gasto => gasto.es_accionable);
-      if (gastosAccionables.length === 0) return;
 
+      if (gastosAccionables.length === 0) {
+        // Si no hay gastos accionables, se informa al usuario y no se redirige.
+        Swal.fire('Información', 'Todos los gastos inusuales detectados ya han sido procesados.', 'info');
+        return;
+      }
       const codigos = gastosAccionables.map(gasto => gasto.codigo_gasto).join(',');
+      router.push({
+        path: '/dashboard/declaraciones',
+        query: { tab: 'validacionContable', alerta: alerta.tipo, codigos }
+      });
+      break;
+    }
+    case 'rendicion_fuera_plazo': {
+      // Para rendiciones tardías, nos interesan TODOS los gastos para el reporte.
+      if (!alerta.gastos || alerta.gastos.length === 0) return;
+
+      const codigos = alerta.gastos.map(gasto => gasto.codigo_gasto).join(',');
 
       router.push({
         path: '/dashboard/declaraciones',
-        // Se redirige a la bandeja de aprobaciones/validación para la acción.
-        query: { tab: 'validacionContable', alerta: alerta.tipo, codigos }
+        // Se redirige a la bandeja de análisis ('reportes').
+        query: { tab: 'reportes', alerta: 'rendicion_tardia', codigos }
       });
       break;
     }

@@ -228,11 +228,17 @@ class GastoController extends Controller
                 $idJefeAprobador = null;
                 $idValidadorAdm = null;
                 $descontarSaldo = false;
+                $fechaRendicion = null;
+                $fechaLimiteRendicion = null;
                 if ($user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
                     $estadoInicial = $esGastoConDJConsolidada ? 'Pendiente de Validación DJ' : 'Contabilizado';
                     $idJefeAprobador = $user->id;
                     $idValidadorAdm = $user->id;
                     $descontarSaldo = !$esGastoConDJConsolidada;
+                    if ($estadoInicial === 'Contabilizado') {
+                        $fechaRendicion = now();
+                        $fechaLimiteRendicion = Carbon::parse($gastoData['fecha_documento'])->endOfMonth();
+                    }
                 } elseif ($user->hasAnyRole(['gerente_general', 'jefe_area'])) {
                     $estadoInicial = $esGastoConDJConsolidada ? 'Pendiente de Validación DJ' : 'Pendiente de Validación Contable';
                     $idJefeAprobador = $user->id;
@@ -267,6 +273,8 @@ class GastoController extends Controller
                     'monto_proyectado_original' => $montoOriginal,
                     'monto_excedido_al_registrar' => $montoExcedido,
                     'saldo_disponible_al_registrar' => $saldoDisponibleAlRegistrar,
+                    'fecha_rendicion' => $fechaRendicion,
+                    'fecha_limite_rendicion' => $fechaLimiteRendicion,
                 ]));
 
                 // --- Lógica post-creación  ---
@@ -327,7 +335,11 @@ class GastoController extends Controller
 
         return DB::transaction(function () use ($gasto, $user, $request) {
             $gasto->fondoEfectivo()->decrement('monto_disponible', $gasto->monto_total);
+            // 1. Se establece la fecha de rendición con la fecha y hora actual.
+            $gasto->fecha_rendicion = now();
 
+            // 2. Se calcula y guarda cuál era la fecha límite para este gasto (fin del mes de la fecha del documento).
+            $gasto->fecha_limite_rendicion = Carbon::parse($gasto->fecha_documento)->endOfMonth();
             $estadoAnterior = $gasto->estado;
             $gasto->estado = 'Contabilizado';
             $gasto->id_validador_adm = $user->id;
@@ -957,11 +969,19 @@ class GastoController extends Controller
         // Aplicar filtros de búsqueda adicionales de la request.
         // El filtro 'texto' en el frontend busca en 'codigo_gasto' y 'glosa'.
         if ($request->filled('texto')) {
-            $searchTerm = strtolower($request->texto);
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('codigo_gasto', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('glosa', 'like', '%' . $searchTerm . '%');
-            });
+            $searchTerm = $request->texto;
+            // Se comprueba si el string contiene comas.
+            if (strpos($searchTerm, ',') !== false) {
+                // Si contiene comas (viene de una alerta del dashboard), se convierte en un array y se usa whereIn.
+                $codigos = explode(',', $searchTerm);
+                $query->whereIn('codigo_gasto', $codigos);
+            } else {
+                // Si no contiene comas, es una búsqueda manual del usuario. Se busca en código y glosa.
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('codigo_gasto', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('glosa', 'like', '%' . $searchTerm . '%');
+                });
+            }
         }
         if ($request->filled('registrador_name')) {
             $searchTerm = strtolower($request->registrador_name);
@@ -1089,10 +1109,10 @@ class GastoController extends Controller
 
         $data = $gastosParaExportar->map(function ($gasto, $djs_consolidadas) {
             $tipo = $gasto->tipo_documento ?? 'N/A';
-    $serie = $gasto->serie_documento ?? 'N/A';
-    $correlativo = $gasto->correlativo_documento ?? 'N/A';
+            $serie = $gasto->serie_documento ?? 'N/A';
+            $correlativo = $gasto->correlativo_documento ?? 'N/A';
 
-    $documentoCompleto = "{$tipo}-{$serie}-{$correlativo}";
+            $documentoCompleto = "{$tipo}-{$serie}-{$correlativo}";
             return [
                 $gasto->id,
                 '323',
