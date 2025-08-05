@@ -24,7 +24,7 @@ const hasPermission = (permissionName) => {
 };
 
 // --- ESTADO DE DATOS ---
-const items = ref([]); // Almacena la data cruda de la API (gastos individuales y grupos DJ)
+const items = ref([]);
 const areas = ref([]);
 const cargando = ref(true);
 const buscando = ref(false);

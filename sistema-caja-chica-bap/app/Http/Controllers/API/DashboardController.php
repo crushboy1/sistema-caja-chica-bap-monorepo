@@ -343,6 +343,7 @@ class DashboardController extends Controller
                         ->diffInDays(Carbon::parse($gasto->fecha_limite_rendicion));
                     return [
                         'id' => $gasto->id_gasto,
+                        'codigo_gasto' => $gasto->codigo_gasto,
                         'usuario' => $gasto->registrador->name . ' ' . $gasto->registrador->last_name ?? 'N/A',
                         'area' => $gasto->fondoEfectivo->area->name ?? 'N/A',
                         'dias_retraso' => $diasRetraso,

@@ -65,23 +65,22 @@
             <!--fuera de plazo -->
             <template v-if="alerta.tipo === 'rendicion_fuera_plazo'">
                 <div v-for="gasto in alerta.gastos" :key="gasto.id"
-                    class="flex items-center justify-between p-3 rounded-lg transition-opacity"
-                    :class="gasto.es_accionable ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200 opacity-70'">
+                    class="flex items-center justify-between p-3 rounded-lg transition-opacity bg-yellow-50 border border-yellow-200">
 
                     <div>
                         <p class="font-semibold text-gray-800">{{ gasto.usuario }} ({{ gasto.codigo_gasto }})</p>
                         <p class="text-sm text-gray-600">{{ gasto.area }}</p>
                         <p class="text-xs text-gray-500 mt-1">
                             Periodo: <strong>{{ formatPeriodo(gasto.fecha_limite) }}</strong> | Límite: {{
-                                formatDate(gasto.fecha_limite) }}
+                                formatDate(gasto.fecha_limite) }} | Fecha Rendicion: {{ formatDate(gasto.fecha_rendicion) }}
                         </p>
                     </div>
 
                     <div class="text-right">
-                        <p class="font-bold" :class="gasto.es_accionable ? 'text-yellow-800' : 'text-gray-600'">
+                        <p class="font-bold text-yellow-800">
                             {{ gasto.dias_retraso }} día(s) tarde
                         </p>
-                        <span v-if="!gasto.es_accionable"
+                        <span
                             class="text-xs text-white font-medium px-2 py-0.5 rounded-full bg-gray-400 mt-1 inline-block">
                             {{ gasto.estado }}
                         </span>
@@ -92,7 +91,8 @@
 
         <!-- Footer con acción si es necesario -->
         <div v-if="alerta.cantidad > 0" class="mt-4 pt-4 border-t border-gray-200">
-            <button @click="$emit('action-clicked', alerta)" :disabled="cantidadAccionable === 0"
+            <button @click="$emit('action-clicked', alerta)"
+                :disabled="botonDeshabilitado"
                 :class="actionButtonClasses"
                 class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
                 {{ actionText }}
@@ -116,11 +116,17 @@ const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', cu
 
 const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('es-PE');
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length !== 3) return dateString;
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
 };
+
 const formatPeriodo = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString + 'T00:00:00');
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length !== 3) return dateString;
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
     return date.toLocaleString('es-PE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 const cantidadAccionable = computed(() => {
@@ -174,13 +180,22 @@ const actionButtonClasses = computed(() => {
     return classMap[props.alerta.tipo] || 'bg-gray-600 hover:bg-gray-700 text-white';
 });
 
+const botonDeshabilitado = computed(() => {
+    if (props.alerta.tipo === 'rendicion_fuera_plazo') {
+        return props.alerta.cantidad === 0;
+    }
+    return cantidadAccionable.value === 0;
+});
 const actionText = computed(() => {
     const textMap = {
         'sobregiro': 'Revisar Fondos',
         'monto_inusual': 'Revisar Gastos',
-        'rendicion_fuera_plazo': 'Gestionar Rendiciones'
+        'rendicion_fuera_plazo': 'Ir al Reporte de Atrasos'
     };
     const baseText = textMap[props.alerta.tipo] || 'Ver Detalles';
+    if (props.alerta.tipo === 'rendicion_fuera_plazo') {
+        return baseText;
+    }
     if (cantidadAccionable.value === 0) {
         return 'No hay acciones pendientes';
     }

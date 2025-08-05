@@ -23,7 +23,8 @@
                     <p class="text-sm text-orange-600">Pend. Val. DJ</p>
                 </div>
                 <div class="p-4 bg-purple-100 rounded-lg">
-                    <p class="text-2xl font-bold text-purple-800">{{ contadoresEstado.pendientesValidacionContable }}</p>
+                    <p class="text-2xl font-bold text-purple-800">{{ contadoresEstado.pendientesValidacionContable }}
+                    </p>
                     <p class="text-sm text-purple-600">Pend. Val. Contable</p>
                 </div>
                 <div class="p-4 bg-red-100 rounded-lg">
@@ -478,7 +479,8 @@ const itemsFiltrados = computed(() => {
     let data = [...items.value]; // Copia de los ítems originales
     const textoBusqueda = filtros.value.texto.toLowerCase().trim();
     const registradorBusqueda = filtros.value.registrador_name.toLowerCase().trim();
-
+    const esBusquedaPorCodigos = textoBusqueda.includes(',');
+    const codigosBusqueda = esBusquedaPorCodigos ? textoBusqueda.split(',').map(c => c.trim()) : [];
     return data.filter(item => {
         const esGrupo = item.es_grupo;
         let fechaItem = null;
@@ -524,15 +526,26 @@ const itemsFiltrados = computed(() => {
 
         // Aplicar filtro por código/glosa (texto)
         if (textoBusqueda.length > 0) { // No se usa MIN_SEARCH_LENGTH aquí para permitir búsquedas de 1 o 2 caracteres si el usuario lo desea en reportes
-            if (esGrupo && item.gastos) {
-                return item.gastos.some(g =>
-                    g.codigo_gasto?.toLowerCase().includes(textoBusqueda) ||
-                    g.glosa?.toLowerCase().includes(textoBusqueda)
-                );
-            } else if (!esGrupo && item.gasto) {
-                return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
+            if (esBusquedaPorCodigos) {
+                // Si es una búsqueda por códigos, solo verificamos si el código del gasto está en la lista.
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g => codigosBusqueda.includes(g.codigo_gasto?.toLowerCase()));
+                } else if (!esGrupo && item.gasto) {
+                    return codigosBusqueda.includes(codigoGastoItem);
+                }
+                return false;
+            } else {
+                // Si es una búsqueda de texto normal, se mantiene la lógica original.
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g =>
+                        g.codigo_gasto?.toLowerCase().includes(textoBusqueda) ||
+                        g.glosa?.toLowerCase().includes(textoBusqueda)
+                    );
+                } else if (!esGrupo && item.gasto) {
+                    return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
+                }
+                return false;
             }
-            return false;
         }
         return true;
     });
@@ -630,8 +643,6 @@ const fetchGastos = async () => {
 const aplicarFiltrosDesdeURL = () => {
     const query = route.query;
     if (query.alerta && query.codigos) {
-        // Se asignan los códigos de la URL al filtro de texto.
-        // El backend ya está preparado para buscar por una lista de códigos en este campo.
         filtros.value.texto = query.codigos;
 
         Swal.fire({
@@ -640,8 +651,6 @@ const aplicarFiltrosDesdeURL = () => {
             icon: 'info',
             showConfirmButton: true
         });
-
-        // Limpiamos la URL después de aplicar los filtros.
         router.replace({ query: {} });
     }
 };
@@ -649,7 +658,7 @@ const triggerSearchWithDebounce = () => {
     buscando.value = true;
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
-        paginaActual.value = 1; // Siempre reiniciar paginación al buscar
+        paginaActual.value = 1;
         fetchGastos();
     }, DEBOUNCE_DELAY);
 };
@@ -755,11 +764,9 @@ watch(filtros, () => {
 onMounted(async () => {
     // 1. Se aplican los filtros que puedan venir de la URL PRIMERO.
     aplicarFiltrosDesdeURL();
-
     // 2. Luego se cargan los datos iniciales.
     await fetchGastos();
     await fetchAreas();
-
     // 3. Finalmente, se marca la inicialización como completa para activar los watchers.
     inicializacionCompleta.value = true;
 });
