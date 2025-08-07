@@ -1,3 +1,342 @@
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue';
+import api from '@/plugins/axios';
+import Swal from 'sweetalert2';
+import GastoDetalleModal from './modals/GastoDetalleModal.vue';
+import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
+
+// --- ESTADO DEL COMPONENTE ---
+const props = defineProps({
+    usuarioActual: {
+        type: Object,
+        required: true
+    }
+});
+
+// --- ESTADO DE DATOS ---
+const items = ref([]); // Almacena la data cruda de la API (gastos individuales y grupos DJ)
+const areas = ref([]);
+const cargando = ref(true);
+const buscando = ref(false);
+const exportando = ref(false);
+
+// --- ESTADO DE FILTROS ---
+const filtros = ref({
+    texto: '', // Para buscar por código o glosa
+    registrador_name: '',
+    fecha_inicio: '',
+    fecha_fin: '',
+    estado: 'Todos', // Permite filtrar por todos los estados posibles
+    area_id: '',
+});
+
+// --- CONSTANTES PARA FILTROS ---
+let debounceTimeout = null;
+const DEBOUNCE_DELAY = 500;
+const MIN_SEARCH_LENGTH = 3;
+
+// --- ESTADO DE PAGINACIÓN ---
+const paginaActual = ref(1);
+const registrosPorPagina = ref(10);
+
+// --- ESTADO DE MODALES Y EXPANSIONES ---
+const gastoSeleccionado = ref(null);
+const mostrarDetalleModal = ref(false);
+const expandedGroups = ref(new Set()); // Para controlar qué grupos DJ están expandidos
+
+// --- UTILIDADES ---
+const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date)) return 'N/A';
+    return date.toLocaleDateString('es-PE');
+};
+
+const isPdf = (url) => {
+    console.log('isPdf called with:', url);
+    const result = url && typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+    console.log('isPdf result:', result);
+    return result;
+};
+
+// --- PROPIEDADES COMPUTADAS ---
+const estadisticas = computed(() => {
+    const contadores = {
+        todos: { count: 0, amount: 0 },
+        pendientes: { count: 0, amount: 0 },
+        observados: { count: 0, amount: 0 },
+        contabilizados: { count: 0, amount: 0 },
+    };
+
+    itemsFiltrados.value.forEach(item => {
+        if (item.es_grupo) {
+            contadores.todos.count += item.gastos?.length || 0;
+            contadores.todos.amount += item.monto_total_grupo || 0;
+            if (item.estado_grupo === 'Observado') {
+                contadores.observados.count += item.gastos?.length || 0;
+                contadores.observados.amount += item.monto_total_grupo || 0;
+            } else if (item.estado_grupo === 'Contabilizado') {
+                contadores.contabilizados.count += item.gastos?.length || 0;
+                contadores.contabilizados.amount += item.monto_total_grupo || 0;
+            } else {
+                contadores.pendientes.count += item.gastos?.length || 0;
+                contadores.pendientes.amount += item.monto_total_grupo || 0;
+            }
+        } else if (item.gasto) {
+            contadores.todos.count++;
+            contadores.todos.amount += parseFloat(item.gasto.monto_total || 0);
+            if (item.gasto.estado === 'Observado' || item.gasto.estado === 'Rechazado') {
+                contadores.observados.count++;
+                contadores.observados.amount += parseFloat(item.gasto.monto_total || 0);
+            } else if (item.gasto.estado === 'Contabilizado') {
+                contadores.contabilizados.count++;
+                contadores.contabilizados.amount += parseFloat(item.gasto.monto_total || 0);
+            } else { // Pendientes de cualquier tipo
+                contadores.pendientes.count++;
+                contadores.pendientes.amount += parseFloat(item.gasto.monto_total || 0);
+            }
+        }
+    });
+
+    return contadores;
+});
+
+const hayFiltrosActivos = computed(() => {
+    return Object.values(filtros.value).some(value => value && String(value).trim() !== '' && value !== 'Todos');
+});
+
+// Lógica de filtrado unificada para items (individuales o grupos DJ)
+const itemsFiltrados = computed(() => {
+    let data = [...items.value]; // Copia de los ítems originales
+    const textoBusqueda = filtros.value.texto.toLowerCase().trim();
+    const registradorBusqueda = filtros.value.registrador_name.toLowerCase().trim();
+
+    return data.filter(item => {
+        const esGrupo = item.es_grupo;
+        let fechaItem = null;
+        let registradorItem = null;
+        let codigoGastoItem = '';
+        let glosaItem = '';
+        let estadoItem = '';
+
+        // Determinar propiedades para el filtrado según si es grupo o gasto individual
+        if (esGrupo) {
+            if (!item.gastos || item.gastos.length === 0) {
+                return false; // Si es un grupo pero no tiene gastos, lo descartamos
+            }
+            fechaItem = item.fecha_registro; // Propiedad de resumen del grupo
+            registradorItem = item.registrador; // Propiedad de resumen del grupo
+            estadoItem = item.estado_grupo; // Propiedad de resumen del grupo
+            // Para búsqueda de texto en grupos, se busca en los gastos internos
+        } else if (item.gasto) {
+            fechaItem = item.gasto.created_at;
+            registradorItem = item.gasto.registrador;
+            codigoGastoItem = item.gasto.codigo_gasto?.toLowerCase();
+            glosaItem = item.gasto.glosa?.toLowerCase();
+            estadoItem = item.gasto.estado;
+        } else {
+            return false; // Item con estructura inesperada
+        }
+
+        const registradorFullName = registradorItem ? `${registradorItem.name || ''} ${registradorItem.last_name || ''}`.toLowerCase() : '';
+
+        // Aplicar filtros
+        const pasaFecha = (!filtros.value.fecha_inicio || (fechaItem && new Date(fechaItem) >= new Date(filtros.value.fecha_inicio))) &&
+            (!filtros.value.fecha_fin || (fechaItem && new Date(fechaItem) <= new Date(filtros.value.fecha_fin)));
+
+        const pasaRegistrador = !registradorBusqueda || registradorFullName.includes(registradorBusqueda);
+
+        const pasaEstado = filtros.value.estado === 'Todos' || estadoItem === filtros.value.estado;
+
+        const pasaArea = !filtros.value.area_id || (registradorItem && registradorItem.area?.id == filtros.value.area_id);
+
+        if (!pasaFecha || !pasaRegistrador || !pasaEstado || !pasaArea) {
+            return false;
+        }
+
+        // Aplicar filtro por código/glosa (texto)
+        if (textoBusqueda.length > 0) { // No se usa MIN_SEARCH_LENGTH aquí para permitir búsquedas de 1 o 2 caracteres si el usuario lo desea en reportes
+            if (esGrupo && item.gastos) {
+                return item.gastos.some(g =>
+                    g.codigo_gasto?.toLowerCase().includes(textoBusqueda) ||
+                    g.glosa?.toLowerCase().includes(textoBusqueda)
+                );
+            } else if (!esGrupo && item.gasto) {
+                return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
+            }
+            return false;
+        }
+        return true;
+    });
+});
+
+const totalItems = computed(() => itemsFiltrados.value.length);
+
+const totalPaginas = computed(() => {
+    return Math.ceil(totalItems.value / registrosPorPagina.value);
+});
+
+const itemsPaginados = computed(() => {
+    const inicio = (paginaActual.value - 1) * registrosPorPagina.value;
+    return itemsFiltrados.value.slice(inicio, inicio + registrosPorPagina.value);
+});
+
+const paginasVisibles = computed(() => {
+    if (totalPaginas.value <= 7) {
+        return Array.from({ length: totalPaginas.value }, (_, i) => i + 1);
+    }
+    if (paginaActual.value < 5) {
+        return [1, 2, 3, 4, 5, '...', totalPaginas.value];
+    }
+    if (paginaActual.value > totalPaginas.value - 4) {
+        return [1, '...', totalPaginas.value - 4, totalPaginas.value - 3, totalPaginas.value - 2, totalPaginas.value - 1, totalPaginas.value];
+    }
+    return [1, '...', paginaActual.value - 1, paginaActual.value, paginaActual.value + 1, '...', totalPaginas.value];
+});
+
+
+// --- MÉTODOS DE DATOS Y ACCIONES ---
+const fetchGastos = async () => {
+    cargando.value = true;
+    try {
+        const params = { ...filtros.value };
+        // No se eliminan filtros de longitud mínima aquí, se manejan en itemsFiltrados
+        // y en el watcher para triggerSearchWithDebounce.
+
+        // Llamada al nuevo endpoint de reportes
+        const response = await api.get('/v1/gastos/reportes', { params });
+        items.value = response.data; // La data ya viene lista y agrupada/formateada del backend
+
+        // Ajusta la página actual si es necesario después de cargar los datos
+        if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
+            paginaActual.value = totalPaginas.value;
+        } else if (totalPaginas.value === 0) {
+            paginaActual.value = 1; // Si no hay páginas, siempre en la primera
+        }
+
+    } catch (error) {
+        console.error("Error al cargar gastos para reportes:", error);
+        Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al cargar los gastos.', 'error');
+    } finally {
+        cargando.value = false;
+        buscando.value = false;
+    }
+};
+
+const triggerSearchWithDebounce = () => {
+    buscando.value = true;
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+        paginaActual.value = 1; // Siempre reiniciar paginación al buscar
+        fetchGastos();
+    }, DEBOUNCE_DELAY);
+};
+
+const limpiarFiltros = () => {
+    filtros.value = {
+        texto: '',
+        registrador_name: '',
+        fecha_inicio: '',
+        fecha_fin: '',
+        estado: 'Todos',
+        area_id: '',
+    };
+    // El watcher principal se encargará de llamar a fetchGastos y resetear la paginación
+};
+
+const verDetalles = (gasto) => {
+    // Siempre pasamos el 'gasto' individual al modal de detalles,
+    // ya que este modal no está diseñado para mostrar "grupos de DJ" directamente.
+    gastoSeleccionado.value = gasto;
+    mostrarDetalleModal.value = true;
+};
+
+const toggleGroup = (groupId) => {
+    if (expandedGroups.value.has(groupId)) {
+        expandedGroups.value.delete(groupId);
+    } else {
+        expandedGroups.value.add(groupId);
+    }
+};
+
+const exportarGastos = async () => {
+    exportando.value = true;
+    try {
+        const params = { ...filtros.value }; // Enviar todos los filtros actuales al backend para la exportación
+
+        // Llamada al nuevo endpoint de exportación
+        const response = await api.post('/v1/gastos/exportar-reporte', params, {
+            responseType: 'blob', // Importante para manejar la descarga de archivos
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = 'reporte_gastos_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+
+        // Limpieza de recursos
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        Swal.fire({
+            icon: 'success', title: '¡Exportación Exitosa!',
+            text: 'El archivo Excel ha sido generado y descargado.',
+            timer: 3000, showConfirmButton: false,
+        });
+
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            Swal.fire('Información', 'No se encontraron gastos que coincidan con los filtros actuales para exportar.', 'info');
+        } else {
+            Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al generar el archivo de exportación.', 'error');
+        }
+        console.error("Error al exportar gastos:", error);
+    } finally {
+        exportando.value = false;
+    }
+};
+
+const fetchAreas = async () => {
+    try {
+        const response = await api.get('/v1/areas');
+        areas.value = response.data.areas;
+    } catch (error) {
+        console.error("Error al cargar las áreas:", error);
+        Swal.fire('Error', 'No se pudieron cargar las áreas para el filtro.', 'error');
+    }
+};
+
+// Paginación
+const irAPagina = (pagina) => {
+    if (typeof pagina === 'number' && pagina >= 1 && pagina <= totalPaginas.value) {
+        paginaActual.value = pagina;
+    }
+};
+const paginaAnterior = () => { if (paginaActual.value > 1) paginaActual.value--; };
+const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) paginaActual.value++; };
+
+// --- WATCHERS Y LIFECYCLE ---
+// Watcher principal para filtros que reinicia la paginación y dispara la búsqueda
+watch(filtros, () => {
+    triggerSearchWithDebounce();
+}, { deep: true }); // 'deep: true' para observar cambios en propiedades anidadas de 'filtros'
+
+// Los watchers individuales para campos de texto con debounce y longitud mínima
+// ya no son estrictamente necesarios si el watcher 'filtros' con deep:true y debounce
+// ya maneja todos los cambios y reinicia la paginación.
+// Se mantienen los MIN_SEARCH_LENGTH para la validación visual, pero la lógica de filtrado
+// en itemsFiltrados ya no los usa para descartar la búsqueda (solo para mostrar el mensaje).
+
+onMounted(() => {
+    fetchGastos();
+    fetchAreas();
+});
+</script>
+
 <template>
     <div class="p-6 bg-white rounded-lg shadow-md animate-fade-in-up">
         <div class="text-center mb-8">
@@ -5,41 +344,6 @@
             <p class="text-gray-500 max-w-2xl mx-auto">
                 Genera reportes detallados de todos los gastos registrados en el sistema, aplicando diversos filtros.
             </p>
-        </div>
-
-        <!-- Panel de Contadores -->
-        <div class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 text-center">
-                <div class="p-4 bg-blue-100 rounded-lg">
-                    <p class="text-2xl font-bold text-blue-800">{{ contadoresEstado.total }}</p>
-                    <p class="text-sm text-blue-600">Total</p>
-                </div>
-                <div class="p-4 bg-yellow-100 rounded-lg">
-                    <p class="text-2xl font-bold text-yellow-800">{{ contadoresEstado.pendientesAprobacion }}</p>
-                    <p class="text-sm text-yellow-600">Pend. Aprobación</p>
-                </div>
-                <div class="p-4 bg-orange-100 rounded-lg">
-                    <p class="text-2xl font-bold text-orange-800">{{ contadoresEstado.pendientesValidacionDJ }}</p>
-                    <p class="text-sm text-orange-600">Pend. Val. DJ</p>
-                </div>
-                <div class="p-4 bg-purple-100 rounded-lg">
-                    <p class="text-2xl font-bold text-purple-800">{{ contadoresEstado.pendientesValidacionContable }}
-                    </p>
-                    <p class="text-sm text-purple-600">Pend. Val. Contable</p>
-                </div>
-                <div class="p-4 bg-red-100 rounded-lg">
-                    <p class="text-2xl font-bold text-red-800">{{ contadoresEstado.observados }}</p>
-                    <p class="text-sm text-red-600">Observados</p>
-                </div>
-                <div class="p-4 bg-gray-200 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800">{{ contadoresEstado.rechazados }}</p>
-                    <p class="text-sm text-gray-600">Rechazados</p>
-                </div>
-                <div class="p-4 bg-green-100 rounded-lg">
-                    <p class="text-2xl font-bold text-green-800">{{ contadoresEstado.contabilizados }}</p>
-                    <p class="text-sm text-green-600">Contabilizados</p>
-                </div>
-            </div>
         </div>
 
         <!-- Panel de Filtros -->
@@ -143,6 +447,31 @@
             </div>
         </div>
 
+        <!-- Contadores -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-blue-100 p-4 rounded-lg shadow-md text-center">
+                <h4 class="text-sm font-semibold text-blue-800 uppercase">Total Gastos</h4>
+                <p class="text-2xl font-bold text-blue-900">{{ estadisticas.todos.count }}</p>
+                <p class="text-sm text-blue-700">{{ currencyFormatter.format(estadisticas.todos.amount) }}</p>
+            </div>
+            <div class="bg-yellow-100 p-4 rounded-lg shadow-md text-center">
+                <h4 class="text-sm font-semibold text-yellow-800 uppercase">Pendientes</h4>
+                <p class="text-2xl font-bold text-yellow-900">{{ estadisticas.pendientes.count }}</p>
+                <p class="text-sm text-yellow-700">{{ currencyFormatter.format(estadisticas.pendientes.amount) }}</p>
+            </div>
+            <div class="bg-red-100 p-4 rounded-lg shadow-md text-center">
+                <h4 class="text-sm font-semibold text-red-800 uppercase">Observados/Rechazados</h4>
+                <p class="text-2xl font-bold text-red-900">{{ estadisticas.observados.count }}</p>
+                <p class="text-sm text-red-700">{{ currencyFormatter.format(estadisticas.observados.amount) }}</p>
+            </div>
+            <div class="bg-green-100 p-4 rounded-lg shadow-md text-center">
+                <h4 class="text-sm font-semibold text-green-800 uppercase">Contabilizados</h4>
+                <p class="text-2xl font-bold text-green-900">{{ estadisticas.contabilizados.count }}</p>
+                <p class="text-sm text-green-700">{{ currencyFormatter.format(estadisticas.contabilizados.amount) }}</p>
+            </div>
+        </div>
+        
+
         <div v-if="cargando || buscando" class="text-center py-16">
             <div class="inline-flex items-center text-lg text-gray-600">
                 <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-purple-bap" xmlns="http://www.w3.org/2000/svg"
@@ -168,22 +497,34 @@
                 Mostrando <strong>{{ (paginaActual - 1) * registrosPorPagina + 1 }} - {{ Math.min(paginaActual *
                     registrosPorPagina, totalItems) }}</strong> de <strong>{{ totalItems }}</strong> registros
             </div>
-            <div class="overflow-x-auto shadow-strong rounded-lg">
-                <table class="min-w-full bg-white">
+            <div class="overflow-x-auto shadow-lg rounded-lg">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                     <thead class="bg-gray-100">
-                        <tr class="text-gray-700 uppercase text-xs leading-normal">
-                            <th scope="col" class="py-3 px-4 text-center font-semibold"></th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Tipo</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Código</th>
-                            <th class="py-3 px-4 text-center font-semibold">Glosa / Descripción</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Monto</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold w-48">Estado</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Registrador</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Fecha Registro</th>
-                            <th scope="col" class="py-3 px-4 text-center font-semibold">Acciones</th>
+                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
+                            <th class="py-3 px-2 text-center font-semibold"></th> <!-- Expander -->
+                            <th class="py-3 px-2 text-center font-semibold">Tipo</th>
+                            <th class="py-3 px-2 text-center font-semibold">Código</th>
+                            <th class="py-3 px-2 text-center font-semibold">Glosa / Descripción</th>
+                            <th class="py-3 px-2 text-center font-semibold">Cód. Cuenta</th>
+                            <th class="py-3 px-2 text-center font-semibold">Desc. Cuenta</th>
+                            <th class="py-3 px-2 text-center font-semibold">Fondo</th>
+                            <th class="py-3 px-2 text-center font-semibold">Proyección Gasto</th>
+                            <th class="py-3 px-2 text-center font-semibold">Tipo Documento</th>
+                            <th class="py-3 px-2 text-center font-semibold">Serie</th>
+                            <th class="py-3 px-2 text-center font-semibold">Correlativo</th>
+                            <th class="py-3 px-2 text-center font-semibold">Fecha</th>
+                            <th class="py-3 px-2 text-center font-semibold">Monto</th>
+                            <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
+                            <th class="py-3 px-2 text-center font-semibold">Registrador</th>
+                            <th class="py-3 px-2 text-center font-semibold">Área</th>
+                            <th class="py-3 px-2 text-center font-semibold">Comentario Adicional</th>
+                            <th class="py-3 px-2 text-center font-semibold">Correo Electrónico</th>
+                            <th class="py-3 px-2 text-center font-semibold">Evidencia</th>
+                            <th class="py-3 px-2 text-center font-semibold">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="text-gray-600 text-sm">
+
+                    <tbody class="text-gray-600 text-sm divide-y divide-gray-200">
                         <template v-for="item in itemsPaginados"
                             :key="item.es_grupo ? `grupo-${item.id_dj_consolidada || ''}` : `gasto-${item.gasto?.id || ''}`">
                             <!-- Fila de Grupo DJ -->
@@ -217,7 +558,7 @@
                                         <div>
                                             <div class="font-bold text-blue-800 text-sm">DJ Grupal</div>
                                             <div class="text-xs text-blue-600 font-medium">{{ item.gastos?.length || 0
-                                            }} gastos</div>
+                                                }} gastos</div>
                                         </div>
                                     </div>
                                 </td>
@@ -226,47 +567,43 @@
                                         item.id_dj_consolidada }}</div>
                                     <div class="text-xs text-blue-600">Consolidada</div>
                                 </td>
-                                <td class="py-3 px-2">
-                                    <div class="text-sm text-gray-700 font-medium text-center">Gastos consolidados</div>
+                                <td class="py-3 px-2 text-sm text-gray-700 font-medium text-center" colspan="8">Gastos consolidados
                                     <div class="text-xs text-gray-500 text-center">Múltiples conceptos de gasto</div>
+                                </td>
+                                <td class="py-3 px-2 text-center text-gray-500">
+                                    {{ formatDate(item.fecha_registro) }}
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="font-bold text-lg text-blue-800">{{
-                                        currencyFormatter.format(item.monto_total_grupo || 0) }}</div>
+                                        currencyFormatter.format(item.monto_total_grupo || 0)
+                                        }}</div>
                                     <div class="text-xs text-gray-500">Total consolidado</div>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.estado_grupo)">{{ item.estado_grupo
-                                    }}</span>
+                                        }}</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
                                     <div class="text-xs text-gray-500">{{ item.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}
-                                </td>
-                                <td class="py-3 px-2 text-center">
-                                    <div class="flex justify-center">
-                                        <!-- Botón "Ver Detalles" para el grupo (para ver los gastos individuales dentro) -->
-                                        <button @click="verDetalles(item)"
-                                            class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors text-xs"
-                                            title="Ver Detalles del Grupo">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                        </button>
-                                    </div>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500">Múltiples comentarios</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.registrador?.email">{{ item.registrador?.email }}</td>
+                                <td class="py-3 px-2 text-center text-xs text-gray-500 italic">Ver en detalle</td>
+                                <td class="py-3 px-2 text-center">     
                                 </td>
                             </tr>
 
                             <!-- Filas de gastos individuales del grupo (solo si está expandido) -->
                             <template v-if="item.es_grupo && expandedGroups.has(item.id_dj_consolidada)">
-                                <tr v-for="(gasto, index) in item.gastos" :key="`${item.id_dj_consolidada}-${gasto.id}`"
+                                <tr v-for="(gasto, index) in item.gastos" 
+                                :key="`${item.id_dj_consolidada}-${gasto.id}`"
                                     class="bg-gray-50 hover:bg-gray-100 transition-colors text-xs"
                                     :class="{ 'border-b-2 border-blue-200': index === item.gastos.length - 1 }">
                                     <td class="py-3 px-2 text-center border-l-4 border-blue-400">
-                                        <div class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <div 
+                                            class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
                                             <span class="text-blue-600 text-xs font-bold">{{ index + 1 }}</span>
                                         </div>
                                     </td>
@@ -276,23 +613,61 @@
                                     <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}
                                     </td>
                                     <td class="py-3 px-2 text-center text-gray-700">{{ gasto.glosa }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
+                                        {{ gasto.cuenta_contable?.codigo_cuenta }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
+                                        {{ gasto.cuenta_contable?.descripcion }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">
+                                        {{ gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
+                                        {{ gasto.gasto_proyectado?.descripcion || 'N/A' }}
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.tipo_documento }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.serie_documento || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.correlativo_documento || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
                                     <td class="py-3 px-2 text-center text-gray-800 font-semibold">
                                         {{ currencyFormatter.format(parseFloat(gasto.monto_total || 0)) }}
                                     </td>
                                     <td class="py-3 px-2 text-center">
-                                        <span class="text-xs text-gray-500">-</span>
+                                        <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
+                                            :class="getClassesForAuditoriaBadge(gasto.estado)">
+                                            {{ gasto.estado }}
+                                        </span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-500">-</td>
-                                    <td class="py-3 px-2 text-center text-gray-500">-</td>
+                                    <td class="py-3 px-2 text-center text-gray-500">
+                                        <div class="text-sm font-medium text-gray-900">{{ gasto.registrador?.name }}
+                                            </div>
+                                        <div class="text-xs text-gray-500">{{ gasto.registrador?.last_name }}</div>
+                                    </td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.comentario || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="gasto.registrador?.email">{{ gasto.registrador?.email }}</td>
+                                    <td class="py-3 px-2 text-center text-gray-500">
+                                        <a v-if="item.dj_consolidada && item.dj_consolidada.documento_url" :href="item.dj_consolidada.documento_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
+                                            <!-- DJ is always PDF -->
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        </a>
+                                        <a v-else-if="gasto.evidencia_url" :href="gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia Individual">
+                                            <!-- Icono para PDF -->
+                                            <svg v-if="isPdf(gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                            <!-- Icono para Imagen -->
+                                            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        </a>
+                                        <span v-else class="text-xs text-gray-400">N/A</span>
+                                    </td>
                                     <td class="py-3 px-2 text-center">
                                         <div class="flex space-x-1 justify-center">
                                             <button @click="verDetalles(gasto)"
                                                 class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition-colors"
                                                 title="Ver Detalle Individual">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" 
+                                                viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" 
+                                                    stroke-width="2"
                                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
                                             </button>
@@ -339,27 +714,57 @@
                                     <div class="text-xs text-verde-bap">Código único</div>
                                 </td>
                                 <td class="py-3 px-2 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
+                                
+                                <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
+                                    {{ item.gasto.cuenta_contable?.codigo_cuenta }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs" :title="item.gasto.cuenta_contable?.descripcion">
+                                    {{ item.gasto.cuenta_contable?.descripcion }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs">
+                                    {{ item.gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
+                                    {{ item.gasto.gasto_proyectado?.descripcion || 'N/A' }}
+                                </td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.tipo_documento }}</td>
+                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.serie_documento || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.correlativo_documento || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.created_at)
+                                    }}</td>
                                 <td class="py-3 px-2 text-center font-semibold text-lg text-verde-bap-dark">
                                     {{ currencyFormatter.format(parseFloat(item.gasto?.monto_total || 0)) }}
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.gasto?.estado)">{{ item.gasto?.estado
-                                    }}</span>
+                                        }}</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
                                     </div>
                                     <div class="text-xs text-gray-500">{{ item.gasto?.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.created_at) }}
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.comentario || 'N/A' }}</td>
+                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.gasto.registrador?.email">{{ item.gasto.registrador?.email }}</td>
+                                <td class="py-3 px-2 text-center">
+                                    <a v-if="item.gasto.evidencia_url" :href="item.gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
+                                        <!-- Icono para PDF -->
+                                        <svg v-if="isPdf(item.gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <!-- Icono para Imagen -->
+                                        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    </a>
+                                    <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="flex space-x-1 justify-center">
                                         <button @click="verDetalles(item.gasto)"
                                             class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors"
-                                            title="Ver Detalles">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            title="Ver Detalle Individual">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" 
+                                            viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" 
+                                                stroke-width="2"
                                                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                             </svg>
                                         </button>
@@ -410,364 +815,3 @@
 
     </div>
 </template>
-
-<script setup>
-import { ref, onMounted, computed, watch } from 'vue';
-import api from '@/plugins/axios';
-import Swal from 'sweetalert2';
-import { useRoute, useRouter } from 'vue-router';
-import GastoDetalleModal from './modals/GastoDetalleModal.vue';
-import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
-
-// --- ESTADO DEL COMPONENTE ---
-const props = defineProps({
-    usuarioActual: {
-        type: Object,
-        required: true
-    }
-});
-
-// --- ESTADO DE DATOS ---
-const items = ref([]); // Almacena la data cruda de la API (gastos individuales y grupos DJ)
-const areas = ref([]);
-const cargando = ref(true);
-const buscando = ref(false);
-const exportando = ref(false);
-const router = useRouter();
-const route = useRoute();
-const inicializacionCompleta = ref(false);
-// --- ESTADO DE FILTROS ---
-const filtros = ref({
-    texto: '',
-    registrador_name: '',
-    fecha_inicio: '',
-    fecha_fin: '',
-    estado: 'Todos',
-    area_id: '',
-});
-
-// --- CONSTANTES PARA FILTROS ---
-let debounceTimeout = null;
-const DEBOUNCE_DELAY = 500;
-const MIN_SEARCH_LENGTH = 3;
-
-// --- ESTADO DE PAGINACIÓN ---
-const paginaActual = ref(1);
-const registrosPorPagina = ref(10);
-
-// --- ESTADO DE MODALES Y EXPANSIONES ---
-const gastoSeleccionado = ref(null);
-const mostrarDetalleModal = ref(false);
-const expandedGroups = ref(new Set()); // Para controlar qué grupos DJ están expandidos
-
-// --- UTILIDADES ---
-const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
-const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    if (isNaN(date)) return 'N/A';
-    return date.toLocaleDateString('es-PE');
-};
-
-// --- PROPIEDADES COMPUTADAS ---
-const hayFiltrosActivos = computed(() => {
-    return Object.values(filtros.value).some(value => value && String(value).trim() !== '' && value !== 'Todos');
-});
-
-// Lógica de filtrado unificada para items (individuales o grupos DJ)
-const itemsFiltrados = computed(() => {
-    let data = [...items.value]; // Copia de los ítems originales
-    const textoBusqueda = filtros.value.texto.toLowerCase().trim();
-    const registradorBusqueda = filtros.value.registrador_name.toLowerCase().trim();
-    const esBusquedaPorCodigos = textoBusqueda.includes(',');
-    const codigosBusqueda = esBusquedaPorCodigos ? textoBusqueda.split(',').map(c => c.trim()) : [];
-    return data.filter(item => {
-        const esGrupo = item.es_grupo;
-        let fechaItem = null;
-        let registradorItem = null;
-        let codigoGastoItem = '';
-        let glosaItem = '';
-        let estadoItem = '';
-
-        // Determinar propiedades para el filtrado según si es grupo o gasto individual
-        if (esGrupo) {
-            if (!item.gastos || item.gastos.length === 0) {
-                return false; // Si es un grupo pero no tiene gastos, lo descartamos
-            }
-            fechaItem = item.fecha_registro; // Propiedad de resumen del grupo
-            registradorItem = item.registrador; // Propiedad de resumen del grupo
-            estadoItem = item.estado_grupo; // Propiedad de resumen del grupo
-            // Para búsqueda de texto en grupos, se busca en los gastos internos
-        } else if (item.gasto) {
-            fechaItem = item.gasto.created_at;
-            registradorItem = item.gasto.registrador;
-            codigoGastoItem = item.gasto.codigo_gasto?.toLowerCase();
-            glosaItem = item.gasto.glosa?.toLowerCase();
-            estadoItem = item.gasto.estado;
-        } else {
-            return false; // Item con estructura inesperada
-        }
-
-        const registradorFullName = registradorItem ? `${registradorItem.name || ''} ${registradorItem.last_name || ''}`.toLowerCase() : '';
-
-        // Aplicar filtros
-        const pasaFecha = (!filtros.value.fecha_inicio || (fechaItem && new Date(fechaItem) >= new Date(filtros.value.fecha_inicio))) &&
-            (!filtros.value.fecha_fin || (fechaItem && new Date(fechaItem) <= new Date(filtros.value.fecha_fin)));
-
-        const pasaRegistrador = !registradorBusqueda || registradorFullName.includes(registradorBusqueda);
-
-        const pasaEstado = filtros.value.estado === 'Todos' || estadoItem === filtros.value.estado;
-
-        const pasaArea = !filtros.value.area_id || (registradorItem && registradorItem.area?.id == filtros.value.area_id);
-
-        if (!pasaFecha || !pasaRegistrador || !pasaEstado || !pasaArea) {
-            return false;
-        }
-
-        // Aplicar filtro por código/glosa (texto)
-        if (textoBusqueda.length > 0) { // No se usa MIN_SEARCH_LENGTH aquí para permitir búsquedas de 1 o 2 caracteres si el usuario lo desea en reportes
-            if (esBusquedaPorCodigos) {
-                // Si es una búsqueda por códigos, solo verificamos si el código del gasto está en la lista.
-                if (esGrupo && item.gastos) {
-                    return item.gastos.some(g => codigosBusqueda.includes(g.codigo_gasto?.toLowerCase()));
-                } else if (!esGrupo && item.gasto) {
-                    return codigosBusqueda.includes(codigoGastoItem);
-                }
-                return false;
-            } else {
-                // Si es una búsqueda de texto normal, se mantiene la lógica original.
-                if (esGrupo && item.gastos) {
-                    return item.gastos.some(g =>
-                        g.codigo_gasto?.toLowerCase().includes(textoBusqueda) ||
-                        g.glosa?.toLowerCase().includes(textoBusqueda)
-                    );
-                } else if (!esGrupo && item.gasto) {
-                    return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
-                }
-                return false;
-            }
-        }
-        return true;
-    });
-});
-
-const totalItems = computed(() => itemsFiltrados.value.length);
-
-const totalPaginas = computed(() => {
-    return Math.ceil(totalItems.value / registrosPorPagina.value);
-});
-
-const itemsPaginados = computed(() => {
-    const inicio = (paginaActual.value - 1) * registrosPorPagina.value;
-    return itemsFiltrados.value.slice(inicio, inicio + registrosPorPagina.value);
-});
-
-const paginasVisibles = computed(() => {
-    if (totalPaginas.value <= 7) {
-        return Array.from({ length: totalPaginas.value }, (_, i) => i + 1);
-    }
-    if (paginaActual.value < 5) {
-        return [1, 2, 3, 4, 5, '...', totalPaginas.value];
-    }
-    if (paginaActual.value > totalPaginas.value - 4) {
-        return [1, '...', totalPaginas.value - 4, totalPaginas.value - 3, totalPaginas.value - 2, totalPaginas.value - 1, totalPaginas.value];
-    }
-    return [1, '...', paginaActual.value - 1, paginaActual.value, paginaActual.value + 1, '...', totalPaginas.value];
-});
-
-const contadoresEstado = computed(() => {
-    const contadores = {
-        total: itemsFiltrados.value.length,
-        pendientesAprobacion: 0,
-        pendientesValidacionDJ: 0,
-        pendientesValidacionContable: 0,
-        observados: 0,
-        rechazados: 0,
-        contabilizados: 0,
-    };
-
-    for (const item of itemsFiltrados.value) {
-        const estado = item.es_grupo ? item.estado_grupo : item.gasto?.estado;
-        switch (estado) {
-            case 'Pendiente de Aprobación':
-                contadores.pendientesAprobacion++;
-                break;
-            case 'Pendiente de Validación DJ':
-                contadores.pendientesValidacionDJ++;
-                break;
-            case 'Pendiente de Validación Contable':
-                contadores.pendientesValidacionContable++;
-                break;
-            case 'Observado':
-                contadores.observados++;
-                break;
-            case 'Rechazado':
-                contadores.rechazados++;
-                break;
-            case 'Contabilizado':
-                contadores.contabilizados++;
-                break;
-        }
-    }
-    return contadores;
-});
-
-
-// --- MÉTODOS DE DATOS Y ACCIONES ---
-const fetchGastos = async () => {
-    cargando.value = true;
-    try {
-        const params = { ...filtros.value };
-        // No se eliminan filtros de longitud mínima aquí, se manejan en itemsFiltrados
-        // y en el watcher para triggerSearchWithDebounce.
-
-        // Llamada al nuevo endpoint de reportes
-        const response = await api.get('/v1/gastos/reportes', { params });
-        items.value = response.data; // La data ya viene lista y agrupada/formateada del backend
-
-        // Ajusta la página actual si es necesario después de cargar los datos
-        if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
-            paginaActual.value = totalPaginas.value;
-        } else if (totalPaginas.value === 0) {
-            paginaActual.value = 1; // Si no hay páginas, siempre en la primera
-        }
-
-    } catch (error) {
-        console.error("Error al cargar gastos para reportes:", error);
-        Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al cargar los gastos.', 'error');
-    } finally {
-        cargando.value = false;
-        buscando.value = false;
-    }
-};
-const aplicarFiltrosDesdeURL = () => {
-    const query = route.query;
-    if (query.alerta && query.codigos) {
-        filtros.value.texto = query.codigos;
-
-        Swal.fire({
-            title: 'Filtro Aplicado desde Alerta',
-            text: `Mostrando los gastos que requieren atención.`,
-            icon: 'info',
-            showConfirmButton: true
-        });
-        router.replace({ query: {} });
-    }
-};
-const triggerSearchWithDebounce = () => {
-    buscando.value = true;
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-        paginaActual.value = 1;
-        fetchGastos();
-    }, DEBOUNCE_DELAY);
-};
-
-const limpiarFiltros = () => {
-    filtros.value = {
-        texto: '',
-        registrador_name: '',
-        fecha_inicio: '',
-        fecha_fin: '',
-        estado: 'Todos',
-        area_id: '',
-    };
-    router.replace({ query: {} });
-};
-
-const verDetalles = (gasto) => {
-    // Siempre pasamos el 'gasto' individual al modal de detalles,
-    // ya que este modal no está diseñado para mostrar "grupos de DJ" directamente.
-    gastoSeleccionado.value = gasto;
-    mostrarDetalleModal.value = true;
-};
-
-const toggleGroup = (groupId) => {
-    if (expandedGroups.value.has(groupId)) {
-        expandedGroups.value.delete(groupId);
-    } else {
-        expandedGroups.value.add(groupId);
-    }
-};
-
-const exportarGastos = async () => {
-    exportando.value = true;
-    try {
-        const params = { ...filtros.value }; // Enviar todos los filtros actuales al backend para la exportación
-
-        // Llamada al nuevo endpoint de exportación
-        const response = await api.post('/v1/gastos/exportar-reporte', params, {
-            responseType: 'blob', // Importante para manejar la descarga de archivos
-        });
-
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        const filename = 'reporte_gastos_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-
-        // Limpieza de recursos
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        Swal.fire({
-            icon: 'success', title: '¡Exportación Exitosa!',
-            text: 'El archivo Excel ha sido generado y descargado.',
-            timer: 3000, showConfirmButton: false,
-        });
-
-    } catch (error) {
-        if (error.response && error.response.status === 404) {
-            Swal.fire('Información', 'No se encontraron gastos que coincidan con los filtros actuales para exportar.', 'info');
-        } else {
-            Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al generar el archivo de exportación.', 'error');
-        }
-        console.error("Error al exportar gastos:", error);
-    } finally {
-        exportando.value = false;
-    }
-};
-
-const fetchAreas = async () => {
-    try {
-        const response = await api.get('/v1/areas');
-        areas.value = response.data.areas;
-    } catch (error) {
-        console.error("Error al cargar las áreas:", error);
-        Swal.fire('Error', 'No se pudieron cargar las áreas para el filtro.', 'error');
-    }
-};
-
-// Paginación
-const irAPagina = (pagina) => {
-    if (typeof pagina === 'number' && pagina >= 1 && pagina <= totalPaginas.value) {
-        paginaActual.value = pagina;
-    }
-};
-const paginaAnterior = () => { if (paginaActual.value > 1) paginaActual.value--; };
-const paginaSiguiente = () => { if (paginaActual.value < totalPaginas.value) paginaActual.value++; };
-
-// --- WATCHERS Y LIFECYCLE ---
-// Watcher principal para filtros que reinicia la paginación y dispara la búsqueda
-watch(filtros, () => {
-    if (!inicializacionCompleta.value) return;
-    triggerSearchWithDebounce();
-}, { deep: true });
-
-// Los watchers individuales para campos de texto con debounce y longitud mínima
-// ya no son estrictamente necesarios si el watcher 'filtros' con deep:true y debounce
-// ya maneja todos los cambios y reinicia la paginación.
-// Se mantienen los MIN_SEARCH_LENGTH para la validación visual, pero la lógica de filtrado
-// en itemsFiltrados ya no los usa para descartar la búsqueda (solo para mostrar el mensaje).
-onMounted(async () => {
-    // 1. Se aplican los filtros que puedan venir de la URL PRIMERO.
-    aplicarFiltrosDesdeURL();
-    // 2. Luego se cargan los datos iniciales.
-    await fetchGastos();
-    await fetchAreas();
-    // 3. Finalmente, se marca la inicialización como completa para activar los watchers.
-    inicializacionCompleta.value = true;
-});
-</script>
