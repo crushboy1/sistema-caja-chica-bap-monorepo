@@ -88,8 +88,8 @@ a,
 }
 
 .router-link-active.nav-link-item::before,
-.router-link-exact-active.nav-link-item::before { /* <--- CAMBIO APLICADO AQUÍ */
-  transform: scaleX(1); /* La barra siempre visible para el enlace activo */
+.router-link-exact-active.nav-link-item::before { 
+  transform: scaleX(1); 
 }
 
 @layer components {
