@@ -23,10 +23,10 @@
           <div class="flex gap-3">
             <div class="flex gap-3">
               <button @click="exportarDatos" class="btn-secondary">
-                📊 Exportar
+                <Download class="w-4 h-4 mr-2" /> Exportar
               </button>
               <button @click="fetchDashboardData" class="btn-primary">
-                🔄 Actualizar
+                <RefreshCw class="w-4 h-4 mr-2" /> Actualizar
               </button>
             </div>
           </div>
@@ -94,7 +94,7 @@
           <h3 class="text-xl font-semibold text-gray-800 mb-2">Error al cargar datos</h3>
           <p class="text-gray-500 mb-6">No se pudieron cargar los datos del dashboard</p>
           <button @click="fetchDashboardData" class="btn-primary">
-            🔄 Reintentar
+            <RefreshCw class="w-4 h-4 mr-2" /> Reintentar
           </button>
         </div>
       </div>
@@ -110,7 +110,7 @@
               icono="FolderKanban" color="blue" />
             <KpiCard titulo="Monto Total Asignado" :valor="dashboardData.kpisGenerales.monto_total_asignado"
               formato="moneda" icono="CircleDollarSign" color="green" />
-            <KpiCard titulo="Monto Total Gastado" :valor="dashboardData.kpisGenerales.monto_total_gastado"
+            <KpiCard titulo="Monto Total Ejecutado" :valor="dashboardData.kpisGenerales.monto_total_ejecutado"
               formato="moneda" icono="TrendingDown" color="orange" />
             <KpiCard titulo="% de Ejecución" :valor="dashboardData.kpisGenerales.porcentaje_ejecucion"
               formato="porcentaje" icono="PieChart" color="purple" />
@@ -119,16 +119,19 @@
 
         <!-- Gastos Declarados -->
         <section>
-          <SectionHeader title="💳 Análisis de Gastos Declarados" />
+          <SectionHeader title="💳 Análisis de Gastos" />
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <KpiCard titulo="Gastos en Proceso" :valor="dashboardData.kpisGastos.gastos_en_proceso" icono="FileClock"
-              color="yellow" />
-            <KpiCard titulo="Gastos Finalizados" :valor="dashboardData.kpisGastos.gastos_finalizados"
-              icono="CheckCircle2" color="cyan" />
-            <KpiCard titulo="Monto Total Declarado" :valor="dashboardData.kpisGastos.monto_total_declarado"
-              formato="moneda" icono="Receipt" color="indigo" />
-            <KpiCard titulo="Gastos Rechazados" :valor="dashboardData.kpisGastos.gastos_rechazados" icono="Ban"
-              color="pink" />
+            <KpiCard titulo="Monto Total Ejecutado" :valor="dashboardData.kpisGastos.monto_total_ejecutado"
+              formato="moneda" icono="Receipt" color="indigo"
+              descripcion="Suma de gastos en estado Contabilizado o Repuesto." />
+            <KpiCard titulo="Monto en Proceso" :valor="dashboardData.kpisGastos.monto_total_en_proceso" formato="moneda"
+              icono="FileClock" color="yellow" descripcion="Suma de gastos pendientes de aprobación o validación." />
+            <KpiCard titulo="% Gastos Rechazados" :valor="dashboardData.kpisGastos.porcentaje_gastos_rechazados"
+              formato="porcentaje" icono="Ban" color="pink"
+              descripcion="Porcentaje de gastos rechazados sobre el total." />
+            <KpiCard titulo="Monto Total Excedido" :valor="dashboardData.kpisGastos.monto_total_excedido"
+              formato="moneda" icono="AlertCircle" color="red"
+              descripcion="Suma de montos que superaron lo proyectado al registrar." />
           </div>
 
           <!-- Gráficos de Gastos -->
@@ -141,7 +144,7 @@
               <GraficoCircular v-if="datosGraficoEstados" :chart-data="datosGraficoEstados" />
             </ChartCard>
 
-            <ChartCard title="Evolución Mensual de Gastos" height="h-[420px]">
+            <ChartCard title="Evolución Mensual: Presupuesto vs Gasto Ejecutado" height="h-[420px]">
               <GraficoEvolucionMensual v-if="datosEvolucionMensual && datosEvolucionMensual.length > 0"
                 :chart-data="datosEvolucionMensual" :show-controls="true" :show-summary="true" :default-period="12"
                 @period-changed="actualizarPeriodoEvolucion" />
@@ -165,7 +168,7 @@
             <!-- Top Usuarios -->
             <div class="bg-white rounded-2xl shadow-lg p-6">
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-800">🏆 Top 10 Usuarios - Mayor Gasto</h3>
+                <h3 class="text-lg font-semibold text-gray-800">🏆 Top 5 Usuarios con más Gastos Declarados</h3>
                 <span class="text-sm text-gray-500">Período actual</span>
               </div>
 
@@ -248,7 +251,7 @@
             <div v-if="puedeVerFiltrosAdmin && dashboardData.topAreasPorGasto"
               class="bg-white rounded-2xl shadow-lg p-6">
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-800">🏢 Top 5 Áreas - Mayor Gasto</h3>
+                <h3 class="text-lg font-semibold text-gray-800">🏢 Top 5 Áreas - Mayor Gasto Ejecutado</h3>
               </div>
 
               <div class="space-y-3">
@@ -266,17 +269,12 @@
               </div>
             </div>
 
-            <!-- Mapa de Calor (Placeholder) -->
+            <!-- Mapa de Calor-->
             <div v-if="puedeVerFiltrosAdmin" class="bg-white rounded-2xl shadow-lg p-6">
               <div class="flex items-center justify-between mb-6">
-                <h3 class="text-lg font-semibold text-gray-800">🗺️ Mapa de Calor - Cumplimiento</h3>
+                <h3 class="text-lg font-semibold text-gray-800">🗺️ Mapa de Calor - Cumplimiento por Área</h3>
               </div>
-
-              <div class="chart-placeholder">
-                <BarChart3 class="w-12 h-12 text-gray-400 mb-2" />
-                <p class="text-gray-500 mb-2">Próxima actualización</p>
-                <p class="text-xs text-gray-400">Análisis por área en desarrollo</p>
-              </div>
+              <MapaCalorCumplimiento v-if="datosMapaCalor" :data="datosMapaCalor" />
             </div>
           </div>
         </section>
@@ -284,12 +282,15 @@
         <!-- Alertas y Control -->
         <section>
           <SectionHeader title="🚨 Centro de Alertas y Control" />
-
-          <!-- Resumen de Alertas -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <KpiCard titulo="Alertas de Sobregiro"
-              :valor="dashboardData.alertas.find(a => a.tipo === 'sobregiro')?.cantidad || 0" icono="AlertTriangle"
-              color="red" />
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- COMENTARIO BAP: Se ajusta el `find` para buscar los nuevos tipos de alerta del backend. -->
+            <KpiCard titulo="Sobregiro de Fondos"
+              :valor="dashboardData.alertas.find(a => a.tipo === 'sobregiro_fondo')?.cantidad || 0"
+              icono="AlertTriangle" color="red" />
+            <!-- COMENTARIO BAP: Se añade un nuevo KPI para la nueva alerta de Desviación de Proyección. -->
+            <KpiCard titulo="Desviación de Proyección"
+              :valor="dashboardData.alertas.find(a => a.tipo === 'desviacion_proyeccion')?.cantidad || 0"
+              icono="AlertCircle" color="blue" />
             <KpiCard titulo="Montos Inusuales"
               :valor="dashboardData.alertas.find(a => a.tipo === 'monto_inusual')?.cantidad || 0" icono="TrendingUp"
               color="orange" />
@@ -299,9 +300,15 @@
           </div>
 
           <!-- Detalle de Alertas -->
-          <div class="grid grid-cols-1 gap-6">
-            <AlertPanel v-for="alerta in dashboardData.alertas" :key="alerta.tipo" :alerta="alerta"
+          <div v-if="dashboardData.alertas && dashboardData.alertas.length > 0"
+            class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AlertPanel v-for="alerta in dashboardData.alertas" :key="alerta.tipo" :alerta="alerta" :user="user"
               @action-clicked="handleAlertaAction" />
+          </div>
+          <div v-else class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <CheckCircle2 class="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h3 class="text-xl font-semibold text-gray-800">Todo en Orden</h3>
+            <p class="text-gray-500 mt-2">No se han detectado alertas en el período seleccionado.</p>
           </div>
         </section>
 
@@ -312,33 +319,30 @@
 
             <!-- Línea de Tiempo del Ciclo de Vida -->
             <div class="bg-white rounded-2xl shadow-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-800 mb-6">🕐 Ciclo de Vida de Fondos</h3>
-              <div class="chart-placeholder">
-                <TrendingUp class="w-12 h-12 text-gray-400 mb-2" />
-                <p class="text-gray-500 mb-2">Timeline en desarrollo</p>
-                <p class="text-xs text-gray-400">Apertura → Ejecución → Cierre</p>
-              </div>
+              <h3 class="text-lg font-semibold text-gray-800 mb-6">🕐 Actividad Reciente de Fondos</h3>
+              <TimelineCicloDeVida v-if="datosTimeline" :timelines="datosTimeline" />
             </div>
 
-            <!-- Análisis de Tendencias -->
-            <div class="bg-white rounded-2xl shadow-lg p-6">
-              <h3 class="text-lg font-semibold text-gray-800 mb-6">📊 Análisis Predictivo</h3>
-              <div class="chart-placeholder">
+            <!-- Evolución Mensual de Gastos por Categoría -->
+            <ChartCard title="Evolución Mensual de Gastos por Categoría" height="h-[420px]">
+              <GraficoBarras v-if="datosGraficoEvolucionCategoria" :chart-data="datosGraficoEvolucionCategoria"
+                :stacked="true" />
+              <div v-else class="chart-placeholder">
                 <BarChart3 class="w-12 h-12 text-gray-400 mb-2" />
-                <p class="text-gray-500 mb-2">Análisis en preparación</p>
-                <p class="text-xs text-gray-400">Predicciones y patrones</p>
+                <p class="text-gray-500">No hay datos para esta visualización</p>
               </div>
-            </div>
+            </ChartCard>
           </div>
         </section>
       </div>
     </div>
   </div>
+
 </template>
 
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
-import { TrendingUp, BarChart3, FileClock, CheckCircle2 } from 'lucide-vue-next';
+import { TrendingUp, BarChart3, FileClock, CheckCircle2, AlertCircle, Ban, Download, RefreshCw, FolderKanban, CircleDollarSign, PieChart, Receipt, Clock } from 'lucide-vue-next';
 import api from '@/plugins/axios';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
@@ -349,7 +353,8 @@ import AlertPanel from '@/components/dashboard/AlertPanel.vue';
 import SectionHeader from '@/components/dashboard/SectionHeader.vue';
 import ChartCard from '@/components/dashboard/ChartCard.vue';
 import GraficoEvolucionMensual from '@/components/dashboard/GraficoEvolucionMensual.vue';
-
+import MapaCalorCumplimiento from '@/components/dashboard/MapaCalorCumplimiento.vue';
+import TimelineCicloDeVida from '@/components/dashboard/TimelineCicloDeVida.vue';
 const props = defineProps({
   user: {
     type: Object,
@@ -360,9 +365,15 @@ const router = useRouter();
 // Estado
 const cargando = ref(true);
 const dashboardData = ref(null);
+const getLocalDateISOString = (date) => {
+  const tzoffset = date.getTimezoneOffset() * 60000;
+  const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, 10);
+  return localISOTime;
+};
+
 const filtros = ref({
-  fecha_inicio: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
-  fecha_fin: new Date().toISOString().slice(0, 10),
+  fecha_inicio: getLocalDateISOString(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+  fecha_fin: getLocalDateISOString(new Date()),
   area_id: null,
   responsable_id: null,
 });
@@ -377,7 +388,7 @@ const currencyFormatter = new Intl.NumberFormat('es-PE', {
 
 // Computed
 const puedeVerFiltrosAdmin = computed(() => {
-  return props.user && ['super_admin', 'jefe_administracion'].includes(props.user.role.name);
+  return props.user && ['super_admin', 'jefe_administracion', 'gerente_general'].includes(props.user.role.name);
 });
 
 const datosGraficoEstados = computed(() => {
@@ -425,41 +436,44 @@ const datosEvolucionMensual = computed(() => {
   }
   return dashboardData.value.evolucionMensual;
 });
-
+const datosGraficoEvolucionCategoria = computed(() => {
+  if (!dashboardData.value?.evolucionGastosPorCategoria) return null;
+  return dashboardData.value.evolucionGastosPorCategoria;
+});
+const datosMapaCalor = computed(() => {
+  if (!dashboardData.value?.cumplimientoPorArea) return null;
+  return dashboardData.value.cumplimientoPorArea;
+});
+const datosTimeline = computed(() => {
+  if (!dashboardData.value?.timelines) return null;
+  return dashboardData.value.timelines;
+});
 // Métodos
 const fetchDashboardData = async () => {
   cargando.value = true;
+  dashboardData.value = null;
   try {
     const response = await api.get('/v1/dashboard', { params: filtros.value });
     dashboardData.value = response.data;
   } catch (error) {
     console.error("Error al cargar datos del dashboard:", error);
-    await Swal.fire({
-      title: 'Error',
-      text: 'No se pudieron cargar los datos del dashboard.',
-      icon: 'error',
-      confirmButtonColor: '#10B981'
-    });
+    Swal.fire({ title: 'Error', text: 'No se pudieron cargar los datos del dashboard.', icon: 'error', confirmButtonColor: '#10B981' });
   } finally {
     cargando.value = false;
   }
 };
-
-const obtenerAreas = async () => {
-  try {
-    const response = await api.get('/v1/areas');
-    areas.value = response.data.areas;
-  } catch (error) {
-    console.error("Error al obtener áreas:", error);
-  }
-};
-
-const obtenerUsuarios = async () => {
-  try {
-    const response = await api.get('/v1/users/list-for-select');
-    usuarios.value = response.data;
-  } catch (error) {
-    console.error("Error al obtener usuarios:", error);
+const fetchFiltersData = async () => {
+  if (puedeVerFiltrosAdmin.value) {
+    try {
+      const [areasRes, usuariosRes] = await Promise.all([
+        api.get('/v1/areas'),
+        api.get('/v1/users/list-for-select')
+      ]);
+      areas.value = areasRes.data.areas;
+      usuarios.value = usuariosRes.data;
+    } catch (error) {
+      console.error("Error al cargar datos para filtros:", error);
+    }
   }
 };
 
@@ -507,11 +521,6 @@ const actualizarPeriodoEvolucion = (nuevoPeriodo) => {
   console.log(`El período del gráfico de evolución ha cambiado a: ${nuevoPeriodo} meses`);
   // Aquí podríamos añadir lógica en el futuro si fuera necesario.
 };
-const calcularTendencia = (tipo) => {
-  // Placeholder para cálculo de tendencias
-  // Implementar lógica basada en datos históricos
-  return { valor: 0, direccion: 'neutral' };
-};
 
 const getRankingClass = (index) => {
   if (index < 3) return 'bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400';
@@ -531,61 +540,42 @@ const getPercentageWidth = (valor, maximo) => {
 
 //Captura evento de click de los botones de alertas.
 const handleAlertaAction = (alerta) => {
-  switch (alerta.tipo) {
-    case 'sobregiro': {
-      // Se filtran los fondos para quedarse solo con los que son accionables.
-      const fondosAccionables = alerta.fondos.filter(fondo => fondo.es_accionable);
-      if (fondosAccionables.length === 0) return; // Si no hay nada que accionar, no hacer nada.
-
-      const codigos = fondosAccionables.map(fondo => fondo.codigo_fondo).join(',');
-
-      router.push({
-        path: '/dashboard/fondos',
-        query: { alerta: 'sobregiro', codigos }
-      });
-      break;
-    }
-
-    case 'monto_inusual': {
-      // Para montos inusuales, solo nos interesan los gastos que aún se pueden accionar.
-      const gastosAccionables = alerta.gastos.filter(gasto => gasto.es_accionable);
-
-      if (gastosAccionables.length === 0) {
-        // Si no hay gastos accionables, se informa al usuario y no se redirige.
+  // Se define un mapa de acciones para cada tipo de alerta. Esto es más limpio que un switch.
+  const actions = {
+    'sobregiro_fondo': () => {
+      const codigos = (alerta.detalles || []).map(d => d.codigo_fondo).join(',');
+      if (codigos) router.push({ path: '/dashboard/fondos', query: { alerta: 'sobregiro', codigos } });
+    },
+    'desviacion_proyeccion': () => {
+      const codigos = (alerta.detalles || []).map(d => d.codigo_gasto).join(',');
+      if (codigos) router.push({ path: '/dashboard/declaraciones', query: { tab: 'reportes', alerta: 'desviacion', codigos } });
+    },
+    'monto_inusual': () => {
+      const accionables = (alerta.detalles || []).filter(d => d.es_accionable);
+      if (accionables.length === 0) {
         Swal.fire('Información', 'Todos los gastos inusuales detectados ya han sido procesados.', 'info');
         return;
       }
-      const codigos = gastosAccionables.map(gasto => gasto.codigo_gasto).join(',');
-      router.push({
-        path: '/dashboard/declaraciones',
-        query: { tab: 'validacionContable', alerta: alerta.tipo, codigos }
-      });
-      break;
+      const codigos = accionables.map(d => d.codigo_gasto).join(',');
+      router.push({ path: '/dashboard/declaraciones', query: { tab: 'validacionContable', alerta: 'inusual', codigos } });
+    },
+    'rendicion_fuera_plazo': () => {
+      const codigos = (alerta.detalles || []).map(d => d.codigo_gasto).join(',');
+      if (codigos) router.push({ path: '/dashboard/declaraciones', query: { tab: 'reportes', alerta: 'tardia', codigos } });
     }
-    case 'rendicion_fuera_plazo': {
-      // Para rendiciones tardías, nos interesan TODOS los gastos para el reporte.
-      if (!alerta.gastos || alerta.gastos.length === 0) return;
+  };
 
-      const codigos = alerta.gastos.map(gasto => gasto.codigo_gasto).join(',');
-
-      router.push({
-        path: '/dashboard/declaraciones',
-        // Se redirige a la bandeja de análisis ('reportes').
-        query: { tab: 'reportes', alerta: 'rendicion_tardia', codigos }
-      });
-      break;
-    }
-    default:
-      console.warn('Acción no definida para el tipo de alerta:', alerta.tipo);
+  const action = actions[alerta.tipo];
+  if (action) {
+    action();
+  } else {
+    console.warn('Acción no definida para el tipo de alerta:', alerta.tipo);
   }
 };
 // Lifecycle
 onMounted(() => {
   fetchDashboardData();
-  if (puedeVerFiltrosAdmin.value) {
-    obtenerAreas();
-    obtenerUsuarios();
-  }
+  fetchFiltersData();
 });
 
 // Watchers

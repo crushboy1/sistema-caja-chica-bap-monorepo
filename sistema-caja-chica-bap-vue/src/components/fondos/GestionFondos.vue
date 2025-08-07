@@ -390,76 +390,17 @@ const obtenerUsuarioAutenticado = async () => {
 };
 
 const obtenerFondos = async () => {
-  // Evitar llamadas duplicadas - retornar si ya hay una llamada en proceso
-  if (llamadaEnProceso) {
-    console.log('🔄 Llamada a obtenerFondos bloqueada - ya hay una en proceso');
-    return;
-  }
-
-  // Marcar que hay una llamada en proceso
-  llamadaEnProceso = true;
-
-  if (!buscandoFondos.value) {
-    cargandoFondos.value = true;
-  }
-
+  cargandoFondos.value = true;
   try {
-    const params = {};
-
-    // Aplicar filtros de texto
-    if (filtro.value.codigo_fondo.length >= MIN_SEARCH_LENGTH || filtro.value.codigo_fondo.length === 0) {
-      params.codigo_fondo = filtro.value.codigo_fondo;
-    }
-    if (filtro.value.responsable_name.length >= MIN_SEARCH_LENGTH || filtro.value.responsable_name.length === 0) {
-      params.responsable_name = filtro.value.responsable_name;
-    }
-
-    // Aplicar filtros de selección
-    if (filtro.value.estado !== 'Todos') {
-      params.estado = filtro.value.estado;
-    }
-    if (filtro.value.area_id) {
-      params.area_id = filtro.value.area_id;
-    }
-
-    console.log('📤 Parámetros de búsqueda de fondos:', params);
-
-    const response = await api.get('/v1/fondos-efectivo', { params });
-
-    if (response.data && Array.isArray(response.data.fondos)) {
-      fondos.value = response.data.fondos.map(fondo => ({
-        ...fondo,
-        monto_aprobado: parseFloat(fondo.monto_aprobado)
-      }));
-      console.log(`📥 Fondos cargados: ${fondos.value.length}`);
-    } else {
-      console.error('La respuesta de la API no contiene un array de fondos:', response.data);
-      fondos.value = [];
-      Swal.fire({
-        icon: 'warning',
-        title: 'Datos Inesperados',
-        text: 'La API devolvió un formato de datos inesperado para los fondos de efectivo. Por favor, contacta a soporte.'
-      });
-    }
-
-    // Resetear a la primera página cuando se aplican filtros
-    paginaActual.value = 1;
-
+    const response = await api.get('/v1/fondos-efectivo', { params: filtro.value });
+    fondos.value = response.data.fondos || [];
+    // COMENTARIO BAP: No resetear la página aquí permite mantener la paginación si solo cambian los datos.
+    // Se reseteará solo al cambiar filtros manualmente.
   } catch (error) {
     console.error('❌ Error al obtener fondos:', error);
-    let errorMessage = 'No se pudieron cargar los fondos de efectivo. Por favor, inténtalo de nuevo.';
-    if (error.response && error.response.data && error.response.data.message) {
-      errorMessage = error.response.data.message;
-    }
-    Swal.fire({
-      icon: 'error',
-      title: 'Error al cargar fondos',
-      text: errorMessage
-    });
+    Swal.fire({ icon: 'error', title: 'Error al Cargar Fondos', text: error.response?.data?.message || 'Ocurrió un error inesperado.' });
   } finally {
     cargandoFondos.value = false;
-    buscandoFondos.value = false;
-    llamadaEnProceso = false; // Liberar el flag al finalizar
   }
 };
 
@@ -620,41 +561,33 @@ const handleFondoRepuesto = () => {
 
 // --- Watchers ---
 // Watchers para filtros de texto (debounced, con lógica de longitud mínima)
-watch(() => [filtro.value.codigo_fondo, filtro.value.responsable_name],
-  ([nuevoCodigo, nuevoResponsable]) => {
-    if (!inicializacionCompleta.value) return;
-
-    const codigoCumple = nuevoCodigo.length >= MIN_SEARCH_LENGTH || nuevoCodigo.length === 0;
-    const responsableCumple = nuevoResponsable.length >= MIN_SEARCH_LENGTH || nuevoResponsable.length === 0;
-
-    if (codigoCumple && responsableCumple) {
-      triggerSearchWithDebounce();
-    } else {
-      buscandoFondos.value = true;
-    }
-  }
-);
-// Watcher para filtros de selección (sin debounce)
-watch(() => [filtro.value.estado, filtro.value.area_id], () => {
-  if (!inicializacionCompleta.value) return;
+watch(filtro, () => {
   clearTimeout(debounceTimeout);
-  buscandoFondos.value = false;
-  obtenerFondos();
-});
+  cargandoFondos.value = true; // Mostrar spinner inmediatamente al cambiar un filtro
+  debounceTimeout = setTimeout(() => {
+    paginaActual.value = 1; // Resetear a la página 1 con cada nueva búsqueda
+    obtenerFondos();
+  }, 500);
+}, { deep: true });
 // --- Ciclo de Vida ---
 onMounted(async () => {
+  cargandoUsuario.value = true;
   try {
-    // Cargar datos iniciales
     await obtenerUsuarioAutenticado();
     await obtenerAreas();
-    // Aplicar filtros desde URL si existen
+
+    // Esto modificará `filtro.value` y disparará el watcher para la carga inicial de datos.
     aplicarFiltrosDesdeURL();
-    // Marcar inicialización como completa ANTES de la primera carga de fondos
-    inicializacionCompleta.value = true;
-    // Una sola llamada a obtenerFondos
-    await obtenerFondos();
+
+    // Si no hay filtros en la URL, el watcher no se dispara, así que forzamos la primera carga.
+    if (!route.query.alerta) {
+      await obtenerFondos();
+    }
+
   } catch (error) {
-    console.error('Error durante la inicialización:', error);
+    console.error("Fallo en la secuencia de inicialización del componente.");
+  } finally {
+    cargandoUsuario.value = false;
   }
 });
 </script>
