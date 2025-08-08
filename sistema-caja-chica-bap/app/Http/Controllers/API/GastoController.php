@@ -1093,22 +1093,53 @@ class GastoController extends Controller
             'Serie SAP',
             'Fecha de Contabilización',
             'Fecha del Documento',
-            'Dirección de correo',
+            //'Dirección de correo',
             'Moneda del Documento',
             'Total del Documento',
+            'Tipo de Documento',
             'Glosa para el Asiento',
             'Tipo de Documento',
             'Serie del Documento',
             'Correlativo del Documento',
             'Referencia de documento',
-            'Desc. Cuenta',
-            'Personal que realizó el gasto',
+            //'Desc. Cuenta',
+            //'Personal que realizó el gasto',
             'Evidencia',
             'Comentarios',
         ];
 
         $data = $gastosParaExportar->map(function ($gasto, $djs_consolidadas) {
-            $tipo = $gasto->tipo_documento ?? 'N/A';
+            
+
+        $baseUrl = 'http://localhost:3000';
+
+        $valor = $gasto->djConsolidada
+            ? $baseUrl . Storage::url($gasto->djConsolidada->ruta_documento)
+            : ($gasto->evidencia_url 
+                ? (str_starts_with($gasto->evidencia_url, 'http') 
+                    ? $gasto->evidencia_url 
+                    : $baseUrl . (str_starts_with($gasto->evidencia_url, '/')
+                        ? $gasto->evidencia_url
+                        : '/storage/' . ltrim($gasto->evidencia_url, '/')))
+                : 'N/A');
+
+            $fechaContabilizacion = HistorialAprobacionGasto::where('id_gasto', $gasto->id)
+                ->where('estado_nuevo', 'contabilizado')
+                ->value('created_at');
+
+            $fechaMostrar = $fechaContabilizacion
+                ? \Carbon\Carbon::parse($fechaContabilizacion)->format('Ymd')
+                : ($gasto->created_at?->format('Ymd') ?? 'N/A');
+            
+            $mapTipoDocumento = [
+                'Factura' => '01',
+                'Boleta de Venta' => '02',
+                'Declaración Jurada' => '03',
+            ];
+
+            $tipoDocumento = $mapTipoDocumento[$gasto->tipo_documento] ?? 'N/A';
+
+            $tipo = $tipoDocumento ?? 'N/A';
             $serie = $gasto->serie_documento ?? 'N/A';
             $correlativo = $gasto->correlativo_documento ?? 'N/A';
 
@@ -1116,19 +1147,22 @@ class GastoController extends Controller
             return [
                 $gasto->id,
                 '323',
-                $gasto->created_at ? $gasto->created_at->format('d/m/Y') : 'N/A',
-                $gasto->fecha_documento ? $gasto->fecha_documento->format('d/m/Y') : 'N/A',
-                $gasto->registrador->email,
+            //verficar del histortial de gastos 
+                $fechaMostrar,
+                $gasto->fecha_documento ? $gasto->fecha_documento->format('Ymd'): 'N/A',
+                //$gasto->registrador->email,
                 'SOL',
                 number_format($gasto->monto_total, 2, '.', ''),
+                'dDocument_Service',
                 $gasto->glosa,
-                $gasto->tipo_documento ?? 'N/A',
+                //$gasto->tipo_documento ?? 'N/A'
+                $tipoDocumento,
                 $gasto->serie_documento ?? 'N/A',
                 $gasto->correlativo_documento ?? 'N/A',
                 $documentoCompleto,
-                $gasto->cuentaContable->descripcion ?? 'N/A',
-                $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
-                $gasto->djConsolidada ? \Illuminate\Support\Facades\Storage::url($gasto->djConsolidada->ruta_documento) : ($gasto->evidencia_url ?? 'N/A'),
+                //$gasto->cuentaContable->descripcion ?? 'N/A',
+                //$gasto->registrador->name . ' ' . $gasto->registrador->last_name,
+                $valor,
                 $gasto->comentario ?? 'N/A',
             ];
         })->toArray();
