@@ -1,10 +1,196 @@
+<template>
+    <div class="min-h-screen bg-verde-bap-extralight p-6 scroll-smooth-custom">
+        <div class="max-w-7xl mx-auto space-y-8">
+
+            <!-- Encabezado del Módulo con animación de entrada -->
+            <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
+                <div class="text-center">
+                    <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gray-700 text-shadow">
+                        MÓDULO DE ADMINISTRACIÓN
+                    </h1>
+                    <p class="text-gray-600 max-w-4xl mx-auto text-base leading-relaxed">
+                        Gestiona los catálogos del sistema y administra los usuarios y sus roles desde este panel
+                        central.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Grid de Cards con animaciones escalonadas mejoradas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
+
+                <!-- Card 1: Panel de Catálogos -->
+                <div v-if="canViewCatalogos" @click="handleCardClick('catalogos')"
+                    @keydown="handleKeydown($event, 'catalogos')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
+                    transition-all duration-300 ease-out shadow-soft
+                    bg-gradient-to-br from-blue-500 to-blue-700
+                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-blue-400/50
+                    hover:shadow-glow-blue"
+                    :class="[getCardClasses('catalogos'), { 'pointer-events-none': isProcessingClick }]"
+                    style="animation-delay: 0.1s" tabindex="0" role="button"
+                    :aria-pressed="activeSection === 'catalogos'" aria-label="Abrir Panel de Catálogos">
+
+                    <!-- Efecto shimmer -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
+                      transition-transform duration-1000 ease-out"></div>
+
+                    <!-- Contenido de la card -->
+                    <div
+                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
+                        <div class="mb-3 flex justify-center">
+                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
+                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                <FolderOpen :size="20" class="text-white" />
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">CATÁLOGOS</h3>
+                        <p
+                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
+                            Gestionar Proyectos, Gastos y Cuentas.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 2: Cierres Contables -->
+                <div v-if="canViewCierres" @click="handleCardClick('cierres')"
+                    @keydown="handleKeydown($event, 'cierres')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
+                    transition-all duration-300 ease-out shadow-soft
+                    bg-gradient-to-br from-orange-500 to-red-600
+                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-orange-400/50
+                    hover:shadow-glow-orange"
+                    :class="[getCardClasses('cierres'), { 'pointer-events-none': isProcessingClick }]"
+                    style="animation-delay: 0.2s" tabindex="0" role="button" :aria-pressed="activeSection === 'cierres'"
+                    aria-label="Abrir Panel de Cierres Contables">
+
+                    <!-- Efecto shimmer -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
+                      transition-transform duration-1000 ease-out"></div>
+
+                    <!-- Contenido de la card -->
+                    <div
+                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
+                        <div class="mb-3 flex justify-center">
+                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
+                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                <Calendar :size="20" class="text-white" />
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">CIERRES</h3>
+                        <p
+                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
+                            Períodos y excepciones de registro.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 3: Panel de Usuarios -->
+                <div v-if="canViewUsuarios" @click="handleCardClick('usuarios')"
+                    @keydown="handleKeydown($event, 'usuarios')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
+                    transition-all duration-300 ease-out shadow-soft
+                    bg-gradient-to-br from-slate-600 to-slate-800
+                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-slate-400/50
+                    hover:shadow-glow-slate"
+                    :class="[getCardClasses('usuarios'), { 'pointer-events-none': isProcessingClick }]"
+                    style="animation-delay: 0.3s" tabindex="0" role="button"
+                    :aria-pressed="activeSection === 'usuarios'" aria-label="Abrir Panel de Usuarios">
+
+                    <!-- Efecto shimmer -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
+                      transition-transform duration-1000 ease-out"></div>
+
+                    <!-- Contenido de la card -->
+                    <div
+                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
+                        <div class="mb-3 flex justify-center">
+                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
+                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                <Users :size="20" class="text-white" />
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">USUARIOS</h3>
+                        <p
+                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
+                            Usuarios, roles y permisos del sistema.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 4: Panel de Auditoría -->
+                <div v-if="canViewAuditoria" @click="handleCardClick('auditoria')"
+                    @keydown="handleKeydown($event, 'auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
+                    transition-all duration-300 ease-out shadow-soft
+                    bg-gradient-to-br from-emerald-500 to-green-700
+                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-green-400/50
+                    hover:shadow-glow-verde"
+                    :class="[getCardClasses('auditoria'), { 'pointer-events-none': isProcessingClick }]"
+                    style="animation-delay: 0.4s" tabindex="0" role="button"
+                    :aria-pressed="activeSection === 'auditoria'" aria-label="Abrir Panel de Auditoría">
+
+                    <!-- Efecto shimmer -->
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
+                      transition-transform duration-1000 ease-out"></div>
+
+                    <!-- Contenido de la card -->
+                    <div
+                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
+                        <div class="mb-3 flex justify-center">
+                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
+                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                <Shield :size="20" class="text-white" />
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">AUDITORÍA</h3>
+                        <p
+                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
+                            Historial de cambios y acciones.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Estado de carga mientras se procesa el clic -->
+            <div v-if="isProcessingClick" class="text-center py-4">
+                <div class="inline-flex items-center text-gray-600">
+                    <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z">
+                        </path>
+                    </svg>
+                    Cargando sección...
+                </div>
+            </div>
+
+            <!-- Contenedor del Componente Activo con transiciones -->
+            <Transition enter-active-class="transition-all duration-500 ease-out"
+                enter-from-class="opacity-0 transform translate-y-8 scale-95"
+                enter-to-class="opacity-100 transform translate-y-0 scale-100"
+                leave-active-class="transition-all duration-300 ease-in"
+                leave-from-class="opacity-100 transform translate-y-0 scale-100"
+                leave-to-class="opacity-0 transform translate-y-4 scale-95">
+                <div v-if="activeSection && activeComponent" class="mt-12">
+                    <div class="glass-modal rounded-3xl p-4 sm:p-8 relative">
+                        <component :is="activeComponent" :usuario-actual="props.user" @close="handleChildClose" />
+                    </div>
+                </div>
+            </Transition>
+        </div>
+    </div>
+</template>
+
 <script setup>
 import { ref, computed, shallowRef, defineProps, nextTick } from 'vue';
+import { FolderOpen, Calendar, Users, Shield } from 'lucide-vue-next';
 
 // --- IMPORTACIÓN DE SUB-COMPONENTES ---
 import PanelCatalogos from '@/components/administracion/PanelCatalogos.vue';
 import PanelUsuarios from '@/components/administracion/PanelUsuarios.vue';
 import PanelCierres from '@/components/administracion/PanelCierres.vue';
+import PanelAuditoria from '@/components/administracion/PanelAuditoria.vue';
 
 // --- PROPS ---
 const props = defineProps({
@@ -17,7 +203,7 @@ const props = defineProps({
 // --- ESTADO REACTIVO ---
 const activeSection = ref(null);
 const activeComponent = shallowRef(null);
-const isProcessingClick = ref(false); // Prevenir clics múltiples
+const isProcessingClick = ref(false);
 
 // --- LÓGICA DE PERMISOS ---
 const hasPermission = (permissionName) => {
@@ -31,6 +217,7 @@ const hasPermission = (permissionName) => {
 const canViewCatalogos = computed(() => hasPermission('admin.catalogos.manage'));
 const canViewUsuarios = computed(() => hasPermission('admin.users.manage'));
 const canViewCierres = computed(() => hasPermission('admin.cierres.manage'));
+const canViewAuditoria = computed(() => hasPermission('admin.audit.view'));
 
 // --- MÉTODOS MEJORADOS ---
 
@@ -88,6 +275,9 @@ const openSection = async (section) => {
         case 'cierres':
             activeComponent.value = PanelCierres;
             break;
+        case 'auditoria':
+            activeComponent.value = PanelAuditoria;
+            break;
         default:
             console.warn(`Sección desconocida: ${section}`);
             activeComponent.value = null;
@@ -127,206 +317,29 @@ const handleKeydown = (event, section) => {
  * Devuelve clases CSS dinámicas para resaltar la card activa.
  */
 const getCardClasses = (section) => {
-    const baseClasses = 'shadow-soft hover:shadow-strong transition-all duration-300';
-    const activeClasses = 'ring-4 ring-white/50 shadow-glow-verde scale-105';
+    const baseClass = activeSection.value === section ? 'ring-4 ring-white/50' : '';
+    let glowClass = '';
 
-    return activeSection.value === section
-        ? `${baseClasses} ${activeClasses}`
-        : baseClasses;
-};
-
-/**
- * Obtiene el ícono SVG para cada sección
- */
-const getSectionIcon = (section) => {
-    const icons = {
-        catalogos: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h2"></path>`,
-        cierres: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>`,
-        usuarios: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.125-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.125-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>`
-    };
-    return icons[section] || '';
+    switch (section) {
+        case 'catalogos':
+            glowClass = 'hover:shadow-glow-blue';
+            break;
+        case 'cierres':
+            glowClass = 'hover:shadow-glow-orange';
+            break;
+        case 'usuarios':
+            glowClass = 'hover:shadow-glow-slate';
+            break;
+        case 'auditoria':
+            glowClass = 'hover:shadow-glow-verde';
+            break;
+    }
+    return `${baseClass} ${glowClass}`;
 };
 </script>
 
-<template>
-    <div class="min-h-screen bg-verde-bap-extralight p-6 scroll-smooth-custom">
-        <div class="max-w-7xl mx-auto space-y-8">
-
-            <!-- Encabezado del Módulo -->
-            <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
-                <div class="text-center">
-                    <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gray-700 text-shadow">
-                        MÓDULO DE ADMINISTRACIÓN
-                    </h1>
-                    <p class="text-gray-600 max-w-4xl mx-auto text-base leading-relaxed">
-                        Gestiona los catálogos del sistema y administra los usuarios y sus roles desde este panel
-                        central.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Contenedor de las Cards de Navegación -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
-
-                <!-- Card 1: Panel de Catálogos -->
-                <div v-if="canViewCatalogos" @click="handleCardClick('catalogos')"
-                    @keydown="handleKeydown($event, 'catalogos')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                           bg-gradient-to-br from-blue-500 to-blue-700
-                           transform hover:scale-105 hover:-translate-y-2
-                           animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-blue-400/50
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-                    :class="[getCardClasses('catalogos'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.1s" tabindex="0" role="button"
-                    :aria-pressed="activeSection === 'catalogos'" aria-label="Abrir Panel de Catálogos">
-
-                    <div
-                        class="relative z-10 p-8 text-center text-white h-full flex flex-col justify-center min-h-[200px]">
-                        <div class="mb-4 flex justify-center">
-                            <div
-                                class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2h2">
-                                    </path>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-xl font-bold mb-2">PANEL DE CATÁLOGOS</h3>
-                        <p class="text-sm text-white/90">Gestionar Proyectos, Gastos y Cuentas Contables.</p>
-                    </div>
-
-                    <!-- Indicador de estado activo -->
-                    <div v-if="activeSection === 'catalogos'"
-                        class="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-pulse">
-                    </div>
-                </div>
-
-                <!-- Card 2: Cierres Contables -->
-                <div v-if="canViewCierres" @click="handleCardClick('cierres')"
-                    @keydown="handleKeydown($event, 'cierres')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                           bg-gradient-to-br from-orange-500 to-red-600
-                           transform hover:scale-105 hover:-translate-y-2
-                           animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-orange-400/50
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-                    :class="[getCardClasses('cierres'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.2s" tabindex="0" role="button" :aria-pressed="activeSection === 'cierres'"
-                    aria-label="Abrir Panel de Cierres Contables">
-
-                    <div
-                        class="relative z-10 p-8 text-center text-white h-full flex flex-col justify-center min-h-[200px]">
-                        <div class="mb-4 flex justify-center">
-                            <div
-                                class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                                    </path>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-xl font-bold mb-2">CIERRES CONTABLES</h3>
-                        <p class="text-sm text-white/90">Gestionar períodos y excepciones de registro.</p>
-                    </div>
-
-                    <!-- Indicador de estado activo -->
-                    <div v-if="activeSection === 'cierres'"
-                        class="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-pulse">
-                    </div>
-                </div>
-
-                <!-- Card 3: Panel de Usuarios -->
-                <div v-if="canViewUsuarios" @click="handleCardClick('usuarios')"
-                    @keydown="handleKeydown($event, 'usuarios')" class="group relative overflow-hidden rounded-3xl cursor-pointer
-                           bg-gradient-to-br from-slate-600 to-slate-800
-                           transform hover:scale-105 hover:-translate-y-2
-                           animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-slate-400/50
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-                    :class="[getCardClasses('usuarios'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.3s" tabindex="0" role="button"
-                    :aria-pressed="activeSection === 'usuarios'" aria-label="Abrir Panel de Usuarios">
-
-                    <div
-                        class="relative z-10 p-8 text-center text-white h-full flex flex-col justify-center min-h-[200px]">
-                        <div class="mb-4 flex justify-center">
-                            <div
-                                class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.125-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.125-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
-                                    </path>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-xl font-bold mb-2">PANEL DE USUARIOS</h3>
-                        <p class="text-sm text-white/90">Administrar usuarios, roles y permisos del sistema.</p>
-                    </div>
-
-                    <!-- Indicador de estado activo -->
-                    <div v-if="activeSection === 'usuarios'"
-                        class="absolute top-4 right-4 w-3 h-3 bg-white rounded-full animate-pulse">
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Estado de carga mientras se procesa el clic -->
-            <div v-if="isProcessingClick" class="text-center py-4">
-                <div class="inline-flex items-center text-gray-600">
-                    <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                        </circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z">
-                        </path>
-                    </svg>
-                    Cargando sección...
-                </div>
-            </div>
-
-            <!-- Contenedor del Componente Activo -->
-            <Transition enter-active-class="transition-all duration-500 ease-out"
-                enter-from-class="opacity-0 transform translate-y-8 scale-95"
-                enter-to-class="opacity-100 transform translate-y-0 scale-100"
-                leave-active-class="transition-all duration-300 ease-in"
-                leave-from-class="opacity-100 transform translate-y-0 scale-100"
-                leave-to-class="opacity-0 transform translate-y-4 scale-95">
-                <div v-if="activeSection && activeComponent" class="mt-12">
-                    <div class="glass-modal rounded-3xl p-4 sm:p-8 relative">
-                        <!-- Botón de cerrar en la esquina superior derecha -->
-                        <button @click="closeSection"
-                            class="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100/80 rounded-full transition-colors duration-200 group"
-                            aria-label="Cerrar panel">
-                            <svg class="w-6 h-6 text-gray-500 group-hover:text-gray-700" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-
-                        <!-- Componente dinámico -->
-                        <component :is="activeComponent" :usuario-actual="props.user" @close="handleChildClose" />
-                    </div>
-                </div>
-            </Transition>
-        </div>
-    </div>
-</template>
-
 <style scoped>
-/* Keyframes personalizados */
-@keyframes cardClickCustom {
-    0% {
-        transform: scale(1) translateY(0);
-    }
-
-    50% {
-        transform: scale(0.98) translateY(2px);
-    }
-
-    100% {
-        transform: scale(1) translateY(0);
-    }
-}
-
+/* Keyframes personalizados del DeclaracionesView */
 @keyframes fade-in-down {
     from {
         opacity: 0;
@@ -360,10 +373,6 @@ const getSectionIcon = (section) => {
     animation: fade-in-up 0.6s ease-out both;
 }
 
-.animate-card-click-custom {
-    animation: cardClickCustom 0.15s ease-in-out;
-}
-
 /* Glass effect mejorado */
 .glass-modal {
     background: rgba(255, 255, 255, 0.95);
@@ -378,12 +387,132 @@ const getSectionIcon = (section) => {
     }
 }
 
-/* Card floating effect */
+/* Card floating effect mejorado */
 .card-float {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card-float:hover {
+    transform: translateY(-4px);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Sombras de "glow" específicas para cada card del AdministracionView */
+.shadow-glow-blue {
+    box-shadow: 0 0 25px 0 rgba(59, 130, 246, 0.4);
+}
+
+.hover\:shadow-glow-blue:hover {
+    box-shadow: 0 0 35px 5px rgba(59, 130, 246, 0.5);
+}
+
+.shadow-glow-orange {
+    box-shadow: 0 0 25px 0 rgba(251, 146, 60, 0.4);
+}
+
+.hover\:shadow-glow-orange:hover {
+    box-shadow: 0 0 35px 5px rgba(251, 146, 60, 0.5);
+}
+
+.shadow-glow-slate {
+    box-shadow: 0 0 25px 0 rgba(100, 116, 139, 0.4);
+}
+
+.hover\:shadow-glow-slate:hover {
+    box-shadow: 0 0 35px 5px rgba(100, 116, 139, 0.5);
+}
+
+.shadow-glow-verde {
+    box-shadow: 0 0 25px 0 rgba(16, 185, 129, 0.4);
+}
+
+.hover\:shadow-glow-verde:hover {
+    box-shadow: 0 0 35px 5px rgba(16, 185, 129, 0.5);
+}
+
+/* Controladores de tamaño consistentes */
+.group {
+    min-height: 160px;
+    max-height: 160px;
+    height: 160px;
+}
+
+.group>div {
+    height: 100%;
+    width: 100%;
+}
+
+.group h3 {
+    min-height: 2rem;
+    max-height: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    letter-spacing: normal !important;
+    padding: 0 0.5rem;
+    line-height: 1.25;
+}
+
+.group p {
+    min-height: 1.5rem;
+    max-height: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0 0.5rem;
+    line-height: 1.25;
+}
+
+/* Asegurar que el ícono no cause expansión */
+.group .w-12.h-12 {
+    flex-shrink: 0;
+    width: 3rem !important;
+    height: 3rem !important;
+    min-width: 3rem;
+    min-height: 3rem;
+    max-width: 3rem;
+    max-height: 3rem;
+}
+
+/* Controlar el grid para evitar expansiones */
+.grid {
+    align-items: start;
+}
+
+.grid>* {
+    align-self: stretch;
+}
+
+/* Para texto largo que pueda causar problemas */
+.group h3,
+.group p {
+    word-break: break-word;
+    hyphens: auto;
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .group h3 {
+        font-size: 0.875rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .group {
+        min-height: 170px;
+        max-height: 170px;
+        height: 170px;
+    }
+
+    .group h3 {
+        min-height: 2.5rem;
+        max-height: 2.5rem;
+        height: 2.5rem;
+    }
 }
 </style>

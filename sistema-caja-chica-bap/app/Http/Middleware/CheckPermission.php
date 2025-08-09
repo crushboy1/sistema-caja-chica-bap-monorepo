@@ -15,28 +15,32 @@ class CheckPermission
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      * @param  string  $permissionName  El nombre del permiso requerido para acceder a la ruta.
      */
-    public function handle(Request $request, Closure $next, string $permissionName): Response
+    public function handle(Request $request, Closure $next, ...$permissions): Response
     {
         $user = Auth::user();
 
-        // Si no hay usuario o el usuario no tiene un rol asignado, denegar acceso.
         if (!$user || !$user->role) {
-            return response()->json(['message' => 'Acceso denegado.'], 403);
+            return response()->json(['message' => 'Acceso denegado. Usuario no autenticado o sin rol.'], 403);
         }
 
-        // Cargar los permisos asociados al rol del usuario para hacer la verificación.
-        // Se asume que en tu modelo User tienes una relación llamada 'role'
-        // y en el modelo Role tienes una relación llamada 'permissions'.
+        // Cargar los permisos del rol una sola vez para eficiencia.
         $user->load('role.permissions');
+        $userPermissions = $user->role->permissions->pluck('name');
 
-        // Verificar si la colección de permisos del rol contiene el permiso requerido.
-        $hasPermission = $user->role->permissions->contains('name', $permissionName);
+        $hasPermission = false;
+        // Iterar sobre todos los permisos requeridos por la ruta.
+        foreach ($permissions as $permissionName) {
+            // Si el usuario tiene AL MENOS UNO de los permisos requeridos, se le concede el acceso.
+            if ($userPermissions->contains($permissionName)) {
+                $hasPermission = true;
+                break;
+            }
+        }
 
         if (!$hasPermission) {
             return response()->json(['message' => 'No tienes los permisos necesarios para realizar esta acción.'], 403);
         }
 
-        // Si tiene el permiso, continuar con la solicitud.
         return $next($request);
     }
 }

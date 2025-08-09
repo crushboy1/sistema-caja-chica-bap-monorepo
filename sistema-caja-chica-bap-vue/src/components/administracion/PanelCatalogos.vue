@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { X } from 'lucide-vue-next';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 
@@ -65,23 +66,23 @@ const catalogConfig = {
 
 // --- FILTROS REACTIVOS PARA PROYECTOS ---
 const filtrosProyectos = ref({
-  codigo: '',
-  nombre: '',
-  activo: '' // '', '1', '0'
+    codigo: '',
+    nombre: '',
+    activo: '' // '', '1', '0'
 });
 
 // --- FILTROS REACTIVOS PARA GASTOS PROYECTADOS ---
 const filtrosGastosProyectados = ref({
-  descripcion: '',
-  cuenta_contable: '', // ahora texto, antes id_cuenta_contable
-  activo: '' // '', '1', '0'
+    descripcion: '',
+    cuenta_contable: '', // ahora texto, antes id_cuenta_contable
+    activo: '' // '', '1', '0'
 });
 
 // --- FILTROS REACTIVOS PARA CUENTAS CONTABLES ---
 const filtrosCuentasContables = ref({
-  codigo_cuenta: '',
-  descripcion: '',
-  activo: '' // '', '1', '0'
+    codigo_cuenta: '',
+    descripcion: '',
+    activo: '' // '', '1', '0'
 });
 
 // --- DEBOUNCE PARA FILTROS DE TEXTO ---
@@ -89,69 +90,69 @@ let debounceTimeout = null;
 const DEBOUNCE_DELAY = 400;
 
 function fetchProyectosConFiltros() {
-  isLoading.value = true;
-  const params = { scope: 'management' };
-  if (filtrosProyectos.value.codigo) params.codigo = filtrosProyectos.value.codigo;
-  if (filtrosProyectos.value.nombre) params.nombre = filtrosProyectos.value.nombre;
-  if (filtrosProyectos.value.activo !== '') params.activo = filtrosProyectos.value.activo;
-  api.get('/v1/proyectos', { params })
-    .then(res => { dataSets.value.proyectos = res.data.proyectos; currentPage.value = 1; })
-    .catch(() => Swal.fire('Error', 'No se pudieron cargar los proyectos.', 'error'))
-    .finally(() => { isLoading.value = false; });
+    isLoading.value = true;
+    const params = { scope: 'management' };
+    if (filtrosProyectos.value.codigo) params.codigo = filtrosProyectos.value.codigo;
+    if (filtrosProyectos.value.nombre) params.nombre = filtrosProyectos.value.nombre;
+    if (filtrosProyectos.value.activo !== '') params.activo = filtrosProyectos.value.activo;
+    api.get('/v1/proyectos', { params })
+        .then(res => { dataSets.value.proyectos = res.data.proyectos; currentPage.value = 1; })
+        .catch(() => Swal.fire('Error', 'No se pudieron cargar los proyectos.', 'error'))
+        .finally(() => { isLoading.value = false; });
 }
 
 function triggerDebouncedFetchProyectos() {
-  clearTimeout(debounceTimeout);
-  debounceTimeout = setTimeout(fetchProyectosConFiltros, DEBOUNCE_DELAY);
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(fetchProyectosConFiltros, DEBOUNCE_DELAY);
 }
 
 function limpiarFiltrosProyectos() {
-  filtrosProyectos.value = { codigo: '', nombre: '', activo: '' };
-  fetchProyectosConFiltros();
+    filtrosProyectos.value = { codigo: '', nombre: '', activo: '' };
+    fetchProyectosConFiltros();
 }
 
 function fetchGastosProyectadosConFiltros() {
-  isLoading.value = true;
-  const params = { scope: 'management' };
-  if (filtrosGastosProyectados.value.descripcion) params.descripcion = filtrosGastosProyectados.value.descripcion;
-  if (filtrosGastosProyectados.value.cuenta_contable) params.cuenta_contable = filtrosGastosProyectados.value.cuenta_contable;
-  if (filtrosGastosProyectados.value.activo !== '') params.activo = filtrosGastosProyectados.value.activo;
-  api.get('/v1/gastos-proyectados', { params })
-    .then(res => { dataSets.value.gastosProyectados = res.data.gastos_proyectados; currentPage.value = 1; })
-    .catch(() => Swal.fire('Error', 'No se pudieron cargar los gastos proyectados.', 'error'))
-    .finally(() => { isLoading.value = false; });
+    isLoading.value = true;
+    const params = { scope: 'management' };
+    if (filtrosGastosProyectados.value.descripcion) params.descripcion = filtrosGastosProyectados.value.descripcion;
+    if (filtrosGastosProyectados.value.cuenta_contable) params.cuenta_contable = filtrosGastosProyectados.value.cuenta_contable;
+    if (filtrosGastosProyectados.value.activo !== '') params.activo = filtrosGastosProyectados.value.activo;
+    api.get('/v1/gastos-proyectados', { params })
+        .then(res => { dataSets.value.gastosProyectados = res.data.gastos_proyectados; currentPage.value = 1; })
+        .catch(() => Swal.fire('Error', 'No se pudieron cargar los gastos proyectados.', 'error'))
+        .finally(() => { isLoading.value = false; });
 }
 
 function triggerDebouncedFetchGastosProyectados() {
-  clearTimeout(debounceTimeout);
-  debounceTimeout = setTimeout(fetchGastosProyectadosConFiltros, DEBOUNCE_DELAY);
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(fetchGastosProyectadosConFiltros, DEBOUNCE_DELAY);
 }
 
 function limpiarFiltrosGastosProyectados() {
-  filtrosGastosProyectados.value = { descripcion: '', cuenta_contable: '', activo: '' };
-  fetchGastosProyectadosConFiltros();
+    filtrosGastosProyectados.value = { descripcion: '', cuenta_contable: '', activo: '' };
+    fetchGastosProyectadosConFiltros();
 }
 
 function fetchCuentasContablesConFiltros() {
-  isLoading.value = true;
-  const params = { scope: 'management' };
-  if (filtrosCuentasContables.value.codigo_cuenta) params.codigo_cuenta = filtrosCuentasContables.value.codigo_cuenta;
-  if (filtrosCuentasContables.value.descripcion) params.descripcion = filtrosCuentasContables.value.descripcion;
-  if (filtrosCuentasContables.value.activo !== '') params.activo = filtrosCuentasContables.value.activo;
-  api.get('/v1/cuentas-contables', { params })
-    .then(res => { dataSets.value.cuentasContables = res.data.cuentas_contables; currentPage.value = 1; })
-    .catch(() => Swal.fire('Error', 'No se pudieron cargar las cuentas contables.', 'error'))
-    .finally(() => { isLoading.value = false; });
+    isLoading.value = true;
+    const params = { scope: 'management' };
+    if (filtrosCuentasContables.value.codigo_cuenta) params.codigo_cuenta = filtrosCuentasContables.value.codigo_cuenta;
+    if (filtrosCuentasContables.value.descripcion) params.descripcion = filtrosCuentasContables.value.descripcion;
+    if (filtrosCuentasContables.value.activo !== '') params.activo = filtrosCuentasContables.value.activo;
+    api.get('/v1/cuentas-contables', { params })
+        .then(res => { dataSets.value.cuentasContables = res.data.cuentas_contables; currentPage.value = 1; })
+        .catch(() => Swal.fire('Error', 'No se pudieron cargar las cuentas contables.', 'error'))
+        .finally(() => { isLoading.value = false; });
 }
 
 function triggerDebouncedFetchCuentasContables() {
-  clearTimeout(debounceTimeout);
-  debounceTimeout = setTimeout(fetchCuentasContablesConFiltros, DEBOUNCE_DELAY);
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(fetchCuentasContablesConFiltros, DEBOUNCE_DELAY);
 }
 
 function limpiarFiltrosCuentasContables() {
-  filtrosCuentasContables.value = { codigo_cuenta: '', descripcion: '', activo: '' };
-  fetchCuentasContablesConFiltros();
+    filtrosCuentasContables.value = { codigo_cuenta: '', descripcion: '', activo: '' };
+    fetchCuentasContablesConFiltros();
 }
 
 // --- LÓGICA DE DATOS Y API ---
@@ -213,13 +214,13 @@ const changeTab = (tab) => {
     activeTab.value = tab;
     currentPage.value = 1;
     if (tab === 'proyectos') {
-      fetchProyectosConFiltros();
+        fetchProyectosConFiltros();
     } else if (tab === 'gastosProyectados') {
-      fetchGastosProyectadosConFiltros();
+        fetchGastosProyectadosConFiltros();
     } else if (tab === 'cuentasContables') {
-      fetchCuentasContablesConFiltros();
+        fetchCuentasContablesConFiltros();
     } else {
-      fetchData();
+        fetchData();
     }
 };
 
@@ -320,9 +321,15 @@ const getNestedValue = (obj, path) => {
 
 <template>
     <div class="p-6 bg-white rounded-lg shadow-md animate-fade-in-up">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Panel de Administración de Catálogos</h2>
-        <p class="text-gray-500 mb-6">Gestiona los datos maestros que se utilizan en todo el sistema.</p>
-
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Panel de Administración de Catálogos</h2>
+                <p class="text-gray-500">Gestiona los datos maestros que se utilizan en todo el sistema.</p>
+            </div>
+            <button @click="$emit('close')" class="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+                <X class="w-5 h-5 text-gray-500" />
+            </button>
+        </div>
         <!-- Pestañas de Navegación -->
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
@@ -335,81 +342,90 @@ const getNestedValue = (obj, path) => {
 
         <!-- FILTROS SOLO PARA PROYECTOS -->
         <div v-if="activeTab === 'proyectos'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Código:</label>
-              <input v-model="filtrosProyectos.codigo" type="text" class="form-input" placeholder="Buscar por código" />
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Código:</label>
+                    <input v-model="filtrosProyectos.codigo" type="text" class="form-input"
+                        placeholder="Buscar por código" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre:</label>
+                    <input v-model="filtrosProyectos.nombre" type="text" class="form-input"
+                        placeholder="Buscar por nombre" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
+                    <select v-model="filtrosProyectos.activo" class="form-input">
+                        <option value="">Todos</option>
+                        <option value="1">Activo</option>
+                        <option value="0">Inactivo</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button @click="limpiarFiltrosProyectos"
+                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
+                        Limpiar Filtros
+                    </button>
+                </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Nombre:</label>
-              <input v-model="filtrosProyectos.nombre" type="text" class="form-input" placeholder="Buscar por nombre" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-              <select v-model="filtrosProyectos.activo" class="form-input">
-                <option value="">Todos</option>
-                <option value="1">Activo</option>
-                <option value="0">Inactivo</option>
-              </select>
-            </div>
-            <div class="flex items-end">
-              <button @click="limpiarFiltrosProyectos" class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
-                Limpiar Filtros
-              </button>
-            </div>
-          </div>
         </div>
         <!-- FILTROS SOLO PARA GASTOS PROYECTADOS -->
         <div v-if="activeTab === 'gastosProyectados'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
-              <input v-model="filtrosGastosProyectados.descripcion" type="text" class="form-input" placeholder="Buscar por descripción" />
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
+                    <input v-model="filtrosGastosProyectados.descripcion" type="text" class="form-input"
+                        placeholder="Buscar por descripción" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable:</label>
+                    <input v-model="filtrosGastosProyectados.cuenta_contable" type="text" class="form-input"
+                        placeholder="Buscar por cuenta contable" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
+                    <select v-model="filtrosGastosProyectados.activo" class="form-input">
+                        <option value="">Todos</option>
+                        <option value="1">Activo</option>
+                        <option value="0">Inactivo</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button @click="limpiarFiltrosGastosProyectados"
+                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
+                        Limpiar Filtros
+                    </button>
+                </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable:</label>
-              <input v-model="filtrosGastosProyectados.cuenta_contable" type="text" class="form-input" placeholder="Buscar por cuenta contable" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-              <select v-model="filtrosGastosProyectados.activo" class="form-input">
-                <option value="">Todos</option>
-                <option value="1">Activo</option>
-                <option value="0">Inactivo</option>
-              </select>
-            </div>
-            <div class="flex items-end">
-              <button @click="limpiarFiltrosGastosProyectados" class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
-                Limpiar Filtros
-              </button>
-            </div>
-          </div>
         </div>
         <!-- FILTROS SOLO PARA CUENTAS CONTABLES -->
         <div v-if="activeTab === 'cuentasContables'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Código de Cuenta:</label>
-              <input v-model="filtrosCuentasContables.codigo_cuenta" type="text" class="form-input" placeholder="Buscar por código" />
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Código de Cuenta:</label>
+                    <input v-model="filtrosCuentasContables.codigo_cuenta" type="text" class="form-input"
+                        placeholder="Buscar por código" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
+                    <input v-model="filtrosCuentasContables.descripcion" type="text" class="form-input"
+                        placeholder="Buscar por descripción" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
+                    <select v-model="filtrosCuentasContables.activo" class="form-input">
+                        <option value="">Todos</option>
+                        <option value="1">Activo</option>
+                        <option value="0">Inactivo</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button @click="limpiarFiltrosCuentasContables"
+                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
+                        Limpiar Filtros
+                    </button>
+                </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
-              <input v-model="filtrosCuentasContables.descripcion" type="text" class="form-input" placeholder="Buscar por descripción" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-              <select v-model="filtrosCuentasContables.activo" class="form-input">
-                <option value="">Todos</option>
-                <option value="1">Activo</option>
-                <option value="0">Inactivo</option>
-              </select>
-            </div>
-            <div class="flex items-end">
-              <button @click="limpiarFiltrosCuentasContables" class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
-                Limpiar Filtros
-              </button>
-            </div>
-          </div>
         </div>
 
         <!-- Contenido de la Pestaña Activa -->
@@ -526,16 +542,10 @@ const getNestedValue = (obj, path) => {
                                 <input v-if="field.type === 'text'" v-model="currentItem[field.key]" type="text"
                                     class="form-input" :required="field.required"
                                     :disabled="isEditing && field.disabledOnEdit">
-                                <v-select
-                                v-if="field.type === 'select'"
-                                v-model="currentItem[field.key]"
-                                :reduce="option => option.id"
-                                :options="dataSets[field.options].filter(o => o.activo)"
-                                label="descripcion"
-                                placeholder="Seleccione una cuenta"
-                                class="mt-1"
-                                :required="field.required"
-                                />
+                                <v-select v-if="field.type === 'select'" v-model="currentItem[field.key]"
+                                    :reduce="option => option.id"
+                                    :options="dataSets[field.options].filter(o => o.activo)" label="descripcion"
+                                    placeholder="Seleccione una cuenta" class="mt-1" :required="field.required" />
 
                             </div>
                         </div>

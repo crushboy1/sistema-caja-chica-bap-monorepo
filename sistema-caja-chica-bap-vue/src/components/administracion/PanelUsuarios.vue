@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from '@/plugins/axios';
+import { X } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
 
@@ -144,8 +145,15 @@ const goToPage = (page) => {
 
 <template>
     <div class="p-6 bg-white rounded-lg shadow-md animate-fade-in-up">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Panel de Administración de Usuarios</h2>
-        <p class="text-gray-500 mb-6">Gestiona los usuarios, sus roles y permisos en el sistema.</p>
+        <div class="flex items-start justify-between mb-2">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Panel de Administración de Usuarios</h2>
+                <p class="text-gray-500 mb-2">Gestiona los usuarios, sus roles y permisos en el sistema.</p>
+            </div>
+            <button @click="$emit('close')" class="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+                <X class="w-5 h-5 text-gray-500" />
+            </button>
+        </div>
 
         <div class="flex justify-end mb-4">
             <button @click="openCreateModal"
@@ -239,7 +247,7 @@ const goToPage = (page) => {
                     class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-auto transform animate-modal-scale">
                     <form @submit.prevent="handleSave">
                         <div class="p-6 border-b">
-                            <h3 class="text-xl font-semibold text-gray-800">{{ isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario' }}</h3>
+                            <h3 class="text-xl font-semibold text-gray-800">{{ isEditing ? 'Editar Usuario' : 'Crea Nuevo Usuario' }}</h3>
                         </div>
                         <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

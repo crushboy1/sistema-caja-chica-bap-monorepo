@@ -185,8 +185,6 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['close']);
-
 // Estados reactivos
 const cargando = ref(true);
 const cierres = ref([]);

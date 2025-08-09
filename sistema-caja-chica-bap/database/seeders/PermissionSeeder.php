@@ -32,7 +32,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'admin.catalogos.manage', 'display_name' => 'Gestionar Catálogos', 'description' => 'Permite gestionar listas maestras (proyectos, cuentas contables, gastos proyectados).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'admin.cierres.manage', 'display_name' => 'Gestionar Cierres Mensuales', 'description' => 'Permite abrir y cerrar períodos contables para el registro de gastos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'admin.excepciones.manage', 'display_name' => 'Gestionar Excepciones de Cierre', 'description' => 'Permite otorgar permisos especiales a usuarios para registrar gastos en períodos cerrados.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-
+            ['name' => 'admin.audit.view', 'display_name' => 'Ver Log de Auditoría', 'description' => 'Permite acceder al historial de cambios administrativos del sistema.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             // === PERMISOS: MÓDULO DE SOLICITUDES DE FONDOS ===
             ['name' => 'solicitudes.view.all', 'display_name' => 'Ver Todas las Solicitudes', 'description' => 'Permite ver todas las solicitudes de todos los usuarios.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'solicitudes.view.area', 'display_name' => 'Ver Solicitudes del Área', 'description' => 'Permite ver las solicitudes de su propia área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
@@ -52,7 +52,12 @@ class PermissionSeeder extends Seeder
             ['name' => 'declaraciones.reposition', 'display_name' => 'Reponer Fondos', 'description' => 'Permite a ADM ejecutar la reposición de un fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'declaraciones.view.reports', 'display_name' => 'Ver Reportes de Gastos', 'description' => 'Permite generar y ver reportes de gastos (incluyendo contabilizados) para análisis y exportación.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
         ];
-
+        foreach ($permissions as &$permission) {
+            if (!isset($permission['created_at'])) {
+                $permission['created_at'] = Carbon::now();
+                $permission['updated_at'] = Carbon::now();
+            }
+        }
         DB::table('permissions')->insert($permissions);
     }
 }
