@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +33,11 @@ class UserController extends Controller
     {
         if (!Auth::user()->hasRole('super_admin')) {
             return response()->json(['message' => 'Acción no autorizada.'], 403);
+        }
+        $superAdminRole = Role::where('name', 'super_admin')->first();
+
+        if ($superAdminRole && $request->input('role_id') == $superAdminRole->id) {
+            return response()->json(['message' => 'No está permitido crear un nuevo Administrador del Sistema.'], 403);
         }
 
         $validatedData = $request->validate([
@@ -65,7 +71,15 @@ class UserController extends Controller
         if (!Auth::user()->hasRole('super_admin')) {
             return response()->json(['message' => 'Acción no autorizada.'], 403);
         }
+        $superAdminRole = Role::where('name', 'super_admin')->first();
 
+        if ($superAdminRole && $request->input('role_id') == $superAdminRole->id && $user->role_id != $superAdminRole->id) {
+            return response()->json(['message' => 'No está permitido asignar el rol de Administrador del Sistema a otro usuario.'], 403);
+        }
+
+        if ($superAdminRole && $user->role_id == $superAdminRole->id && $request->input('role_id') != $superAdminRole->id) {
+            return response()->json(['message' => 'El Administrador del Sistema principal no puede cambiar su rol.'], 403);
+        }
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -112,6 +126,23 @@ class UserController extends Controller
         return response()->json($users);
     }
 
+    //Devuelve una lista de usuarios con roles de gestión para el filtro del log de auditoría.
+    public function listForAuditFilter()
+    {
+        // 1. Definir los nombres de los roles que consideramos de gestión.
+        $managementRoles = ['super_admin', 'jefe_administracion', 'gerente_general'];
+
+        // 2. Buscar los IDs de estos roles en la base de datos.
+        $roleIds = Role::whereIn('name', $managementRoles)->pluck('id');
+
+        // 3. Obtener los usuarios que tienen asignado alguno de esos roles.
+        $users = User::whereIn('role_id', $roleIds)
+            ->where('activo', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'last_name']);
+
+        return response()->json($users);
+    }
     /**
      * Desactiva un usuario (Soft Delete).
      */
@@ -120,7 +151,10 @@ class UserController extends Controller
         if (!Auth::user()->hasRole('super_admin')) {
             return response()->json(['message' => 'Acción no autorizada.'], 403);
         }
-
+        $superAdminRole = Role::where('name', 'super_admin')->first();
+        if ($superAdminRole && $user->role_id == $superAdminRole->id) {
+            return response()->json(['message' => 'La cuenta del Administrador del Sistema no puede ser desactivada.'], 403);
+        }   
         // Un administrador no puede desactivarse a sí mismo.
         if ($user->id === Auth::id()) {
             return response()->json(['message' => 'No puedes desactivar tu propia cuenta.'], 409);

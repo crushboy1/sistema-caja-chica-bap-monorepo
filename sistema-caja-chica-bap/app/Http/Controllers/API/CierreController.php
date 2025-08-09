@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\CierreMensual;
+use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -14,6 +15,11 @@ class CierreController extends Controller
     /**
      * Muestra el estado de todos los períodos mensuales.
      */
+    protected $activityLogService;
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -76,12 +82,24 @@ class CierreController extends Controller
             ['periodo' => $fechaPeriodo],
             ['id_usuario_accion' => $user->id]
         );
+        // Capturamos el estado antes del cambio
+        $estadoAnterior = $cierre->estado ?? 'Abierto';
 
         $cierre->estado = $validated['estado'];
         $cierre->id_usuario_accion = $user->id;
         $cierre->save();
 
-        Log::info("El usuario {$user->name} ha cambiado el estado del período {$validated['periodo']} a {$validated['estado']}.");
+        // Determinamos el tipo de acción basado en el nuevo estado.
+        $actionType = ($validated['estado'] === 'Cerrado') ? 'PERIODO_CERRADO' : 'PERIODO_REABIERTO';
+
+        // Creamos una descripción detallada para guardar en el log.
+        $properties = [
+            'descripcion' => "El usuario cambió el estado del período {$validated['periodo']} de '{$estadoAnterior}' a '{$validated['estado']}'.",
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $validated['estado'],
+        ];
+
+        $this->activityLogService->log($actionType, $cierre, $properties, $user);
 
         return response()->json([
             'message' => "El período {$validated['periodo']} ha sido actualizado a '{$validated['estado']}' exitosamente.",

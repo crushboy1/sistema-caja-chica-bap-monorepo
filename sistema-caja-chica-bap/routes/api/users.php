@@ -3,25 +3,41 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\UserController;
 
-// Se asume que este archivo se carga dentro de un grupo con el middleware 'auth:sanctum'.
+/*
+|--------------------------------------------------------------------------
+| Rutas del Módulo de Usuarios
+|--------------------------------------------------------------------------
+*/
 
-// COMENTARIO BAP: Se define la ruta GET para el listado principal ('index') de forma separada
-// para poder aplicarle su propio middleware de permisos de forma explícita.
-Route::get('/users', [UserController::class, 'index'])
-    ->name('users.index')
-    ->middleware('check.permission:admin.users.manage');
+//==========================================================================
+// RUTAS PARA LISTAS DE SELECCIÓN (SELECTS/DROPDOWNS)
+//==========================================================================
 
 Route::get('/users/list-for-select', [UserController::class, 'listForSelect'])
     ->name('users.listForSelect')
-    ->middleware('check.permission:admin.excepciones.manage');
+    ->middleware('check.permission:navigate.dashboard');
 
-// Se define el apiResource pero se le indica que ignore el método 'index',
-// ya que lo hemos definido manualmente arriba para asignarle su permiso específico.
-// El resto de las rutas (store, show, update, destroy) se crearán automáticamente.
-Route::apiResource('users', UserController::class)->except(['index']);
+Route::get('/users/list-for-audit', [UserController::class, 'listForAuditFilter'])
+    ->name('users.listForAudit')
+    ->middleware('check.permission:admin.audit.view');
 
-Route::post('users/{user}/activate', [UserController::class, 'activate'])
-    ->name('users.activate')
-    ->middleware('check.permission:admin.users.manage'); 
-Route::get('/users/list-for-select', [UserController::class, 'listForSelect'])
-    ->name('users.listForSelect');
+
+//==========================================================================
+// RUTAS CRUD PARA LA GESTIÓN DE USUARIOS (PANEL DE USUARIOS)
+//==========================================================================
+// COMENTARIO BAP: Se agrupan todas las rutas de gestión bajo un prefijo y un middleware común.
+// Esto hace que el código sea más limpio y fácil de mantener.
+Route::prefix('users')->name('users.')->middleware('check.permission:admin.users.manage')->group(function () {
+
+    Route::get('/', [UserController::class, 'index'])->name('index');
+
+    Route::post('/', [UserController::class, 'store'])->name('store');
+
+    Route::get('/{user}', [UserController::class, 'show'])->name('show');
+
+    Route::put('/{user}', [UserController::class, 'update'])->name('update');
+
+    Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
+
+    Route::post('/{user}/activate', [UserController::class, 'activate'])->name('activate');
+});

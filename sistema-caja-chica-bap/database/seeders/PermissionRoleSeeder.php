@@ -32,6 +32,9 @@ class PermissionRoleSeeder extends Seeder
                 'navigate.solicitudes',
                 'navigate.declaraciones',
                 'navigate.fondos',
+                'navigate.administracion',
+                //Administración
+                'admin.audit.view',
                 // Solicitudes
                 'solicitudes.view.all',
                 'solicitudes.create', 
@@ -54,6 +57,7 @@ class PermissionRoleSeeder extends Seeder
                 'admin.catalogos.manage',
                 'admin.cierres.manage',
                 'admin.excepciones.manage',
+                'admin.audit.view',
                 // Solicitudes
                 'solicitudes.view.all',
                 'solicitudes.create',

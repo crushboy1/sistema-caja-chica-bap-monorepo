@@ -3,16 +3,24 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use App\Models\ExcepcionCierre;
 use App\Models\CierreMensual;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class ExcepcionController extends Controller
 {
+    protected $activityLogService;
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
+
     public function index(CierreMensual $cierre)
     {
         $excepciones = $cierre->excepciones()->with([
@@ -57,7 +65,18 @@ class ExcepcionController extends Controller
         ]);
 
         $usuarioExcepcion = User::find($validated['id_usuario_excepcion']);
-        Log::info("El admin {$user->name} otorgó una excepción al usuario {$usuarioExcepcion->name} para el período {$validated['periodo']}.");
+        $properties = [
+            'descripcion' => "Otorgó una excepción al usuario '{$usuarioExcepcion->name} {$usuarioExcepcion->last_name}' para el período {$validated['periodo']}.",
+            'usuario_excepcion' => [
+                'id' => $usuarioExcepcion->id,
+                'nombre' => $usuarioExcepcion->name . ' ' . $usuarioExcepcion->last_name,
+            ],
+            'periodo' => $validated['periodo'],
+            'fecha_expiracion' => $validated['fecha_expiracion'],
+            'motivo' => $validated['motivo'],
+        ];
+
+        $this->activityLogService->log('EXCEPCION_OTORGADA', $excepcion, $properties, $user);
 
         return response()->json([
             'message' => 'Excepción otorgada exitosamente.',
@@ -70,10 +89,22 @@ class ExcepcionController extends Controller
      */
     public function destroy(ExcepcionCierre $excepcion)
     {
-        $user = Auth::user();
-        $excepcion->delete();
 
-        Log::info("El admin {$user->name} revocó la excepción ID {$excepcion->id}.");
+        $user = Auth::user();
+        $excepcion->load('usuarioExcepcion:id,name,last_name', 'cierreMensual:id,periodo');
+        $properties = [
+            'descripcion' => "Revocó la excepción otorgada al usuario '{$excepcion->usuarioExcepcion->name} {$excepcion->usuarioExcepcion->last_name}' para el período " . Carbon::parse($excepcion->cierreMensual->periodo)->format('Y-m') . ".",
+            'usuario_excepcion' => [
+                'id' => $excepcion->usuarioExcepcion->id,
+                'nombre' => $excepcion->usuarioExcepcion->name . ' ' . $excepcion->usuarioExcepcion->last_name,
+            ],
+            'periodo' => Carbon::parse($excepcion->cierreMensual->periodo)->format('Y-m'),
+            'motivo_original' => $excepcion->motivo,
+        ];
+
+        $this->activityLogService->log('EXCEPCION_REVOCADA', $excepcion, $properties, $user);
+
+        $excepcion->delete();
 
         return response()->json(['message' => 'La excepción ha sido revocada exitosamente.']);
     }
