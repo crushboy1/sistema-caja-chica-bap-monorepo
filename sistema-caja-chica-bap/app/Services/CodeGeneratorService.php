@@ -2,45 +2,108 @@
 
 namespace App\Services;
 
+use App\Models\FondoEfectivo;
+use App\Models\Gasto;
 use App\Models\SolicitudFondo;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class CodeGeneratorService
 {
     /**
-     * Genera un código único para una nueva solicitud de fondo.
-     * Formato: ÁREA-ACTIVIDAD-TIPOFONDO-CORRELATIVO (ej: GSO-SOL-01-01)
-     *
-     * @param SolicitudFondo $solicitud El modelo de la solicitud que se está creando.
-     * @return string El código generado.
+     * Mapeo de tipos de actividad a sus acrónimos.
+     * @var array
+     */
+    private const ACTIVITY_CODES = [
+        'Apertura' => 'SOL',
+        'Incremento' => 'MOD',
+        'Decremento' => 'MOD',
+        'Cierre' => 'MOD',
+        'Declaracion' => 'DEC',
+        'Fondo' => 'FON',
+    ];
+
+    /**
+     * Mapeo de tipos de fondo a sus códigos numéricos.
+     * @var array
+     */
+    private const FUND_TYPE_CODES = [
+        'Regular' => '01',
+        'Proyecto' => '02',
+        'Excepcional' => '03',
+    ];
+
+    /**
+     * Genera un código para una Solicitud de Fondo (SOL o MOD),
+     * manteniendo la lógica original de obtención de datos.
      */
     public function generateForSolicitud(SolicitudFondo $solicitud): string
     {
         // 1. Obtener Acrónimo del Área
         $areaAcronym = $solicitud->area->acronym ?? 'XXX';
 
-        // 2. Obtener Código de Actividad
-        // Para este modelo, la actividad siempre es 'SOL' (Solicitud).
-        $activityCode = 'SOL';
+        // 2. Obtener Código de Actividad (SOL vs MOD)
+        $activityCode = self::ACTIVITY_CODES[$solicitud->tipo_solicitud] ?? 'SOL';
 
-        // 3. Obtener Código del Tipo de Fondo
+        // 3. Obtener Código del Tipo de Fondo (Lógica original preservada)
         $fundTypeCode = '00'; // Valor por defecto
         if ($solicitud->tipo_solicitud === 'Apertura') {
-            // Si es una nueva apertura, tomamos el tipo de la solicitud misma.
-            $fundTypeCode = $this->getFundTypeCode($solicitud->tipo_fondo_solicitado);
+            $fundTypeCode = self::FUND_TYPE_CODES[$solicitud->tipo_fondo_solicitado] ?? '00';
         } else if ($solicitud->solicitudOriginal && $solicitud->solicitudOriginal->fondoEfectivo) {
-            // Si es una modificación, buscamos el tipo en el fondo original que se está modificando.
-            $fundTypeCode = $this->getFundTypeCode($solicitud->solicitudOriginal->fondoEfectivo->tipo_fondo);
+            $fundTypeCode = self::FUND_TYPE_CODES[$solicitud->solicitudOriginal->fondoEfectivo->tipo_fondo] ?? '00';
         }
 
-        // 4. Generar Correlativo
+        // 4. Construir prefijo y generar código
+        $prefix = "{$areaAcronym}-{$activityCode}-{$fundTypeCode}-";
+        return $this->generateCode(SolicitudFondo::class, 'codigo_solicitud', $prefix);
+    }
+
+    /**
+     * Genera un código para un Gasto individual (DEC).
+     */
+    public function generateForGasto(Gasto $gasto): string
+    {
+        $areaAcronym = $gasto->fondoEfectivo->area->acronym ?? 'XXX';
+        $activityCode = self::ACTIVITY_CODES['Declaracion'];
+        $fundTypeCode = self::FUND_TYPE_CODES[$gasto->fondoEfectivo->tipo_fondo] ?? '00';
+
         $prefix = "{$areaAcronym}-{$activityCode}-{$fundTypeCode}-";
 
-        // Buscamos el último código con el mismo prefijo para determinar el siguiente número.
-        $latestCode = SolicitudFondo::where('codigo_solicitud', 'like', $prefix . '%')
-            ->lockForUpdate() // Bloquea la fila para evitar condiciones de carrera si dos solicitudes se crean al mismo tiempo.
-            ->orderBy('id', 'desc') // Ordenar por ID para mayor fiabilidad
-            ->value('codigo_solicitud');
+        return $this->generateCode(Gasto::class, 'codigo_gasto', $prefix);
+    }
+
+    /**
+     * Genera un código para un Fondo de Efectivo (FON).
+     */
+    public function generateForFondo(FondoEfectivo $fondo): string
+    {
+        $areaAcronym = $fondo->area->acronym ?? 'XXX';
+        $activityCode = self::ACTIVITY_CODES['Fondo'];
+        $fundTypeCode = self::FUND_TYPE_CODES[$fondo->tipo_fondo] ?? '00';
+
+        $prefix = "{$areaAcronym}-{$activityCode}-{$fundTypeCode}-";
+
+        return $this->generateCode(FondoEfectivo::class, 'codigo_fondo', $prefix);
+    }
+
+    /**
+     * Lógica central para generar un código correlativo único y seguro.
+     *
+     * @param string $modelClass El nombre de la clase del modelo (ej: SolicitudFondo::class).
+     * @param string $columnName El nombre de la columna donde se guarda el código.
+     * @param string $prefix El prefijo del código (ej: "GSO-SOL-01-").
+     * @return string El código completo generado.
+     */
+    private function generateCode(string $modelClass, string $columnName, string $prefix): string
+    {
+        $modelInstance = new $modelClass();
+        $primaryKey = $modelInstance->getKeyName(); // Obtiene la llave primaria ('id', 'id_fondo', etc.) dinámicamente
+
+        $latestCode = DB::table($modelInstance->getTable())
+            ->where($columnName, 'like', $prefix . '%')
+            ->lockForUpdate()
+            ->orderBy($primaryKey, 'desc') // Usa la llave primaria dinámica para ordenar
+            ->value($columnName);
 
         $correlative = 1;
         if ($latestCode) {
@@ -48,23 +111,7 @@ class CodeGeneratorService
             $correlative = $lastNumber + 1;
         }
 
-        // Formateamos el correlativo a 2 dígitos con ceros a la izquierda (ej: 01, 02, ... 10).
-        return $prefix . str_pad($correlative, 2, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * Mapea el nombre del tipo de fondo a su código numérico.
-     *
-     * @param string|null $tipoFondo
-     * @return string
-     */
-    private function getFundTypeCode(?string $tipoFondo): string
-    {
-        return match ($tipoFondo) {
-            'Regular' => '01',
-            'Proyecto' => '02',
-            'Excepcional' => '03',
-            default => '00',
-        };
+        // Formato a 4 dígitos para soportar hasta 9999 registros por prefijo.
+        return $prefix . str_pad($correlative, 4, '0', STR_PAD_LEFT);
     }
 }

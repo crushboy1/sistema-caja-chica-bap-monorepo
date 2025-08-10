@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use App\Models\SolicitudFondo;
+use App\Services\CodeGeneratorService;
 
 class FondoEfectivo extends Model
 {
@@ -41,6 +42,18 @@ class FondoEfectivo extends Model
         'fecha_cierre' => 'date',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (FondoEfectivo $fondo) {
+            if (is_null($fondo->codigo_fondo)) {
+                // Cargamos la relación 'area' que el servicio necesita.
+                $fondo->loadMissing('area');
+
+                $generator = new CodeGeneratorService();
+                $fondo->codigo_fondo = $generator->generateForFondo($fondo);
+            }
+        });
+    }
     // Se añade la relación con el modelo Proyecto.
     /**
      * Relación opcional: Un fondo puede pertenecer a un proyecto.
@@ -99,41 +112,6 @@ class FondoEfectivo extends Model
             ->where('tipo_solicitud', 'Cierre')
             ->where('estado', 'Aprobada');
     }
-    /**
-     * Genera un código único secuencial para los fondos de efectivo.
-     * El formato es 'FNRO-NNNNN'.
-     * Este método ha sido movido desde SolicitudFondoController para centralizar
-     * la lógica de generación de códigos de FondoEfectivo en su propio dominio.
-     *
-     * @return string
-     */
-    public static function generateUniqueFondoCode(): string
-    {
-        $prefix = 'FNRO';
-        // Buscar el último fondo que comience con el prefijo 'FNRO-'
-        $latestFondo = self::where('codigo_fondo', 'like', $prefix . '-%')
-            ->latest('id_fondo') // Asumiendo que 'id_fondo' es autoincremental
-            ->first();
-
-        $nextNumber = 1;
-        if ($latestFondo) {
-            $lastCode = $latestFondo->codigo_fondo;
-            // Asegurar que $lastCode es una cadena no vacía antes de intentar la expresión regular
-            if (!empty($lastCode) && is_string($lastCode)) {
-                // preg_match devuelve 1 si hay coincidencia, 0 si no hay, y false si hay un error
-                if (preg_match('/-(\d+)$/', $lastCode, $matches) === 1) {
-                    // Si se encuentra una coincidencia, $matches[1] contendrá los dígitos capturados
-                    $nextNumber = (int)$matches[1] + 1;
-                }
-                // Si no hay coincidencia (0) o error (false), $nextNumber permanece en 1.
-            } else {
-                Log::warning('El codigo_fondo del último fondo no es una cadena válida o está vacío. ID: ' . $latestFondo->id_fondo . ' Codigo: ' . ($lastCode ?? 'NULL'));
-            }
-        }
-
-        // Formato final: FNRO-NÚMERO_PADDEADO (ej. FNRO-00001)
-        return $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-    }
 
     /**
      * Crea un nuevo FondoEfectivo basado en una SolicitudFondo de tipo 'Apertura' aprobada.
@@ -161,7 +139,6 @@ class FondoEfectivo extends Model
 
         // Si no existe, procedemos a crearlo
         $fondoEfectivo->fill([
-            'codigo_fondo' => self::generateUniqueFondoCode(), // Genera un código de fondo único
             'tipo_fondo' => $solicitud->tipo_fondo_solicitado,
             'id_responsable' => $solicitud->id_solicitante, // El solicitante de la apertura es el responsable inicial
             'id_area' => $solicitud->id_area,

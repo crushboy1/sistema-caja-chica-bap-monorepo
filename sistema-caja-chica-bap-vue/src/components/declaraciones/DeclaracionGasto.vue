@@ -101,12 +101,15 @@
                                 <div class="flex items-center space-x-2">
                                     <!-- Indicador de completitud -->
                                     <div class="flex items-center">
-                                    <div v-if="isGastoCompleto(gasto)" class="w-3 h-3 bg-green-500 rounded-full" title="Completo"></div>
-                                    <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
-                                </div>
-                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
+                                        <div v-if="isGastoCompleto(gasto)" class="w-3 h-3 bg-green-500 rounded-full"
+                                            title="Completo"></div>
+                                        <div v-else class="w-3 h-3 bg-yellow-500 rounded-full" title="Incompleto"></div>
+                                    </div>
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
+                                    </svg>
                                 </div>
                             </div>
                         </transition>
@@ -225,6 +228,23 @@
                                                         required />
                                                     <p class="text-xs text-gray-500 mt-1">Fecha de emisión del documento
                                                     </p>
+                                                    <div v-if="gasto.es_declaracion_jurada"
+                                                        class="dj-warning-message mt-2">
+                                                        <svg class="w-5 h-5 flex-shrink-0" fill="none"
+                                                            stroke="currentColor" viewBox="0 0 24 24"
+                                                            xmlns="http://www.w3.org/2000/svg">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                                            </path>
+                                                        </svg>
+                                                        <p>
+                                                            <strong>Importante:</strong> Asegúrese de que esta fecha sea
+                                                            el día <strong>real de la transacción</strong>. Si es un
+                                                            gasto de un mes anterior (declaración por excepción), debe
+                                                            usar la fecha correspondiente a ese mes.
+                                                        </p>
+                                                    </div>
                                                 </div>
 
                                                 <!-- Monto del Documento -->
@@ -582,7 +602,7 @@ const djConsolidadaFile = ref(null);
 onMounted(async () => {
     cargandoInicial.value = true;
     await Promise.all([
-      
+
         obtenerFondosActivos(),
         obtenerCuentasContables()
 
@@ -735,7 +755,7 @@ const agregarGasto = async () => {
         serie_documento: '',
         correlativo_documento: '',
         monto_total: null,
-        
+
         comentario: '',
         evidencia: null,
         es_declaracion_jurada: false,
@@ -884,17 +904,17 @@ const generarDJConsolidada = async () => {
         Swal.fire('Gastos Insuficientes para DJ', 'Necesitas al menos 1 gastos marcados como "Declaración Jurada" y completos para generar la plantilla de DJ Consolidada.', 'info');
         return;
     }
-    
+
     // Preparar FormData para enviar los datos de los gastos al backend
     const formDataForDJGen = new FormData();
     formDataForDJGen.append('id_fondo_efectivo', fondoSeleccionadoId.value);
-    formDataForDJGen.append('id_registrador', props.usuarioActual.id); 
+    formDataForDJGen.append('id_registrador', props.usuarioActual.id);
 
     gastosValidosParaDJ.forEach((gasto, index) => {
         Object.keys(gasto).forEach(key => {
             // No enviar el ID temporal de Vue ni campos que no son del modelo
             if (key === 'id' || key === 'responsable_gasto_nombre' || key === 'evidencia' || key === 'ruta_evidencia' || key === 'monto_proyectado_original') return;
-            
+
             // Convertir booleanos a 0 o 1
             const value = typeof gasto[key] === 'boolean' ? (gasto[key] ? 1 : 0) : gasto[key];
             formDataForDJGen.append(`gastos[${index}][${key}]`, value);
@@ -1076,7 +1096,7 @@ const enviarFormulario = async () => {
                 title: 'Acción No Permitida',
                 html: `<p>No se puede registrar el gasto.</p><p class="mt-2 text-sm">${error.response.data.message || 'El período contable para una de las fechas seleccionadas ya ha sido cerrado.'}</p>`
             });
-        } else {            
+        } else {
             const errorMessage = error.response?.data?.message || 'Ocurrió un error inesperado.';
             const errors = error.response?.data?.errors;
             let htmlError = `<p>${errorMessage}</p>`;
@@ -1119,18 +1139,22 @@ const enviarFormulario = async () => {
 .gasto-list-move {
     transition: transform 0.5s ease;
 }
+
 /* Esto crea el efecto de acordeón suave al expandir y contraer. */
 .slide-up-enter-active,
 .slide-up-leave-active {
     transition: all 0.3s ease-out;
-    max-height: 1000px; /* Altura máxima esperada del contenido */
+    max-height: 1000px;
+    /* Altura máxima esperada del contenido */
 }
+
 .slide-up-enter-from,
 .slide-up-leave-to {
     max-height: 0;
     opacity: 0;
     transform: translateY(-10px);
 }
+
 /* Transiciones para las secciones internas del formulario */
 .fade-in-up-enter-active,
 .fade-in-up-leave-active {
@@ -1179,5 +1203,28 @@ const enviarFormulario = async () => {
     60% {
         transform: translate3d(4px, 0, 0);
     }
+}
+
+.dj-warning-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* 8px */
+    padding: 0.75rem;
+    /* 12px */
+    background-color: #fefce8;
+    /* bg-yellow-50 */
+    border: 1px solid #fde047;
+    /* border-yellow-300 */
+    border-radius: 0.5rem;
+    /* rounded-lg */
+    color: #a16207;
+    /* text-yellow-800 */
+}
+
+.dj-warning-message p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
 }
 </style>

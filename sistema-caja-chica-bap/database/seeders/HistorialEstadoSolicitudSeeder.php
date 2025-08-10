@@ -41,7 +41,7 @@ class HistorialEstadoSolicitudSeeder extends Seeder
         $solicitudAprobada->registrarEnHistorial('Creada', 'Solicitud de apertura de fondo creada por el Jefe de Área.', $jefeAreaJuan->id);
         $solicitudAprobada->registrarEnHistorial('Pendiente Aprobación ADM', 'Enviada a revisión del Jefe de Administración.', $jefeAreaJuan->id);
         $solicitudAprobada->registrarEnHistorial('Aprobada ADM', 'Aprobada por el Jefe de Administración.', $jefeAdmMaria->id);
-        $solicitudAprobada->registrarEnHistorial('Pendiente Aprobación GRTE', 'Enviada a revisión del Gerente General.', $jefeAdmMaria->id);
+        $solicitudAprobada->registrarEnHistorial('Pendiente Aprobación GG', 'Enviada a revisión del Gerente General.', $jefeAdmMaria->id);
         $solicitudAprobada->registrarEnHistorial('Aprobada', 'Aprobada por el Gerente General. Fondo listo para ser activado.', $gerenteCarlos->id);
 
         $this->command->info('Historial de Estados de Solicitud creado exitosamente.');
