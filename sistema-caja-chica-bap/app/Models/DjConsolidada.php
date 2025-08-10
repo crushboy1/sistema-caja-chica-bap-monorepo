@@ -12,60 +12,77 @@ class DjConsolidada extends Model
 {
     use HasFactory;
 
-    /**
-     * La tabla asociada con el modelo.
-     *
-     * @var string
-     */
     protected $table = 'djs_consolidadas';
-
-    /**
-     * La clave primaria para el modelo.
-     *
-     * @var string
-     */
     protected $primaryKey = 'id_dj_consolidada';
 
     /**
-     * Los atributos que son asignables en masa.
-     *
-     * @var array<int, string>
+     * ATRIBUTOS ASIGNABLES
+     * Se han añadido los campos necesarios para que la DJ tenga contexto.
      */
     protected $fillable = [
-        'ruta_documento',
-        'id_uploader',
+        'codigo_dj', 
+        'fondo_efectivo_id', 
+        'fecha_declaracion', 
+        'monto_total_declarado', 
+        'estado', 
+        'creado_por', 
+        'ruta_documento_firmado', 
+        'id_uploader_firmado',
     ];
 
     /**
-     * Los "accessors" para añadir al array del modelo.
-     *
-     * @var array
+     * CASTS
+     * Para asegurar que los tipos de datos sean correctos.
      */
-    protected $appends = ['documento_url'];
+    protected $casts = [
+        'fecha_declaracion' => 'datetime',
+        'monto_total_declarado' => 'decimal:2',
+    ];
+
+    /**
+     * ACCESSORS
+     * Añadimos un accesor para el documento firmado.
+     */
+    protected $appends = ['documento_firmado_url'];
 
 
     /*
     |--------------------------------------------------------------------------
-    | RELACIONES DE ELOQUENT
+    | RELACIONES DE ELOQUENT (¡MUY IMPORTANTE!)
     |--------------------------------------------------------------------------
     */
 
     /**
-     * Una DJ consolidada puede tener muchos gastos asociados.
+     * Una DJ consolidada pertenece a un Fondo de Efectivo.
+     */
+    public function fondoEfectivo(): BelongsTo
+    {
+        return $this->belongsTo(FondoEfectivo::class, 'fondo_efectivo_id');
+    }
+
+    /**
+     * Una DJ consolidada tiene muchos gastos asociados.
      */
     public function gastos(): HasMany
     {
-        // Una DjConsolidada tiene muchos Gastos. La clave foránea en la tabla 'gastos' es 'id_dj_consolidada'.
         return $this->hasMany(Gasto::class, 'id_dj_consolidada', 'id_dj_consolidada');
     }
 
     /**
-     * La DJ consolidada fue subida por un usuario.
+     * La DJ fue creada por un usuario (EL DECLARANTE).
+     * Esta es la relación que usaremos para obtener el DNI y nombre en el PDF.
      */
-    public function uploader(): BelongsTo
+    public function creadoPor(): BelongsTo
     {
-        // Una DjConsolidada pertenece a un User. La clave foránea aquí es 'id_uploader'.
-        return $this->belongsTo(User::class, 'id_uploader');
+        return $this->belongsTo(User::class, 'creado_por');
+    }
+
+    /**
+     * La DJ firmada fue subida por un usuario.
+     */
+    public function uploaderFirmado(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'id_uploader_firmado');
     }
 
     /*
@@ -75,17 +92,12 @@ class DjConsolidada extends Model
     */
 
     /**
-     * Obtiene la URL completa del documento de la DJ.
-     *
-     * @return string|null
+     * Obtiene la URL completa del documento FIRMADO de la DJ.
      */
-    public function getDocumentoUrlAttribute(): ?string
+    public function getDocumentoFirmadoUrlAttribute(): ?string
     {
-        // Chequeo para asegurar que el campo no esté vacío
-        // y se ha tipado el retorno para mejorar la predicción de código.
-        if ($this->ruta_documento && Storage::disk('public')->exists($this->ruta_documento)) {
-            // Devuelve la URL pública completa del archivo almacenado.
-            return Storage::url($this->ruta_documento);
+        if ($this->ruta_documento_firmado && Storage::disk('public')->exists($this->ruta_documento_firmado)) {
+            return Storage::url($this->ruta_documento_firmado);
         }
         return null;
     }

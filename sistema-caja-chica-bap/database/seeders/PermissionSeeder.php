@@ -38,7 +38,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'solicitudes.view.area', 'display_name' => 'Ver Solicitudes del Área', 'description' => 'Permite ver las solicitudes de su propia área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'solicitudes.create', 'display_name' => 'Crear Solicitud de Fondo', 'description' => 'Permite crear solicitudes de Apertura, Incremento, etc.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'solicitudes.approve.adm', 'display_name' => 'Aprobar/Observar Solicitud (ADM)', 'description' => 'Permite al Jefe de ADM aprobar u observar solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-            ['name' => 'solicitudes.approve.grte', 'display_name' => 'Aprobar/Observar Solicitud (GRTE)', 'description' => 'Permite al Gerente General la aprobación final de solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+            ['name' => 'solicitudes.approve.gg', 'display_name' => 'Aprobar/Observar Solicitud (GG)', 'description' => 'Permite al Gerente General la aprobación final de solicitudes.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'solicitudes.submit.descargo', 'display_name' => 'Enviar Descargo de Solicitud', 'description' => 'Permite responder a una observación en una solicitud.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
 
             // === PERMISOS: MÓDULO DE DECLARACIÓN DE GASTOS ===

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Services\CodeGeneratorService;
+
 class Gasto extends Model
 {
     use HasFactory;
@@ -83,29 +85,21 @@ class Gasto extends Model
     /**
      * El método "booted" del modelo.
      */
-    protected static function boot()
+    protected static function booted(): void
     {
-        parent::boot();
-
-        static::creating(function ($gasto) {
-            if (empty($gasto->codigo_gasto)) {
-                $gasto->codigo_gasto = self::generateUniqueGastoCode();
+        static::creating(function (Gasto $gasto) {
+            // Verificamos si el código no ha sido asignado previamente.
+            if (is_null($gasto->codigo_gasto)) {
+                // Es crucial cargar las relaciones necesarias ANTES de pasar el modelo al servicio.
+                // El servicio necesita acceder a $gasto->fondoEfectivo->area.
+                $gasto->loadMissing('fondoEfectivo.area');
+                // Instanciamos y usamos nuestro servicio centralizado.
+                $generator = new CodeGeneratorService();
+                $gasto->codigo_gasto = $generator->generateForGasto($gasto);
             }
         });
     }
 
-    /**
-     * Genera un código único para el gasto (ej. GTO-00001).
-     *
-     * @return string
-     */
-    public static function generateUniqueGastoCode()
-    {
-        $prefix = 'GTO-';
-        $lastGasto = DB::table('gastos')->orderBy('id', 'desc')->first();
-        $number = $lastGasto ? intval(substr($lastGasto->codigo_gasto, strlen($prefix))) + 1 : 1;
-        return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
-    }
 
     /*
     |--------------------------------------------------------------------------

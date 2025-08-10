@@ -29,7 +29,7 @@
               Fondo</label>
             <input type="text" id="filter_codigo_fondo" v-model="filtro.codigo_fondo"
               class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-              placeholder="Ej: FNRO-00001" />
+              placeholder="Ej: GSO-FON-01-0001" />
             <div v-if="buscandoFondos && filtro.codigo_fondo.length > 0" class="absolute right-3 top-8 text-gray-400">
               <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -160,7 +160,7 @@
                 <th class="py-3 px-2 text-center font-semibold">Fecha Apertura</th>
                 <th class="py-3 px-2 text-center font-semibold w-32">Solicitud Apertura</th>
                 <th class="py-3 px-2 text-center font-semibold">Aprobador ADM</th>
-                <th class="py-3 px-2 text-center font-semibold">Aprobador GRTE</th>
+                <th class="py-3 px-2 text-center font-semibold">Aprobador GG</th>
                 <th class="py-3 px-2 text-center font-semibold w-28">Acciones</th>
               </tr>
             </thead>

@@ -38,7 +38,7 @@ class PermissionRoleSeeder extends Seeder
                 // Solicitudes
                 'solicitudes.view.all',
                 'solicitudes.create', 
-                'solicitudes.approve.grte',
+                'solicitudes.approve.gg',
                 'solicitudes.submit.descargo',
                 // Declaraciones
                 'declaraciones.view.all',

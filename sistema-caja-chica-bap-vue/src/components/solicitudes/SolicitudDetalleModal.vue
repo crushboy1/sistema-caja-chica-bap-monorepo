@@ -30,7 +30,7 @@ const nombreRevisorAdm = computed(() => {
     return `${props.solicitud.revisor_adm.name || ''} ${props.solicitud.revisor_adm.last_name || ''}`;
 });
 
-const nombreAprobadorGrte = computed(() => {
+const nombreAprobadorGg = computed(() => {
     if (!props.solicitud?.aprobador_gerente) return 'N/A';
     if (props.solicitud.aprobador_gerente.id === props.solicitud.id_solicitante) {
         return 'No Aplica (Automático)';
@@ -150,7 +150,7 @@ const cerrarModal = () => {
                             class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Aprobadores</h4>
                             <p class="text-sm text-gray-600"><strong>Revisor ADM:</strong> {{ nombreRevisorAdm }}</p>
-                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ nombreAprobadorGrte }}</p>
+                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ nombreAprobadorGg }}</p>
                         </div>
 
                         <div class="p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">

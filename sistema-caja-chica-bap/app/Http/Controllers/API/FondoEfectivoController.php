@@ -351,26 +351,30 @@ class FondoEfectivoController extends Controller
         }
 
         try {
-            $request->validate([
+            $validatedData = $request->validate([
                 'id_responsable' => 'required|exists:users,id',
                 'id_area' => 'required|exists:areas,id',
                 'monto_aprobado' => 'required|numeric|min:0.01',
                 'fecha_apertura' => 'required|date',
-                'estado' => 'required|in:Activo,Cerrado', // Solo Activo o Cerrado al crear
-                // 'id_solicitud_apertura' => 'nullable|exists:solicitudes_fondos,id', // Opcional si se crea directamente
+                'estado' => 'required|in:Activo,Cerrado',
+                'tipo_fondo' => 'required|string', // Asegurarse de que el tipo de fondo venga en la request
+                'id_proyecto' => 'nullable|exists:proyectos,id_proyecto',
+                //opcional si se crea manualmente'id_solicitud_apertura' => 'nullable|exists:solicitudes_fondos,id',
             ]);
 
             DB::beginTransaction();
 
+            // El código se genera automáticamente en el modelo.
             $fondo = FondoEfectivo::create([
-                'codigo_fondo' => FondoEfectivo::generateUniqueFondoCode(), // Utiliza el método estático del modelo
-                'id_responsable' => $request->id_responsable,
-                'id_area' => $request->id_area,
-                'monto_aprobado' => $request->monto_aprobado,
-                'monto_disponible' => $request->monto_aprobado,
-                'fecha_apertura' => $request->fecha_apertura,
-                'estado' => $request->estado,
-                'id_solicitud_apertura' => $request->id_solicitud_apertura ?? null, // Permite asignar si viene de una solicitud
+                'id_responsable' => $validatedData['id_responsable'],
+                'id_area' => $validatedData['id_area'],
+                'monto_aprobado' => $validatedData['monto_aprobado'],
+                'monto_disponible' => $validatedData['monto_aprobado'], // El disponible es igual al aprobado al crear.
+                'fecha_apertura' => $validatedData['fecha_apertura'],
+                'estado' => $validatedData['estado'],
+                'tipo_fondo' => $validatedData['tipo_fondo'],
+                'id_proyecto' => $validatedData['id_proyecto'] ?? null,
+                'id_solicitud_apertura' => $validatedData['id_solicitud_apertura'] ?? null,
             ]);
 
             DB::commit();
@@ -388,7 +392,6 @@ class FondoEfectivoController extends Controller
             return response()->json(['message' => 'Ocurrió un error al crear el fondo de efectivo.', 'error' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Actualiza un fondo de efectivo existente.

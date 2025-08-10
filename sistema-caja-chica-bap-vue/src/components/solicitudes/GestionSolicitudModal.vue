@@ -70,21 +70,21 @@
                         class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Gerencia General</h4>
                         <div class="flex flex-wrap gap-3">
-                            <button @click="ejecutarAccionSinMotivo('aprobarGRTE')"
+                            <button @click="ejecutarAccionSinMotivo('aprobarGG')"
                                 :class="getClassesForActionButton('exito')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M5 13l4 4L19 7" />
                                 </svg>
-                                <span>Aprobar GRTE</span>
+                                <span>Aprobar GG</span>
                             </button>
-                            <button @click="iniciarAccionConMotivo('observarGRTE')"
+                            <button @click="iniciarAccionConMotivo('observarGG')"
                                 :class="getClassesForActionButton('advertencia')" :disabled="isLoadingAction">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.306 17c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
-                                <span>Observar GRTE</span>
+                                <span>Observar GG</span>
                             </button>
                             <button @click="iniciarAccionConMotivo('rechazarFinal')"
                                 :class="getClassesForActionButton('error')" :disabled="isLoadingAction">
@@ -185,7 +185,7 @@ const emit = defineEmits(['close', 'open-edit-modal']);
 
 // --- Variables de Estado Internas ---
 const motivoAccion = ref('');
-const accionActual = ref(null); // 'observarADM', 'observarGRTE', 'rechazarFinal', 'presentarDescargo', 'aprobarADM', 'aprobarGRTE'
+const accionActual = ref(null); // 'observarADM', 'observarGG', 'rechazarFinal', 'presentarDescargo', 'aprobarADM', 'aprobarGG'
 const isLoadingAction = ref(false);
 
 // --- Roles de Usuario (para visibilidad de botones dentro del modal) ---
@@ -210,7 +210,7 @@ const showAccionesSolicitante = computed(() => {
     if (!props.solicitud || !esSolicitante.value) return false; // Debe ser el solicitante.
 
     // La única acción que un solicitante puede hacer desde este modal es responder a una observación.
-    return ['Observada ADM', 'Observada GRTE'].includes(props.solicitud.estado);
+    return ['Observada ADM', 'Observada GG'].includes(props.solicitud.estado);
 });
 
 // Muestra la sección "Acciones de Administración"
@@ -237,8 +237,8 @@ const showAccionesAdministracion = computed(() => {
 const showAccionesGerenteGeneral = computed(() => {
     if (!props.solicitud) return false;
 
-    const esRolAprobadorGrte = [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolUsuario.value);
-    const esEstadoParaGrte = ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'].includes(props.solicitud.estado);
+    const esRolAprobadorGg = [ROLES.GERENTE_GENERAL, ROLES.SUPER_ADMIN].includes(rolUsuario.value);
+    const esEstadoParaGg = ['Pendiente Aprobación GG', 'Pendiente Re-evaluacion GG'].includes(props.solicitud.estado);
 
     // Un aprobador no puede gestionar su propia solicitud.
     // Se añade la lógica específica para Decremento/Cierre.
@@ -249,25 +249,25 @@ const showAccionesGerenteGeneral = computed(() => {
         return false;
     }
 
-    return esRolAprobadorGrte && esEstadoParaGrte;
+    return esRolAprobadorGg && esEstadoParaGg;
 });
 
 // Determina si se debe mostrar el botón de "Presentar Descargo" para el solicitante.
-// Esta acción está disponible para cualquier solicitante si su solicitud está en estado 'Observada ADM' u 'Observada GRTE'.
+// Esta acción está disponible para cualquier solicitante si su solicitud está en estado 'Observada ADM' u 'Observada GG'.
 const showSolicitanteDescargoAction = computed(() => {
     if (!props.solicitud || !props.usuarioActual) return false;
 
     const estado = props.solicitud.estado;
     const usuarioEsSolicitante = props.usuarioActual.id === props.solicitud.id_solicitante;
 
-    return usuarioEsSolicitante && (estado === 'Observada ADM' || estado === 'Observada GRTE');
+    return usuarioEsSolicitante && (estado === 'Observada ADM' || estado === 'Observada GG');
 });
 
 
 // Determina si el campo de texto para el motivo debe ser visible
 const showMotivoInput = computed(() => {
     return accionActual.value === 'observarADM' ||
-        accionActual.value === 'observarGRTE' ||
+        accionActual.value === 'observarGG' ||
         accionActual.value === 'rechazarFinal' ||
         accionActual.value === 'presentarDescargo';
 });
@@ -277,7 +277,7 @@ const motivoPlaceholder = computed(() => {
     switch (accionActual.value) {
         case 'observarADM':
             return 'Escribe el motivo de la observación de Administración aquí...';
-        case 'observarGRTE':
+        case 'observarGG':
             return 'Escribe el motivo de la observación de Gerencia General aquí...';
         case 'rechazarFinal':
             return 'Escribe el motivo del rechazo definitivo aquí...';
@@ -292,7 +292,7 @@ const motivoPlaceholder = computed(() => {
 const motivoLabel = computed(() => {
     switch (accionActual.value) {
         case 'observarADM':
-        case 'observarGRTE':
+        case 'observarGG':
             return 'Motivo de la Observación';
         case 'rechazarFinal':
             return 'Motivo del Rechazo';
@@ -366,7 +366,7 @@ const ejecutarAccion = async () => {
                 errorMessage = 'Error al observar por Administración.';
                 break;
             }
-            case 'aprobarGRTE': {
+            case 'aprobarGG': {
                 confirmationTitle = 'Confirmar Aprobación';
                 confirmationText = '¿Estás seguro de aprobar esta solicitud por Gerencia General? Esta acción es final.';
                 confirmButtonText = 'Sí, Aprobar';
@@ -374,7 +374,7 @@ const ejecutarAccion = async () => {
                 errorMessage = 'Error al aprobar por Gerencia General.';
                 break;
             }
-            case 'observarGRTE': {
+            case 'observarGG': {
                 if (!motivoAccion.value) {
                     Swal.fire('Advertencia', 'El motivo de la observación es obligatorio.', 'warning');
                     isLoadingAction.value = false;
@@ -383,7 +383,7 @@ const ejecutarAccion = async () => {
                 confirmationTitle = 'Confirmar Observación';
                 confirmationText = `¿Estás seguro de observar esta solicitud por Gerencia General con el siguiente motivo:<br><strong>"${motivoAccion.value}"</strong>?`;
                 confirmButtonText = 'Sí, Observar';
-                payload.estado = 'Observada GRTE';
+                payload.estado = 'Observada GG';
                 payload.motivo_observacion = motivoAccion.value;
                 errorMessage = 'Error al observar por Gerencia General.';
                 break;
@@ -411,8 +411,8 @@ const ejecutarAccion = async () => {
                 let newStateDescargo = '';
                 if (props.solicitud.estado === 'Observada ADM') {
                     newStateDescargo = 'Descargo Enviado ADM';
-                } else if (props.solicitud.estado === 'Observada GRTE') {
-                    newStateDescargo = 'Descargo Enviado GRTE';
+                } else if (props.solicitud.estado === 'Observada GG') {
+                    newStateDescargo = 'Descargo Enviado GG';
                 } else {
                     Swal.fire('Advertencia', 'No se puede presentar descargo en el estado actual de la solicitud.', 'warning');
                     isLoadingAction.value = false;
@@ -434,8 +434,8 @@ const ejecutarAccion = async () => {
 
         // Definir qué acciones requieren una confirmación adicional
         const requiresConfirmation = [
-            'aprobarADM', 'aprobarGRTE',
-            'observarADM', 'observarGRTE',
+            'aprobarADM', 'aprobarGG',
+            'observarADM', 'observarGG',
             'rechazarFinal', 'presentarDescargo'
         ];
 

@@ -64,10 +64,10 @@ const estadosSolicitud = [
     'Descargo Enviado ADM',
     'Pendiente Re-evaluacion',
     'Aprobada ADM',
-    'Pendiente Aprobación GRTE',
-    'Observada GRTE',
-    'Descargo Enviado GRTE',
-    'Pendiente Re-evaluacion GRTE',
+    'Pendiente Aprobación GG',
+    'Observada GG',
+    'Descargo Enviado GG',
+    'Pendiente Re-evaluacion GG',
     'Aprobada',
     'Rechazada Final'
 ];
@@ -93,10 +93,10 @@ const estadosVisiblesEnTabla = computed(() => {
         'Observada ADM',
         'Descargo Enviado ADM',
         'Pendiente Re-evaluacion',
-        'Pendiente Aprobación GRTE',
-        'Observada GRTE',
-        'Descargo Enviado GRTE',
-        'Pendiente Re-evaluacion GRTE',
+        'Pendiente Aprobación GG',
+        'Observada GG',
+        'Descargo Enviado GG',
+        'Pendiente Re-evaluacion GG',
         'Aprobada',
         'Rechazada Final'
     ];
@@ -185,20 +185,20 @@ const puedeGestionarSolicitud = (solicitud) => {
         }
         // El Gerente General puede gestionar lo que está en su bandeja de entrada.
         if (rol === ROLES.GERENTE_GENERAL) {
-            // Se incluye el nuevo estado 'Pendiente Re-evaluacion GRTE'.
-            return ['Pendiente Aprobación GRTE', 'Pendiente Re-evaluacion GRTE'].includes(estado);
+            // Se incluye el nuevo estado 'Pendiente Re-evaluacion GG'.
+            return ['Pendiente Aprobación GG', 'Pendiente Re-evaluacion GG'].includes(estado);
         }
     }
     // REGLA 2: LÓGICA PARA SOLICITANTES (El usuario actual SÍ es quien pidió la solicitud)
     if (usuarioEsSolicitante) {
-        // REGLA 2.1: Lógica de negocio específica para Decremento/Cierre solicitados por ADM/GRTE.
+        // REGLA 2.1: Lógica de negocio específica para Decremento/Cierre solicitados por ADM/GG.
         // Se preserva la regla de que no pueden auto-gestionar, solo enviar descargos.
         if ((rol === ROLES.JEFE_ADM || rol === ROLES.GERENTE_GENERAL) && esDecrementoCierre) {
-            return estado === 'Observada GRTE'; // Solo pueden actuar si GRTE observó.
+            return estado === 'Observada GG'; // Solo pueden actuar si GG observó.
         }
         // REGLA 2.2: Para CUALQUIER OTRA solicitud, el solicitante solo puede "gestionar"
         // para enviar un descargo si su solicitud fue previamente observada.
-        return ['Observada ADM', 'Observada GRTE'].includes(estado);
+        return ['Observada ADM', 'Observada GG'].includes(estado);
     }
     // Si ninguna regla se cumple, no se muestra el botón.
     return false;
@@ -219,10 +219,10 @@ const puedeEditarProactivamente = (solicitud) => {
     }
     // REGLA 2: Solicitantes de "alto nivel" (Jefe ADM) solo pueden editar ANTES de la
     // primera revisión por parte de Gerencia (su solicitud salta a ADM).
-    // Esta lógica es segura porque el backend usará 'Pendiente Re-evaluacion GRTE'
+    // Esta lógica es segura porque el backend usará 'Pendiente Re-evaluacion GG'
     // para los descargos, impidiendo que la solicitud vuelva a este estado inicial.
     if ([ROLES.JEFE_ADM, ROLES.SUPER_ADMIN].includes(solicitanteRol)) {
-        return estado === 'Pendiente Aprobación GRTE';
+        return estado === 'Pendiente Aprobación GG';
     }
     // REGLA 3: El Gerente General no edita proactivamente, sus solicitudes se auto-aprueban.
     // Si ninguna regla aplica, no se puede editar.
@@ -515,13 +515,13 @@ watch(() => props.usuarioActual, (newUser) => {
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Búsqueda por Número de Solicitud -->
+                    <!-- Búsqueda por Código de Solicitud -->
                     <div class="relative">
                         <label for="busquedaNumeroSolicitud" class="block text-sm font-medium text-gray-700 mb-1">
-                            Buscar por Nro de Solicitud:
+                            Buscar por Código de Solicitud:
                         </label>
                         <input type="text" id="busquedaNumeroSolicitud" v-model="busquedaNumeroSolicitud"
-                            placeholder="Ej. SOL-00001"
+                            placeholder="Ej. GSO-SOL-01-01"
                             class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500" />
                         <!-- Indicador de búsqueda -->
                         <div v-if="buscandoSolicitudes && busquedaNumeroSolicitud.length > 0 && busquedaNumeroSolicitud.length < MIN_SEARCH_LENGTH"
@@ -688,7 +688,7 @@ watch(() => props.usuarioActual, (newUser) => {
                                 <td class="py-3 px-2 text-center text-sm">
                                     {{ new Date(solicitud.created_at).toLocaleDateString('es-PE') }}
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-1.5 text-center">
                                     <div class="flex items-center justify-center space-x-2">
                                         <button @click="verDetalles(solicitud)"
                                             class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-700 transition-colors duration-200"

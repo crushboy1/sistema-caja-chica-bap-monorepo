@@ -9,20 +9,21 @@ return new class extends Migration
     /**
      * Run the migrations.
      *
-     * Esta tabla almacenará la información de los documentos de Declaración Jurada
-     * que agrupan varios gastos.
+     * Esta tabla almacenará las Declaraciones Juradas que agrupan varios gastos.
      */
     public function up(): void
     {
         Schema::create('djs_consolidadas', function (Blueprint $table) {
-            // ID único para cada documento de DJ consolidada.
             $table->id('id_dj_consolidada');
+            $table->string('codigo_dj')->unique()->nullable();
+            $table->foreignId('fondo_efectivo_id')->constrained('fondo_efectivo', 'id_fondo');
+            $table->date('fecha_declaracion');
+            $table->decimal('monto_total_declarado', 10, 2);
+            $table->string('estado', 50)->default('Declarado');
+            $table->foreignId('creado_por')->constrained('users', 'id');
+            $table->string('ruta_documento_firmado')->nullable();
+            $table->foreignId('id_uploader_firmado')->nullable()->constrained('users', 'id');
 
-            // Ruta donde se almacena el archivo PDF o de imagen de la DJ.
-            $table->string('ruta_documento');
-
-            // Quién subió el documento, relacionado con la tabla de usuarios.
-            $table->foreignId('id_uploader')->constrained('users', 'id');
             $table->timestamps();
         });
     }

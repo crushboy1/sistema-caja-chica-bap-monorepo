@@ -535,7 +535,7 @@ onMounted(async () => {
                     <label for="filtro_codigo_gasto_audit"
                         class="block text-sm font-medium text-gray-700 mb-1">Código</label>
                     <input type="text" id="filtro_codigo_gasto_audit" v-model="filtros.codigo_gasto"
-                        placeholder="GTO-00001"
+                        placeholder="GSO-DEC-01-0001"
                         class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
                     <div v-if="filtros.codigo_gasto.length > 0 && filtros.codigo_gasto.length < MIN_SEARCH_LENGTH"
                         class="text-xs text-amber-600 mt-1">
@@ -784,8 +784,8 @@ onMounted(async () => {
                                             <span class="text-blue-600 text-xs font-bold">{{ index + 1 }}</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-600">
-                                        <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
+                                    <td class="py-3 px-2 text-center  text-gray-600">
+                                        <span class="text-xs text-blue-600 px-2 py-1 rounded ">Parte del grupo</span>
                                     </td>
                                     <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}
                                     </td>

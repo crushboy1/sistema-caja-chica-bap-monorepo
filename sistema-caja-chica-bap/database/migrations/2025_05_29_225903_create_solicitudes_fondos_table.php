@@ -41,19 +41,19 @@ return new class extends Migration
                 'Observada ADM',
                 'Descargo Enviado ADM',
                 'Pendiente Re-evaluacion',
-                'Pendiente Re-evaluacion GRTE',
+                'Pendiente Re-evaluacion GG',
                 'Aprobada ADM', // Estado transicional interno
-                'Pendiente Aprobación GRTE',
-                'Observada GRTE',
-                'Descargo Enviado GRTE',
-                'Aprobada', // Estado final de éxito
+                'Pendiente Aprobación GG',
+                'Observada GG',
+                'Descargo Enviado GG',
+                'Aprobada', 
                 'Rechazada Final'
-            ])->default('Creada'); // Estado inicial al crear la solicitud
+            ])->default('Creada'); 
             // Añade una columna para contar el número de ediciones.
             $table->unsignedInteger('edit_count')->default(0);
             $table->json('historial_cambios')->nullable();
             // Campos para motivos de observación/rechazo/descargo
-            $table->text('motivo_observacion')->nullable(); // Motivo de observación por ADM o GRTE
+            $table->text('motivo_observacion')->nullable(); // Motivo de observación por ADM o GG
             $table->text('motivo_descargo')->nullable(); // Contenido del descargo presentado por el Jefe de Área
             $table->text('motivo_rechazo_final')->nullable(); // Motivo del rechazo definitivo
 

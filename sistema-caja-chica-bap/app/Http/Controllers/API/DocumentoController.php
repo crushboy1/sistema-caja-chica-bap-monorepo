@@ -10,7 +10,7 @@ use App\Models\Gasto;
 use App\Models\GastoProyectado;
 use App\Models\User;
 use PDF;
-
+use Carbon\Carbon;
 class DocumentoController extends Controller
 {
 
@@ -22,6 +22,7 @@ class DocumentoController extends Controller
             'gastos.*.monto_total' => 'required|numeric|min:0.01',
             'gastos.*.glosa' => 'required|string|max:1000',
             'gastos.*.id_gasto_proyectado' => 'required|integer',
+            'gastos.*.fecha_documento' => 'required|date_format:Y-m-d',
         ]);
 
         if ($validator->fails()) {
@@ -36,13 +37,15 @@ class DocumentoController extends Controller
             $gastoProyectado = GastoProyectado::find($gasto['id_gasto_proyectado']);
             return array_merge($gasto, [
                 'gasto_proyectado_descripcion' => $gastoProyectado->descripcion ?? 'N/A',
+                'glosa' => $gasto['glosa'],
+                'monto_total' => $gasto['monto_total'],
+                'fecha_documento' => Carbon::parse($gasto['fecha_documento']),
             ]);
         });
 
         $data = [
-            'nombreCompleto' => $user->name . ' ' . $user->last_name,
-            'dni' => $user->dni,
-            'fecha' => now()->isoFormat('D [de] MMMM [de] YYYY'),
+            'usuario_declarante' => $user,
+            'fecha_declaracion' => now(),
             'gastos' => $gastosData,
             'totalGeneral' => $gastosData->sum('monto_total'),
         ];
@@ -84,21 +87,11 @@ class DocumentoController extends Controller
         }
 
         // 3. Preparar los datos para la vista del PDF.
-        $gastosData = $gastos->map(function ($gasto) {
-            return [
-                'gasto_proyectado_descripcion' => $gasto->gastoProyectado->descripcion ?? 'N/A',
-                'glosa' => $gasto->glosa,
-                'monto_total' => $gasto->monto_total,
-
-            ];
-        });
-
         $data = [
-            'nombreCompleto' => $user->name . ' ' . $user->last_name,
-            'dni' => $user->dni,
-            'fecha' => now()->isoFormat('D [de] MMMM [de] YYYY'),
-            'gastos' => $gastosData,
-            'totalGeneral' => $gastosData->sum('monto_total'),
+            'usuario_declarante' => $user,
+            'fecha_declaracion' => now(),
+            'gastos' => $gastos, // Pasamos la colección de modelos Gasto directamente
+            'totalGeneral' => $gastos->sum('monto_total'),
         ];
 
         // 4. Cargar la vista de Blade y generar el PDF.

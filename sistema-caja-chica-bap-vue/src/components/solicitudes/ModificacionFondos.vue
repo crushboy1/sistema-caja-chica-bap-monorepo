@@ -4,14 +4,14 @@
 
     <div>
       <Transition name="fade-slide" mode="out-in">
-        <!-- VISTA LISTA - Mejorada con mejor organización -->
+        <!-- VISTA LISTA  -->
         <div v-if="vistaActual === 'lista'" key="mod-list-view">
           <div class="mb-6">
             <h3 class="text-2xl font-semibold text-gray-800 mb-2">Fondos Disponibles para Modificar</h3>
             <p class="text-gray-600">Selecciona un fondo activo para realizar modificaciones</p>
           </div>
 
-          <!-- Filtros de Búsqueda - Reorganizados -->
+          <!-- Filtros de Búsqueda -->
           <div class="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl shadow-inner mb-6 border border-gray-200">
             <div class="flex items-center mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -31,7 +31,7 @@
                   id="filter_codigo_fondo" 
                   v-model="filtro.codigo_fondo"
                   class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                  placeholder="Ej: FNRO-00001" 
+                  placeholder="Ej: GSO-FON-01-0001" 
                 />
                 <div v-if="buscandoFondos && filtro.codigo_fondo.length > 0" class="absolute right-3 top-11 text-verde-bap">
                   <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -126,7 +126,6 @@ class GastoController extends Controller
     public function store(Request $request)
     {
         // 1. VALIDACIÓN
-        // El asterisco (*) aplica las reglas a cada elemento del array.
         $rules = [
             'id_fondo_efectivo' => ['required', 'integer', 'exists:fondo_efectivo,id_fondo'],
             'gastos' => 'required|array|min:1',
@@ -191,13 +190,32 @@ class GastoController extends Controller
             $djConsolidadaId = null;
 
             // 2.1. --- MANEJO DE LA DJ CONSOLIDADA (ANTES DEL BUCLE) ---
-            if ($request->hasFile('dj_consolidada_file')) {
-                $pathDj = $request->file('dj_consolidada_file')->store('djs_consolidadas', 'public');
-                $djConsolidada = \App\Models\DjConsolidada::create([
-                    'ruta_documento' => $pathDj,
-                    'id_uploader' => $user->id,
+            $tieneGastosDJ = collect($gastosParaCrear)->contains('es_declaracion_jurada', true);
+
+            if ($tieneGastosDJ) {
+                // Calculamos el monto total solo de los gastos que son parte de esta DJ.
+                $montoTotalDJ = collect($gastosParaCrear)
+                    ->where('es_declaracion_jurada', true)
+                    ->sum('monto_total');
+
+                $pathDjFirmado = null;
+                $idUploaderFirmado = null;
+
+                // Si se adjunta el archivo firmado en el momento, lo guardamos.
+                if ($request->hasFile('dj_consolidada_file')) {
+                    $pathDjFirmado = $request->file('dj_consolidada_file')->store('djs_consolidadas', 'public');
+                    $idUploaderFirmado = $user->id;
+                }
+
+                $djConsolidada = DjConsolidada::create([
+                    'fondo_efectivo_id' => $fondo->id_fondo,
+                    'fecha_declaracion' => now(),
+                    'monto_total_declarado' => $montoTotalDJ,
+                    'estado' => 'Declarado', // Estado inicial
+                    'creado_por' => $user->id, // El usuario que declara
+                    'ruta_documento_firmado' => $pathDjFirmado,
+                    'id_uploader_firmado' => $idUploaderFirmado,
                 ]);
-                $djConsolidadaId = $djConsolidada->id_dj_consolidada;
             }
 
             // 2.2. --- PREPARACIÓN DE DATOS (EFICIENCIA) ---
@@ -212,14 +230,16 @@ class GastoController extends Controller
             foreach ($gastosParaCrear as $index => $gastoData) {
                 $pathEvidenciaIndividual = null;
                 $idDjParaGasto = null;
-                $esGastoConDJConsolidada = false;
+
                 // --- Lógica condicional para asignar la evidencia correcta ---
-                if (($gastoData['es_declaracion_jurada'] || $gastoData['tipo_documento'] === 'Declaración Jurada') && $djConsolidadaId) {
-                    $idDjParaGasto = $djConsolidadaId;
-                    $esGastoConDJConsolidada = true;
+                if ($gastoData['es_declaracion_jurada'] && $djConsolidada) {
+                    $idDjParaGasto = $djConsolidada->id_dj_consolidada;
+                    // La evidencia de un gasto de DJ es la propia DJ firmada, que ya está en la tabla consolidada.
+                    // No se guarda una ruta de evidencia individual para este gasto.
                 } elseif ($request->hasFile("gastos.{$index}.evidencia")) {
                     $pathEvidenciaIndividual = $request->file("gastos.{$index}.evidencia")->store('evidencias_gastos', 'public');
                 } else {
+                    // Si no es DJ y no tiene evidencia, es un error.
                     throw ValidationException::withMessages(["gastos.{$index}.evidencia" => 'Se requiere un archivo de evidencia para este gasto.']);
                 }
 
@@ -231,16 +251,16 @@ class GastoController extends Controller
                 $fechaRendicion = null;
                 $fechaLimiteRendicion = null;
                 if ($user->hasAnyRole(['jefe_administracion', 'super_admin'])) {
-                    $estadoInicial = $esGastoConDJConsolidada ? 'Pendiente de Validación DJ' : 'Contabilizado';
+                    $estadoInicial = $idDjParaGasto ? 'Pendiente de Validación DJ' : 'Contabilizado';
                     $idJefeAprobador = $user->id;
                     $idValidadorAdm = $user->id;
-                    $descontarSaldo = !$esGastoConDJConsolidada;
+                    $descontarSaldo = !$idDjParaGasto;
                     if ($estadoInicial === 'Contabilizado') {
                         $fechaRendicion = now();
                         $fechaLimiteRendicion = Carbon::parse($gastoData['fecha_documento'])->endOfMonth();
                     }
                 } elseif ($user->hasAnyRole(['gerente_general', 'jefe_area'])) {
-                    $estadoInicial = $esGastoConDJConsolidada ? 'Pendiente de Validación DJ' : 'Pendiente de Validación Contable';
+                    $estadoInicial = $idDjParaGasto ? 'Pendiente de Validación DJ' : 'Pendiente de Validación Contable';
                     $idJefeAprobador = $user->id;
                 }
 
@@ -364,8 +384,8 @@ class GastoController extends Controller
 
         // 2. --- Lógica de Autorización y Permisos por Rol ---
         $isJefeAreaAutorizado = ($user->hasRole('jefe_area') && $user->area_id === $gasto->registrador->area_id);
-        $isAdministrador = in_array($user->hasRole('jefe_administracion'), ['jefe_administracion', 'super_admin']); // Corregir esta línea si usas hasAnyRole
-        // REVISAR: $isAdministrador = $user->hasAnyRole(['jefe_administracion', 'super_admin']); // Esta línea es la que debería estar si se usa hasAnyRole
+        $isAdministrador = $user->hasAnyRole(['jefe_administracion', 'super_admin']);
+
 
         if (!$isJefeAreaAutorizado && !$isAdministrador) {
             return response()->json(['message' => 'No tienes permiso para observar este gasto.'], 403);
@@ -580,14 +600,21 @@ class GastoController extends Controller
         if (!in_array($primerEstado, $estadosValidos)) {
             return response()->json(['message' => 'Los gastos no se encuentran en un estado válido para ser consolidados.'], 409);
         }
-        return DB::transaction(function () use ($gastosAConsolidar, $user, $request) {
+        return DB::transaction(function () use ($gastosAConsolidar, $user, $request, $primerFondoId) {
             $pathDj = $request->file('dj_consolidada_file')->store('djs_consolidadas', 'public');
             $djConsolidada = DjConsolidada::create([
-                'ruta_documento' => $pathDj,
-                'id_uploader' => $user->id,
+                'fondo_efectivo_id' => $primerFondoId,
+                'fecha_declaracion' => now(),
+                'monto_total_declarado' => $gastosAConsolidar->sum('monto_total'),
+                'estado' => 'Declarado',
+                'creado_por' => $user->id,
+                'ruta_documento_firmado' => $pathDj,
+                'id_uploader_firmado' => $user->id,
             ]);
 
-            $nuevoEstado = $user->hasAnyRole(['jefe_area', 'gerente_general']) ? 'Pendiente de Validación DJ' : 'Pendiente de Aprobación';
+            $nuevoEstado = $user->hasAnyRole(['jefe_area', 'gerente_general', 'jefe_administracion', 'super_admin'])
+                ? 'Pendiente de Validación DJ'
+                : 'Pendiente de Aprobación';
 
             foreach ($gastosAConsolidar as $gasto) {
                 $estadoAnterior = $gasto->estado;
@@ -724,7 +751,7 @@ class GastoController extends Controller
      */
     public function show(Gasto $gasto)
     {
-        // CAMBIO: La política de autorización se ha reescrito para ser más explícita y
+        // La política de autorización se ha reescrito para ser más explícita y
         // seguir exactamente las reglas de negocio definidas.
         $user = Auth::user();
 
