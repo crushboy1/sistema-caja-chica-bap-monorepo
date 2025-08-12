@@ -20,8 +20,8 @@ Route::get('/health', function (Request $request) {
 |
 */
 
-Route::prefix('auth')->group(base_path('routes/api/auth.php'));
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+Route::prefix('auth')->middleware('throttle:60,1')->group(base_path('routes/api/auth.php'));
+Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
     require base_path('routes/api/solicitudes.php');
     require base_path('routes/api/fondos.php');
     require base_path('routes/api/gastos.php');

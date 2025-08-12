@@ -22,60 +22,27 @@
         </div>
 
         <!-- Panel de Contadores Globales -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Card Monto Total -->
+            <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out p-6 flex flex-col justify-between border border-gray-200">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Monto Asignado al Fondo</p>
-                    <p class="text-3xl font-bold text-gray-800">
-                        {{ fondoActivoDetalles ? currencyFormatter.format(fondoActivoDetalles.monto_asignado) : 'Seleccione un gasto' }}
-                    </p>
-                </div>
-                <p class="text-xs text-gray-400 mt-2">Monto total del fondo activo.</p>
-            </div>
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Saldo Disponible</p>
-                    <p class="text-3xl font-bold text-verde-bap">
-                        {{ saldoFondoActivo !== null ? currencyFormatter.format(saldoFondoActivo) : 'Seleccione un gasto' }}
-                    </p>
-                </div>
-                <p class="text-xs text-gray-400 mt-2">Balance actual del fondo activo.</p>
-            </div>
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Monto Total (Filtrado)</p>
-                    <p class="text-3xl font-bold text-gray-800">
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Monto Total</p>
+                    <p class="text-4xl font-bold text-gray-800 mt-2">
                         {{ currencyFormatter.format(contadores.montos.total) }}
                     </p>
                 </div>
-                <p class="text-xs text-gray-400 mt-2">Suma de gastos en la vista actual.</p>
+                <p class="text-xs text-gray-400 mt-4">Suma de todos los gastos en la vista actual.</p>
             </div>
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
+
+            <!-- Card # Gastos -->
+            <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out p-6 flex flex-col justify-between border border-gray-200">
                 <div>
-                    <p class="text-sm font-medium text-gray-500">Monto Proyectado (Filtrado)</p>
-                    <p class="text-3xl font-bold text-gray-800">
-                        {{ currencyFormatter.format(contadores.montos.proyectado) }}
-                    </p>
-                </div>
-                <p class="text-xs text-gray-400 mt-2">Suma de montos proyectados.</p>
-            </div>
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Monto Original (Filtrado)</p>
-                    <p class="text-3xl font-bold text-gray-800">
-                        {{ currencyFormatter.format(contadores.montos.original) }}
-                    </p>
-                </div>
-                <p class="text-xs text-gray-400 mt-2">Suma de montos originales.</p>
-            </div>
-            <div class="p-5 bg-white rounded-xl shadow-strong border border-gray-200 flex flex-col justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500"># Gastos (Filtrado)</p>
-                    <p class="text-3xl font-bold text-gray-800">
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wider"># Gastos</p>
+                    <p class="text-4xl font-bold text-gray-800 mt-2">
                         {{ contadores.estados.total }}
                     </p>
                 </div>
-                <p class="text-xs text-gray-400 mt-2">Cantidad de gastos en la vista actual.</p>
+                <p class="text-xs text-gray-400 mt-4">Cantidad total de gastos en la vista actual.</p>
             </div>
         </div>
 
@@ -94,8 +61,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-yellow-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesAprobacion.total) }}</span></p>
-                        <p class="text-xs text-yellow-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesAprobacion.proyectado) }}</p>
-                        <p class="text-xs text-yellow-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesAprobacion.original) }}</p>
                     </div>
                 </div>
 
@@ -107,8 +72,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-orange-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.total) }}</span></p>
-                        <p class="text-xs text-orange-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.proyectado) }}</p>
-                        <p class="text-xs text-orange-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.original) }}</p>
                     </div>
                 </div>
 
@@ -120,8 +83,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-purple-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.total) }}</span></p>
-                        <p class="text-xs text-purple-700">Proy: {{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.proyectado) }}</p>
-                        <p class="text-xs text-purple-700">Orig: {{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.original) }}</p>
                     </div>
                 </div>
 
@@ -133,8 +94,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-red-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.observados.total) }}</span></p>
-                        <p class="text-xs text-red-700">Proy: {{ currencyFormatter.format(contadores.montos.observados.proyectado) }}</p>
-                        <p class="text-xs text-red-700">Orig: {{ currencyFormatter.format(contadores.montos.observados.original) }}</p>
                     </div>
                 </div>
 
@@ -146,8 +105,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-gray-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.rechazados.total) }}</span></p>
-                        <p class="text-xs text-gray-700">Proy: {{ currencyFormatter.format(contadores.montos.rechazados.proyectado) }}</p>
-                        <p class="text-xs text-gray-700">Orig: {{ currencyFormatter.format(contadores.montos.rechazados.original) }}</p>
                     </div>
                 </div>
 
@@ -159,8 +116,6 @@
                     </div>
                     <div class="mt-2 text-right">
                         <p class="text-sm text-green-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.contabilizados.total) }}</span></p>
-                        <p class="text-xs text-green-700">Proy: {{ currencyFormatter.format(contadores.montos.contabilizados.proyectado) }}</p>
-                        <p class="text-xs text-green-700">Orig: {{ currencyFormatter.format(contadores.montos.contabilizados.original) }}</p>
                     </div>
                 </div>
             </div>
@@ -203,10 +158,7 @@
                 <table class="min-w-full divide-y  divide-gray-200" style="table-layout: fixed; min-width: 900px;">
                     <thead class="bg-gray-50 ">
                         <tr>
-                            <th scope="col" class="p-4 w-12 ">
-                                <input type="checkbox" v-model="todosSeleccionados"
-                                    class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light">
-                            </th>
+                            
                             <th scope="col"
                                 class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 Código</th>
@@ -236,11 +188,7 @@
                     <transition-group name="gasto-list" tag="tbody" class="bg-white divide-y divide-gray-200">
                         <tr v-for="gasto in gastosFiltrados" :key="gasto.id"
                             class="hover:bg-verde-bap-extralight transition-colors duration-200">
-                            <td class="p-4 align-middle">
-                                <input type="checkbox" v-model="gastosSeleccionados" :value="gasto.id"
-                                    :disabled="esCheckboxDeshabilitado(gasto)"
-                                    class="form-checkbox h-5 w-5 text-verde-bap rounded focus:ring-verde-bap-light disabled:bg-gray-200 disabled:cursor-not-allowed">
-                            </td>
+                            
                             <td
                                 class="px-4 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900 align-middle">
                                 {{ gasto.codigo_gasto }}</td>
@@ -260,7 +208,7 @@
                                 <div class="flex items-center justify-center space-x-2">
                                     <button @click="abrirModalDetalle(gasto)"
                                         class="p-2 rounded-full  hover:bg-blue-100 text-blue-600 transition-colors"
-                                        title="Ver Detalle">
+                                        title="Ver Detalle" aria-label="Ver detalle del gasto">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -271,13 +219,14 @@
                                     </button>
                                     <button v-if="gasto.estado === 'Observado'" @click="abrirModalCorreccion(gasto)"
                                         class="p-2 rounded-full hover:bg-orange-100 text-orange-600 transition-colors"
-                                        title="Corregir Gasto">
+                                        title="Corregir Gasto" aria-label="Corregir gasto observado">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z">
                                             </path>
                                         </svg>
                                     </button>
+                                    
                                 </div>
                             </td>
                         </tr>
@@ -356,15 +305,6 @@ const fetchFondoDetalles = async (fondoId) => {
     }
 };
 
-const saldoFondoActivo = computed(() => {
-    if (!fondoActivoDetalles.value) {
-        return null;
-    }
-    // Usar el saldo_disponible que ya viene calculado del backend
-    return parseFloat(fondoActivoDetalles.value.saldo_disponible);
-});
-
-
 // --- LÓGICA DE DATOS ---
 onMounted(() => {
     fetchGastos();
@@ -433,8 +373,11 @@ const contadores = computed(() => {
 
     return gastosFiltrados.value.reduce((acc, gasto) => {
         const monto = parseFloat(gasto.monto_total) || 0;
-        const montoProyectado = parseFloat(gasto.monto_proyectado) || 0;
-        const montoOriginal = parseFloat(gasto.monto_original) || 0;
+        // Un gasto puede o no estar asociado a una proyección.
+        // Si tiene una proyección, ese es el monto proyectado/original.
+        // Si no (es un gasto directo), su monto "proyectado" y "original" es su propio monto total.
+        const montoProyectado = parseFloat(gasto.monto_proyectado_original) || monto;
+        const montoOriginal = montoProyectado;
 
         // Contadores generales
         acc.estados.total++;

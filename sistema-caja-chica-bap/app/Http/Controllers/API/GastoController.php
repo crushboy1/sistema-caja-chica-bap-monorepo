@@ -1115,52 +1115,73 @@ class GastoController extends Controller
 
         $gastosParaExportar = $query->orderBy('id', 'asc')->get();
 
+        // --- OPTIMIZACIÓN N+1 ---
+        // Obtenemos todas las fechas de contabilización en una sola consulta.
+        $gastoIds = $gastosParaExportar->pluck('id');
+        $fechasContabilizacion = HistorialAprobacionGasto::whereIn('id_gasto', $gastoIds)
+            ->where('estado_nuevo', 'Contabilizado')
+            ->pluck('created_at', 'id_gasto'); // Clave: id_gasto, Valor: created_at
+        
         $headings = [
-            'Numero Correlativo',
-            'Serie SAP',
-            'Fecha de Contabilización',
-            'Fecha del Documento',
-            'Dirección de correo',
-            'Moneda del Documento',
-            'Total del Documento',
-            'Glosa para el Asiento',
-            'Tipo de Documento',
-            'Serie del Documento',
-            'Correlativo del Documento',
-            'Referencia de documento',
-            'Desc. Cuenta',
-            'Personal que realizó el gasto',
-            'Evidencia',
-            'Comentarios',
+            'Numero Correlativo', 'Serie SAP', 'Fecha de Contabilización', 'Fecha del Documento',
+            //'Dirección de correo',
+            'Moneda del Documento', 'Total del Documento', 'Tipo Doc. (SAP)', 'Glosa para el Asiento',
+            'Tipo Doc. (SUNAT)', 'Serie del Documento', 'Correlativo del Documento', 'Referencia de documento',
+            //'Desc. Cuenta',
+            //'Personal que realizó el gasto',
+            'Evidencia', 'Comentarios',
         ];
+        
+        $data = $gastosParaExportar->map(function ($gasto) use ($fechasContabilizacion) {
+            // --- LÓGICA DE URL MEJORADA ---
+        $evidenciaUrl = 'N/A';
+        if ($gasto->djConsolidada && $gasto->djConsolidada->ruta_documento_firmado) {
+                // Storage::url genera la URL pública correcta para el disco 'public'.
+                $evidenciaUrl = url(\Storage::url($gasto->djConsolidada->ruta_documento_firmado));
+            } elseif ($gasto->ruta_evidencia) {
+                $evidenciaUrl = url(\Storage::url($gasto->ruta_evidencia));
+            }
 
-        $data = $gastosParaExportar->map(function ($gasto, $djs_consolidadas) {
-            $tipo = $gasto->tipo_documento ?? 'N/A';
+            // --- BÚSQUEDA DE FECHA OPTIMIZADA ---
+            $fechaContabilizacion = $fechasContabilizacion->get($gasto->id);
+            $fechaMostrar = $fechaContabilizacion
+                ? \Carbon\Carbon::parse($fechaContabilizacion)->format('Ymd')
+                : ($gasto->created_at?->format('Ymd') ?? 'N/A');
+            
+            $mapTipoDocumento = [
+                'Factura' => '01',
+                'Boleta de Venta' => '02',
+                'Declaración Jurada' => '03',
+            ];
+            $tipoDocumento = $mapTipoDocumento[$gasto->tipo_documento] ?? 'N/A';
             $serie = $gasto->serie_documento ?? 'N/A';
             $correlativo = $gasto->correlativo_documento ?? 'N/A';
-
-            $documentoCompleto = "{$tipo}-{$serie}-{$correlativo}";
+            $documentoCompleto = "{$tipoDocumento}-{$serie}-{$correlativo}";
+           
             return [
                 $gasto->id,
                 '323',
-                $gasto->created_at ? $gasto->created_at->format('d/m/Y') : 'N/A',
-                $gasto->fecha_documento ? $gasto->fecha_documento->format('d/m/Y') : 'N/A',
-                $gasto->registrador->email,
+            //verficar del historial de gastos 
+                $fechaMostrar,
+                $gasto->fecha_documento ? $gasto->fecha_documento->format('Ymd') : 'N/A',
+                //$gasto->registrador->email,
                 'SOL',
                 number_format($gasto->monto_total, 2, '.', ''),
+                'dDocument_Service',
                 $gasto->glosa,
-                $gasto->tipo_documento ?? 'N/A',
-                $gasto->serie_documento ?? 'N/A',
-                $gasto->correlativo_documento ?? 'N/A',
+                //$gasto->tipo_documento ?? 'N/A'
+                $tipoDocumento,
+                $serie,
+                $correlativo,
                 $documentoCompleto,
-                $gasto->cuentaContable->descripcion ?? 'N/A',
-                $gasto->registrador->name . ' ' . $gasto->registrador->last_name,
-                $gasto->djConsolidada ? \Illuminate\Support\Facades\Storage::url($gasto->djConsolidada->ruta_documento) : ($gasto->evidencia_url ?? 'N/A'),
+                //$gasto->cuentaContable->descripcion ?? 'N/A',
+                //$gasto->registrador->name . ' ' . $gasto->registrador->last_name,
+                $evidenciaUrl,
                 $gasto->comentario ?? 'N/A',
             ];
         })->toArray();
 
-        return Excel::download(new GastosReportExport($data, $headings), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\GastosReportExport($data, $headings), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
     }
 
     /**

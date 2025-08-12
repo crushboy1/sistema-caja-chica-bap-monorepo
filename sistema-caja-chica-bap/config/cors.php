@@ -12,14 +12,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // Configuración específica para tu setup Docker
-    'allowed_origins' => [
-        'http://localhost:3000',          // Frontend Vue
-        'http://127.0.0.1:3000',          // Frontend Vue alternativo
-        'http://caja-chica-frontend:3000', // Comunicación entre contenedores
-        'http://localhost:8080',          // Backend Laravel (para testing)
-        'http://127.0.0.1:8080'           // Backend Laravel alternativo
-    ],
+    // Configuración específica para tu setup Docker con soporte para variables de entorno
+    'allowed_origins' => array_filter(array_map('trim', explode(',', env('CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,http://127.0.0.1:3000,http://caja-chica-frontend:3000,http://localhost:8080,http://127.0.0.1:8080'
+    )))),
 
     'allowed_origins_patterns' => [],
 

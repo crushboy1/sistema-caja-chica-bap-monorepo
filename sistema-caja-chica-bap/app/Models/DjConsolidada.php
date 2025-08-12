@@ -97,7 +97,7 @@ class DjConsolidada extends Model
     public function getDocumentoFirmadoUrlAttribute(): ?string
     {
         if ($this->ruta_documento_firmado && Storage::disk('public')->exists($this->ruta_documento_firmado)) {
-            return Storage::url($this->ruta_documento_firmado);
+            return url(Storage::url($this->ruta_documento_firmado));
         }
         return null;
     }
