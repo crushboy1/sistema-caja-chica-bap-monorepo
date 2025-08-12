@@ -60,6 +60,33 @@ const isPdf = (url) => {
     return result;
 };
 
+// --- CONSTS Y HELPERS PARA ALINEAR CON EXCEL ---
+const SAP_SERIE = '323';
+const SAP_TIPO_DOCUMENTO = 'dDocument_Service';
+const MONEDA_DOCUMENTO = 'SOL';
+
+const mapTipoDocumentoSunat = {
+    'Factura': '01',
+    'Boleta de Venta': '02',
+    'Declaración Jurada': '03',
+};
+
+const getTipoDocumentoSunat = (tipo) => mapTipoDocumentoSunat[tipo] || 'N/A';
+
+const getReferenciaDocumento = (g) => {
+    if (!g) return 'N/A';
+    const tipo = getTipoDocumentoSunat(g.tipo_documento);
+    const serie = g.serie_documento || 'N/A';
+    const correlativo = g.correlativo_documento || 'N/A';
+    return `${tipo}-${serie}-${correlativo}`;
+};
+
+const getFechaContabilizacion = (g) => {
+    const historial = g?.historial_aprobaciones || [];
+    const record = historial.find(h => String(h.estado_nuevo || '').toLowerCase() === 'contabilizado');
+    return record ? formatDate(record.created_at) : 'N/A';
+};
+
 // --- PROPIEDADES COMPUTADAS ---
 const estadisticas = computed(() => {
     const contadores = {
@@ -501,7 +528,11 @@ onMounted(() => {
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg">
                     <thead class="bg-gray-100">
                         <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
+                            
+
                             <th class="py-3 px-2 text-center font-semibold"></th> <!-- Expander -->
+                            <th class="py-3 px-2 text-center font-semibold">Número Correlativo</th>
+                            <th class="py-3 px-2 text-center font-semibold">Serie SAP</th>
                             <th class="py-3 px-2 text-center font-semibold">Tipo</th>
                             <th class="py-3 px-2 text-center font-semibold">Código</th>
                             <th class="py-3 px-2 text-center font-semibold">Glosa / Descripción</th>
@@ -509,10 +540,14 @@ onMounted(() => {
                             <th class="py-3 px-2 text-center font-semibold">Desc. Cuenta</th>
                             <th class="py-3 px-2 text-center font-semibold">Fondo</th>
                             <th class="py-3 px-2 text-center font-semibold">Proyección Gasto</th>
-                            <th class="py-3 px-2 text-center font-semibold">Tipo Documento</th>
+                            <th class="py-3 px-2 text-center font-semibold">Tipo Doc. (SAP)</th>
+                            <th class="py-3 px-2 text-center font-semibold">Tipo Doc. (SUNAT)</th>
                             <th class="py-3 px-2 text-center font-semibold">Serie</th>
                             <th class="py-3 px-2 text-center font-semibold">Correlativo</th>
-                            <th class="py-3 px-2 text-center font-semibold">Fecha</th>
+                            <th class="py-3 px-2 text-center font-semibold">Referencia Doc</th>
+                            <th class="py-3 px-2 text-center font-semibold">Fecha Doc.</th>
+                            <th class="py-3 px-2 text-center font-semibold">Fecha Contab.</th>
+                            <th class="py-3 px-2 text-center font-semibold">Moneda</th>
                             <th class="py-3 px-2 text-center font-semibold">Monto</th>
                             <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
                             <th class="py-3 px-2 text-center font-semibold">Registrador</th>
@@ -541,6 +576,8 @@ onMounted(() => {
                                         </svg>
                                     </button>
                                 </td>
+                                <td class="py-3 px-2 text-center">—</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-2 text-center">—</td> <!-- Serie SAP -->
                                 <td class="py-3 px-2">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
@@ -567,12 +604,19 @@ onMounted(() => {
                                         item.id_dj_consolidada }}</div>
                                     <div class="text-xs text-blue-600">Consolidada</div>
                                 </td>
-                                <td class="py-3 px-2 text-sm text-gray-700 font-medium text-center" colspan="8">Gastos consolidados
-                                    <div class="text-xs text-gray-500 text-center">Múltiples conceptos de gasto</div>
-                                </td>
-                                <td class="py-3 px-2 text-center text-gray-500">
-                                    {{ formatDate(item.fecha_registro) }}
-                                </td>
+                                <td class="py-3 px-2 text-sm text-gray-700">Gastos consolidados</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-center">—</td> <!-- Tipo Doc (SAP) -->
+                                <td class="py-3 px-2 text-center">—</td> <!-- Tipo Doc (SUNAT) -->
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-left text-xs">—</td>
+                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}</td>
+                                <td class="py-3 px-2 text-center">—</td> <!-- Fecha Contab -->
+                                <td class="py-3 px-2 text-center">—</td> <!-- Moneda -->
                                 <td class="py-3 px-2 text-center">
                                     <div class="font-bold text-lg text-blue-800">{{
                                         currencyFormatter.format(item.monto_total_grupo || 0)
@@ -590,7 +634,12 @@ onMounted(() => {
                                 <td class="py-3 px-2 text-left text-xs">{{ item.registrador?.area?.name }}</td>
                                 <td class="py-3 px-2 text-left text-xs text-gray-500">Múltiples comentarios</td>
                                 <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.registrador?.email">{{ item.registrador?.email }}</td>
-                                <td class="py-3 px-2 text-center text-xs text-gray-500 italic">Ver en detalle</td>
+                                <td class="py-3 px-2 text-center text-xs">
+                                    <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    </a>
+                                    <span v-else class="text-xs text-gray-400">N/A</span>
+                                </td>
                                 <td class="py-3 px-2 text-center">     
                                 </td>
                             </tr>
@@ -607,11 +656,12 @@ onMounted(() => {
                                             <span class="text-blue-600 text-xs font-bold">{{ index + 1 }}</span>
                                         </div>
                                     </td>
+                                    <td class="py-3 px-2 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
+                                    <td class="py-3 px-2 text-center text-gray-600">{{ SAP_SERIE }}</td> <!-- Serie SAP -->
                                     <td class="py-3 px-2 text-center text-gray-600">
                                         <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}
-                                    </td>
+                                    <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}</td>
                                     <td class="py-3 px-2 text-center text-gray-700">{{ gasto.glosa }}</td>
                                     <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
                                         {{ gasto.cuenta_contable?.codigo_cuenta }}
@@ -625,10 +675,14 @@ onMounted(() => {
                                     <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
                                         {{ gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                     </td>
-                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.tipo_documento }}</td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ SAP_TIPO_DOCUMENTO }}</td> <!-- Tipo Doc SAP -->
+                                    <td class="py-3 px-2 text-left text-xs">{{ getTipoDocumentoSunat(gasto.tipo_documento) }}</td> <!-- Tipo Doc SUNAT -->
                                     <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.serie_documento || 'N/A' }}</td>
                                     <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.correlativo_documento || 'N/A' }}</td>
+                                    <td class="py-3 px-2 text-left text-xs">{{ getReferenciaDocumento(gasto) }}</td>
                                     <td class="py-3 px-2 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
+                                    <td class="py-3 px-2 text-center">{{ getFechaContabilizacion(gasto) }}</td>
+                                    <td class="py-3 px-2 text-center">{{ MONEDA_DOCUMENTO }}</td>
                                     <td class="py-3 px-2 text-center text-gray-800 font-semibold">
                                         {{ currencyFormatter.format(parseFloat(gasto.monto_total || 0)) }}
                                     </td>
@@ -647,14 +701,11 @@ onMounted(() => {
                                     <td class="py-3 px-2 text-left text-xs">{{ gasto.comentario || 'N/A' }}</td>
                                     <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="gasto.registrador?.email">{{ gasto.registrador?.email }}</td>
                                     <td class="py-3 px-2 text-center text-gray-500">
-                                        <a v-if="item.dj_consolidada && item.dj_consolidada.documento_url" :href="item.dj_consolidada.documento_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
-                                            <!-- DJ is always PDF -->
+                                        <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         </a>
                                         <a v-else-if="gasto.evidencia_url" :href="gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia Individual">
-                                            <!-- Icono para PDF -->
                                             <svg v-if="isPdf(gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                            <!-- Icono para Imagen -->
                                             <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                         </a>
                                         <span v-else class="text-xs text-gray-400">N/A</span>
@@ -688,6 +739,8 @@ onMounted(() => {
                                         </svg>
                                     </div>
                                 </td>
+                                <td class="py-3 px-2 text-center">{{ item.gasto?.id }}</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-2 text-center">{{ SAP_SERIE }}</td> <!-- Serie SAP -->
                                 <td class="py-3 px-2">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
@@ -727,11 +780,15 @@ onMounted(() => {
                                 <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
                                     {{ item.gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.tipo_documento }}</td>
+                                <td class="py-3 px-2 text-left text-xs">{{ SAP_TIPO_DOCUMENTO }}</td> <!-- Tipo Doc SAP -->
+                                <td class="py-3 px-2 text-left text-xs">{{ getTipoDocumentoSunat(item.gasto.tipo_documento) }}</td> <!-- Tipo Doc SUNAT -->
                                 <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.serie_documento || 'N/A' }}</td>
                                 <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.correlativo_documento || 'N/A' }}</td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.created_at)
+                                <td class="py-3 px-2 text-left text-xs">{{ getReferenciaDocumento(item.gasto) }}</td>
+                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.fecha_documento)
                                     }}</td>
+                                <td class="py-3 px-2 text-center text-gray-500">{{ getFechaContabilizacion(item.gasto) }}</td>
+                                <td class="py-3 px-2 text-center">{{ MONEDA_DOCUMENTO }}</td>
                                 <td class="py-3 px-2 text-center font-semibold text-lg text-verde-bap-dark">
                                     {{ currencyFormatter.format(parseFloat(item.gasto?.monto_total || 0)) }}
                                 </td>
@@ -749,10 +806,8 @@ onMounted(() => {
                                 <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.gasto.registrador?.email">{{ item.gasto.registrador?.email }}</td>
                                 <td class="py-3 px-2 text-center">
                                     <a v-if="item.gasto.evidencia_url" :href="item.gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
-                                        <!-- Icono para PDF -->
                                         <svg v-if="isPdf(item.gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                        <!-- Icono para Imagen -->
-                                        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 01-2 2v12a2 2 0 002 2z"></path></svg>
                                     </a>
                                     <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>

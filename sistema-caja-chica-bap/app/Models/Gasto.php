@@ -199,7 +199,7 @@ class Gasto extends Model
     public function getEvidenciaUrlAttribute()
     {
         if ($this->ruta_evidencia) {
-            return Storage::url($this->ruta_evidencia);
+            return url(Storage::url($this->ruta_evidencia));
         }
         return null;
     }

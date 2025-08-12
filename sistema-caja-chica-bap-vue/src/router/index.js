@@ -1,9 +1,11 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '@/views/LoginView.vue'
-import MainLayout from '@/components/layout/MainLayout.vue' // Importa el nuevo componente de layout
+import MainLayout from '@/components/layout/MainLayout.vue'
 import SolicitudFondoView from '@/views/SolicitudFondoView.vue'
 import GestiondeUsuariosView from '@/views/AdministracionView.vue'
+import api from '@/plugins/axios'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -15,22 +17,23 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
+      meta: { public: true },
     },
     {
       path: '/about',
       name: 'about',
       component: () => import('../views/AboutView.vue'),
+      meta: { public: true },
     },
     {
-      // La ruta /dashboard ahora usa MainLayout como su componente principal
       path: '/dashboard',
-      component: MainLayout, // MainLayout contendrá el navbar y el <router-view> para las rutas hijas
-      // meta: { requiresAuth: true }, // Puedes añadir esto para proteger la ruta
+      component: MainLayout,
+      meta: { requiresAuth: true },
       children: [
         {
-          path: '', // Ruta por defecto para /dashboard (ej. un resumen)
+          path: '',
           name: 'dashboard-home',
-          component: () => import('@/views/DashboardView.vue'), // Ahora DashboardView es una vista hija
+          component: () => import('@/views/DashboardView.vue'),
         },
         {
           path: 'solicitudes',
@@ -45,28 +48,51 @@ const router = createRouter({
         {
           path: 'fondos',
           name: 'dashboard-fondos',
-          component: () => import('@/components/fondos/GestionFondos.vue'), // Apuntando a tu componente
+          component: () => import('@/components/fondos/GestionFondos.vue'),
         },
         {
           path: 'administracion',
           name: 'administracion',
           component: () => import('@/views/AdministracionView.vue'),
+          meta: { roles: ['jefe_administracion', 'super_admin'] },
         },
-        // Puedes añadir más rutas hijas aquí para otros módulos
       ],
     },
   ],
 })
 
-// Opcional: Guardia de navegación para proteger rutas
-// router.beforeEach((to, from, next) => {
-//   // Ejemplo simple: Si la ruta requiere autenticación y el usuario no está autenticado
-//   // Esto requeriría una lógica de estado de autenticación global (ej. Pinia/Vuex)
-//   if (to.meta.requiresAuth && !localStorage.getItem('auth_token')) { // Ejemplo muy básico
-//     next('/login');
-//   } else {
-//     next();
-//   }
-// });
+let cachedUser = null
+
+async function getCurrentUser() {
+  if (cachedUser) return cachedUser
+  try {
+    const { data } = await api.get('/auth/user')
+    cachedUser = data
+    return data
+  } catch (e) {
+    cachedUser = null
+    throw e
+  }
+}
+
+router.beforeEach(async (to, from, next) => {
+  if (to.meta.public) return next()
+
+  if (!to.meta.requiresAuth && !to.matched.some(r => r.meta.requiresAuth)) {
+    return next()
+  }
+
+  try {
+    const data = await getCurrentUser()
+    const userRole = data?.role?.name || data?.user?.role?.name
+    const requiredRoles = to.meta.roles || to.matched.find(r => r.meta?.roles)?.meta?.roles
+    if (requiredRoles && !requiredRoles.includes(userRole)) {
+      return next('/dashboard')
+    }
+    return next()
+  } catch (e) {
+    return next('/login')
+  }
+})
 
 export default router
