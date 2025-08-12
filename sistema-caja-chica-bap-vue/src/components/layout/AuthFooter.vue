@@ -1,8 +1,8 @@
 <template>
-  <footer class="mt-10 text-center text-xs text-gray-400">
+  <footer class="mt-10 text-center text-xs text-gris-bap">
     <p>
-      <a href="#" class="hover:text-gray-600">Términos de uso</a> ·
-      <a href="#" class="hover:text-gray-600">Política de privacidad</a>
+      <a href="#" class="hover:text-gris-bap-dark">Términos de uso</a> ·
+      <a href="#" class="hover:text-gris-bap-dark">Política de privacidad</a>
     </p>
   </footer>
-</template>
+  </template>

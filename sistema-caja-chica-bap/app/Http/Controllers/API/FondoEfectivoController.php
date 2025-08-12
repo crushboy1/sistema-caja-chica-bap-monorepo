@@ -480,48 +480,59 @@ class FondoEfectivoController extends Controller
         if (!$user->hasAnyRole(['super_admin', 'jefe_administracion'])) {
             return response()->json(['message' => 'No tienes permiso para ver este resumen.'], 403);
         }
+
+        // 1. Se mantienen tus cálculos originales
         $montoAReponer = 0;
         $montoADevolver = 0;
         $gastosContabilizados = $fondo->gastos()->where('estado', 'Contabilizado')->get();
-        // Se calculan los gastos que ya están finalizados y afectan el saldo.
-        $totalGastado = $fondo->gastos()->where('estado', 'Contabilizado')->sum('monto_total');
-        // El saldo real disponible para liquidar se calcula sobre el monto aprobado, no el disponible.
-        $saldoRealParaLiquidar = $fondo->monto_aprobado - $totalGastado;
-        // Verificar si el fondo tiene una solicitud de cierre aprobada
+        $totalGastado = (float) $gastosContabilizados->sum('monto_total');
+        $saldoRealParaLiquidar = (float) $fondo->monto_aprobado - $totalGastado;
         $tieneCierreAprobado = $fondo->solicitudCierreAprobada()->exists();
+        $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación','Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado'])->count();
+
+        // 2.lógica para determinar montos
         if ($saldoRealParaLiquidar < 0) {
             $montoAReponer = abs($saldoRealParaLiquidar);
         } else if ($saldoRealParaLiquidar >= 0 && $tieneCierreAprobado) {
-            // Si tiene un cierre aprobado y saldo 0 o positivo, se debe devolver el saldo disponible actual.
-            $montoADevolver = $fondo->monto_disponible;
+            $montoADevolver = (float) $fondo->monto_disponible;
         } else if ($saldoRealParaLiquidar > 0) {
             $montoADevolver = $saldoRealParaLiquidar;
         }
 
-        $estadosPendientes = ['Pendiente de Aprobación', 'Pendiente de Validación Contable', 'Observado'];
-        $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', $estadosPendientes)->count();
+        // 3. Lógica para determinar la acción requerida y el mensaje
+        $accionRequerida = 'ninguna'; 
         $mensajeEstado = '';
+
         if ($conteoGastosPendientes > 0) {
-            $mensajeEstado = "Tiene {$conteoGastosPendientes} gasto(s) en proceso de aprobación o validación.";
+            $accionRequerida = 'bloqueado';
+            $mensajeEstado = "Tiene {$conteoGastosPendientes} gasto(s) en proceso. No se puede liquidar hasta que se resuelvan.";
         } elseif ($montoAReponer > 0) {
-            $mensajeEstado = 'Listo para reponer el excedente.';
+            $accionRequerida = 'reponer';
+            $mensajeEstado = 'El fondo ha excedido su monto. Se requiere un reembolso para liquidar.';
         } elseif ($montoADevolver > 0) {
-            $mensajeEstado = 'Listo para registrar la devolución del sobrante.';
-        } else {
-            $mensajeEstado = 'Sin gastos contabilizados para reponer o devolver.';
+            $accionRequerida = 'devolver';
+            if ($totalGastado == 0) {
+                $mensajeEstado = 'El fondo no ha sido utilizado. Se debe registrar la devolución del monto completo.';
+            } else {
+                $mensajeEstado = 'El fondo tiene un sobrante. Se debe registrar la devolución para liquidar.';
+            }
+        } else { 
+            $accionRequerida = 'ninguna';
+            $mensajeEstado = 'El fondo ha sido ejecutado al 100%. No se requiere reposición ni devolución. Puede proceder al cierre mensual o definitivo.';
         }
-        // 4. Devolvemos un único objeto JSON con toda la información.
+
         return response()->json([
             'monto_asignado' => (float) $fondo->monto_aprobado,
             'saldo_disponible_actual' => (float) $fondo->monto_disponible,
-            'monto_a_reponer' => (float) $montoAReponer,
-            'monto_a_devolver' => (float) $montoADevolver,
+            'monto_a_reponer' => round($montoAReponer, 2),
+            'monto_a_devolver' => round($montoADevolver, 2),
             'gastos_contabilizados' => $gastosContabilizados,
-            'total_gastado_contabilizado' => (float) $totalGastado,
+            'total_gastado_contabilizado' => $totalGastado,
             'tiene_gastos_pendientes' => $conteoGastosPendientes > 0,
-            'conteo_gastos_pendientes' => $conteoGastosPendientes,
             'mensaje_estado' => $mensajeEstado,
+            'accion_requerida' => $accionRequerida, 
         ]);
+
     }
 
     //El método reponer ahora solo maneja el caso de excedentes (saldo negativo)

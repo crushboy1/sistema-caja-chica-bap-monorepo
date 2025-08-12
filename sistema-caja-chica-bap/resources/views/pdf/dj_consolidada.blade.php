@@ -100,7 +100,7 @@
             en pleno uso de mis facultades, declaro bajo juramento que los gastos detallados a continuación fueron realizados para fines exclusivamente laborales y en representación del Banco de Alimentos Perú.
         </p>
         <p>
-            Asimismo, declaro que no se pudo obtener un comprobante de pago válido (boleta de venta o factura) para las siguientes transacciones y que <strong>las fechas indicadas en la columna 'Fecha Transacción' corresponden al día en que se realizó efectivamente cada operación</strong>, asumiendo la total responsabilidad sobre la veracidad de la información presentada.
+            Asimismo, declaro que no se pudo obtener un comprobante de pago válido para las siguientes transacciones y que <strong>las fechas indicadas en la columna 'Fecha Transacción' corresponden al día en que se realizó efectivamente cada operación</strong>, asumiendo la total responsabilidad sobre la veracidad de la información presentada.
         </p>
 
         @php
@@ -123,13 +123,13 @@
                 <tr>
                     <th class="text-center">N°</th>
                     <th>Gasto Proyectado</th>
-                    <th>Descripción del Gasto (Glosa)</th>
+                    <th>Glosa/Descripción del Gasto</th>
                     <th class="text-center">Fecha Transacción</th>
                     <th class="text-right">Monto (S/)</th>
                 </tr>
             </thead>
             <tbody>
-                {{-- INICIO DE CAMBIOS --}}
+                
                 @foreach ($gastos as $index => $gasto)
                 @php
                 // Se definen las variables de forma segura para manejar tanto arrays como objetos
@@ -146,7 +146,7 @@
                     <td class="text-right">{{ number_format($montoTotal, 2) }}</td>
                 </tr>
                 @endforeach
-                {{-- FIN DE CAMBIOS --}}
+
                 <tr class="total-row">
                     <td colspan="4" class="text-right"><strong>TOTAL GENERAL</strong></td>
                     <td class="text-right"><strong>S/ {{ number_format($totalGeneral, 2) }}</strong></td>

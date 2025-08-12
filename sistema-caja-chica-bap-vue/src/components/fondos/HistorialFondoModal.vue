@@ -4,14 +4,12 @@
             @click.self="closeModal">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-transform duration-300"
                 :class="{ 'scale-100': mostrar, 'scale-95': !mostrar }">
-                <header
-                    class="flex items-center justify-between p-5 border-b border-gray-200 bg-gray-800 text-white rounded-t-2xl">
+                <header class="flex items-center justify-between p-5 border-b border-gray-200 bg-verde-bap-dark text-white rounded-t-2xl">
                     <div>
                         <h3 class="text-xl font-bold">Línea de Tiempo del Fondo</h3>
-                        <p class="text-sm text-gray-300">{{ fondoCodigo }}</p>
+                        <p class="text-sm text-verde-bap-light">{{ fondoCodigo }}</p>
                     </div>
-                    <button @click="closeModal"
-                        class="p-2 rounded-full text-gray-300 hover:bg-black/20 transition-colors">
+                    <button @click="closeModal" class="p-2 rounded-full text-gray-300 hover:bg-black/20 transition-colors">
                         <X class="w-6 h-6" />
                     </button>
                 </header>
@@ -24,11 +22,10 @@
                         </div>
                     </div>
 
-                    <div v-else-if="error" class="text-center text-red-500 bg-red-100 p-4 rounded-lg">
+                    <div v-else-if="error" class="text-center text-estado-error-text bg-estado-error-bg p-4 rounded-lg">
                         {{ error }}
                     </div>
-
-                    <div v-else-if="timeline.length === 0" class="text-center text-gray-500 py-10">
+                    <div v-else-if="timeline.length === 0" class="text-center text-gris-bap py-10">
                         Este fondo no tiene historial de modificaciones.
                     </div>
 
@@ -98,9 +95,8 @@
 
                                         <!-- Enlace al comprobante si existe -->
                                         <div v-if="item.ruta_comprobante" class="pt-2">
-                                            <a :href="getComprobanteUrl(item.ruta_comprobante)" target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="inline-flex items-center text-sm font-medium text-purple-600 hover:text-purple-800 bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded-full transition-colors">
+                                            <a :href="getComprobanteUrl(item.ruta_comprobante)" target="_blank" rel="noopener noreferrer"
+                                                class="inline-flex items-center text-sm font-medium text-azul-bap-dark hover:text-azul-bap-dark bg-azul-bap-light hover:bg-azul-bap/30 px-3 py-1 rounded-full transition-colors">
                                                 <ExternalLink class="h-4 w-4 mr-2" />
                                                 Ver Comprobante
                                             </a>
@@ -194,53 +190,58 @@ const getTimelineClass = (tipo) => {
     switch (tipo) {
         case 'Apertura':
             return {
-                bg: 'bg-green-500',
-                text: 'text-green-700',
-                card: 'bg-green-50 border-green-200',
+                bg: 'bg-verde-bap',
+                text: 'text-verde-bap-dark',
+                card: 'bg-verde-bap-light border-verde-bap',
                 icon: Plus
             };
         case 'Incremento':
             return {
-                bg: 'bg-blue-500',
-                text: 'text-blue-700',
-                card: 'bg-blue-50 border-blue-200',
+                bg: 'bg-azul-bap',
+                text: 'text-azul-bap-dark',
+                card: 'bg-azul-bap-light border-azul-bap',
                 icon: TrendingUp
             };
         case 'Decremento':
             return {
-                bg: 'bg-yellow-500',
-                text: 'text-yellow-700',
-                card: 'bg-yellow-50 border-yellow-200',
+                bg: 'bg-amarillo-bap-dark',
+                text: 'text-amarillo-bap-dark',
+                card: 'bg-amarillo-bap-light border-amarillo-bap',
                 icon: TrendingDown
             };
         case 'Reposicion por Excedente':
             return {
-                bg: 'bg-purple-500',
-                text: 'text-purple-700',
-                card: 'bg-purple-50 border-purple-200',
+                bg: 'bg-naranja-bap',
+                text: 'text-naranja-bap-dark',
+                card: 'bg-naranja-bap-light border-naranja-bap',
                 icon: RefreshCw
             };
         case 'Devolucion por Sobrante':
             return {
-                bg: 'bg-orange-500',
-                text: 'text-orange-700',
-                card: 'bg-orange-50 border-orange-200',
+                bg: 'bg-naranja-bap',
+                text: 'text-naranja-bap-dark',
+                card: 'bg-naranja-bap-light border-naranja-bap',
                 icon: CornerDownLeft
             };
         case 'Restauracion Mensual':
-            return { bg: 'bg-cyan-500', text: 'text-cyan-700', card: 'bg-cyan-50 border-cyan-200', icon: Zap };
+            return { 
+                bg: 'bg-indigo-500', 
+                text: 'text-indigo-700', 
+                card: 'bg-indigo-100 border-indigo-200', 
+                icon: Zap 
+            };
         case 'Cierre':
             return {
-                bg: 'bg-red-500',
-                text: 'text-red-700',
-                card: 'bg-red-50 border-red-200',
+                bg: 'bg-rojo-bap',
+                text: 'text-rojo-bap-dark',
+                card: 'bg-rojo-bap-light border-rojo-bap',
                 icon: X
             };
         default:
             return {
-                bg: 'bg-gray-500',
-                text: 'text-gray-700',
-                card: 'bg-gray-50 border-gray-200',
+                bg: 'bg-gris-bap',
+                text: 'text-gris-bap-dark',
+                card: 'bg-gris-bap-light border-gris-bap',
                 icon: Plus
             };
     }

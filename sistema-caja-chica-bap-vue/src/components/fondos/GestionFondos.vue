@@ -1,13 +1,13 @@
 <template>
   <div class="p-6 bg-white rounded-lg shadow-md">
-    <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Gestión y Seguimiento de Fondos de Caja Chica</h2>
+    <h2 class="text-3xl font-bold text-gris-bap-dark mb-6 text-center">Gestión y Seguimiento de Fondos de Caja Chica</h2>
     <div class="text-center mb-6">
-      <p class="text-gray-600 mb-4">Supervisa el estado de todos los fondos de caja chica y realiza las acciones
+      <p class="text-gris-bap mb-4">Supervisa el estado de todos los fondos de caja chica y realiza las acciones
         necesarias.</p>
     </div>
-    <div v-if="cargandoUsuario" class="text-center text-gray-500 py-8">
+    <div v-if="cargandoUsuario" class="text-center text-gris-bap py-8">
       <div class="inline-flex items-center">
-        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gris-bap" xmlns="http://www.w3.org/2000/svg" fill="none"
           viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor"
@@ -21,7 +21,7 @@
     <div v-else>
       <!-- Panel de filtros -->
       <div class="mb-6 p-4 bg-gray-50 rounded-lg shadow-sm">
-        <h3 class="text-xl font-semibold text-gray-700 mb-4">Filtros de Búsqueda</h3>
+        <h3 class="text-xl font-semibold text-gris-bap-dark mb-4">Filtros de Búsqueda</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
           <!-- Filtro Código de Fondo -->
           <div class="relative">
@@ -82,15 +82,7 @@
         </div>
 
         <div class="flex justify-end space-x-3 mt-4">
-          <button @click="aplicarFiltros"
-            class="bg-verde-bap hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-              stroke="currentColor" class="w-5 h-5 mr-2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-            Buscar
-          </button>
+          
           <button @click="limpiarFiltros"
             class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -115,9 +107,9 @@
       </div>
 
       <!-- Tabla de Fondos -->
-      <div v-if="cargandoFondos" class="text-center text-gray-500 py-8">
+      <div v-if="cargandoFondos" class="text-center text-gris-bap py-8">
         <div class="inline-flex items-center">
-          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gris-bap" xmlns="http://www.w3.org/2000/svg" fill="none"
             viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor"
@@ -127,7 +119,7 @@
           Cargando fondos...
         </div>
       </div>
-      <div v-else-if="fondosMostrados.length === 0" class="text-center text-gray-500 py-8">
+      <div v-else-if="fondosMostrados.length === 0" class="text-center text-gris-bap py-8">
         <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -151,7 +143,7 @@
         <div class="overflow-x-auto shadow-lg rounded-lg">
           <table class="min-w-full bg-white border border-gray-200 rounded-lg">
             <thead>
-              <tr class="bg-gray-100 text-gray-700 uppercase text-sm leading-normal">
+              <tr class="bg-gray-100 text-gris-bap-dark uppercase text-sm leading-normal">
                 <th class="py-3 px-2 text-center font-semibold">Código Fondo</th>
                 <th class="py-3 px-2 text-center font-semibold">Responsable Fondo</th>
                 <th class="py-3 px-2 text-center font-semibold">Área Fondo</th>
@@ -173,12 +165,7 @@
                 <td class="py-3 px-2 text-center font-medium whitespace-nowrap">S/. {{ fondo.monto_aprobado ?
                   parseFloat(fondo.monto_aprobado).toFixed(2) : '0.00' }}</td>
                 <td class="py-3 px-2 text-center">
-                  <span :class="{
-                    'bg-green-200 text-green-600': fondo.estado === 'Activo',
-                    'bg-red-200 text-red-600': fondo.estado === 'Cerrado'
-                  }" class="py-2 px-3 rounded-full text-xs font-semibold inline-block text-center w-24">
-                    {{ fondo.estado }}
-                  </span>
+                  <span :class="getClassesForBadge(fondo.estado)">{{ fondo.estado }}</span>
                 </td>
                 <td class="py-3 px-2 text-center">
                   {{ formatearFechaSinHora(fondo.fecha_apertura) }}
@@ -198,7 +185,7 @@
                 <td class="py-4 px-4 text-center">
                   <div class="flex items-center justify-center space-x-2">
                     <button @click="verHistorialFondo(fondo)"
-                      class="w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center text-blue-700 transition-colors duration-200"
+                      class="w-8 h-8 rounded-full bg-azul-bap-light hover:bg-azul-bap/30 flex items-center justify-center text-azul-bap-dark transition-colors duration-200"
                       title="Ver Historial de Cambios">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                         class="w-4 h-4">
@@ -299,7 +286,7 @@ import Swal from 'sweetalert2';
 import { useRouter, useRoute } from 'vue-router';
 import HistorialFondoModal from './HistorialFondoModal.vue';
 import ReposicionFondoModal from './ReposicionFondoModal.vue';
-
+import { getClassesForBadge } from '@/utils/statusStyles.js';
 // --- Variables de Estado ---
 const usuarioActual = ref(null);
 const cargandoUsuario = ref(true);
@@ -324,16 +311,13 @@ const filtro = ref({
 
 // Variables para el debounce de los campos de texto
 let debounceTimeout = null;
-const DEBOUNCE_DELAY = 800; // Aumentado para mejor UX
 const MIN_SEARCH_LENGTH = 3;
 let llamadaEnProceso = false;
 // --- Variables para Paginación ---
 const paginaActual = ref(1);
 const registrosPorPagina = ref(10);
-
 const router = useRouter();
 const route = useRoute();
-const inicializacionCompleta = ref(false);
 // --- Propiedades Computadas ---
 
 const rolUsuario = computed(() => {
@@ -394,13 +378,14 @@ const obtenerFondos = async () => {
   try {
     const response = await api.get('/v1/fondos-efectivo', { params: filtro.value });
     fondos.value = response.data.fondos || [];
-    // COMENTARIO BAP: No resetear la página aquí permite mantener la paginación si solo cambian los datos.
+    // No resetear la página aquí permite mantener la paginación si solo cambian los datos.
     // Se reseteará solo al cambiar filtros manualmente.
   } catch (error) {
     console.error('❌ Error al obtener fondos:', error);
     Swal.fire({ icon: 'error', title: 'Error al Cargar Fondos', text: error.response?.data?.message || 'Ocurrió un error inesperado.' });
   } finally {
     cargandoFondos.value = false;
+    buscandoFondos.value = false;
   }
 };
 
@@ -427,7 +412,7 @@ const confirmarCierreMensual = async (fondo) => {
     html: `El saldo del fondo <strong>${fondo.codigo_fondo}</strong> se ha ejecutado completamente. <br><br>Esta acción restaurará el saldo a <strong>${currencyFormatter.format(fondo.monto_aprobado)}</strong> para el siguiente período.`,
     icon: 'info',
     showCancelButton: true,
-    confirmButtonColor: '#10B981', // Verde BAP
+    confirmButtonColor: '#10B981', 
     cancelButtonColor: '#6B7280',
     confirmButtonText: 'Sí, cerrar y restaurar',
     cancelButtonText: 'Cancelar'
@@ -442,7 +427,7 @@ const ejecutarCierreMensual = async (fondo) => {
   try {
     const response = await api.post(`/v1/fondos-efectivo/${fondo.id_fondo}/cierre-mensual`);
     await Swal.fire('¡Éxito!', response.data.message, 'success');
-    await obtenerFondos(); // Recargar la lista de fondos para reflejar los cambios
+    await obtenerFondos();
   } catch (error) {
     console.error("Error al ejecutar el cierre mensual:", error);
     Swal.fire('Error', error.response?.data?.message || 'No se pudo procesar el cierre mensual.', 'error');
@@ -455,7 +440,6 @@ const formatearFechaSinHora = (fechaString) => {
   if (!fechaString) return '';
 
   try {
-    // Para fechas que vienen como "2025-07-04" sin hora
     const [año, mes, dia] = fechaString.split('-');
     const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
 
@@ -470,17 +454,6 @@ const formatearFechaSinHora = (fechaString) => {
   }
 };
 // --- Funciones de Filtrado y Búsqueda ---
-const triggerSearchWithDebounce = () => {
-  if (!inicializacionCompleta.value || llamadaEnProceso) return;
-  buscandoFondos.value = true;
-  clearTimeout(debounceTimeout);
-  debounceTimeout = setTimeout(() => {
-    if (!llamadaEnProceso) { // Verificar nuevamente antes de ejecutar
-      obtenerFondos();
-    }
-  }, DEBOUNCE_DELAY);
-};
-
 const aplicarFiltrosDesdeURL = () => {
   const query = route.query;
   if (query.alerta === 'sobregiro' && query.codigos) {
@@ -491,13 +464,7 @@ const aplicarFiltrosDesdeURL = () => {
   }
   return false;
 };
-const aplicarFiltros = () => {
-  if (llamadaEnProceso) return;
 
-  clearTimeout(debounceTimeout);
-  buscandoFondos.value = false;
-  obtenerFondos();
-};
 const limpiarFiltros = () => {
   if (llamadaEnProceso) return;
   filtro.value.codigo_fondo = '';
@@ -561,12 +528,18 @@ const handleFondoRepuesto = () => {
 
 // --- Watchers ---
 // Watchers para filtros de texto (debounced, con lógica de longitud mínima)
-watch(filtro, () => {
+watch(filtro, (newFiltro, oldFiltro) => {
   clearTimeout(debounceTimeout);
-  cargandoFondos.value = true; // Mostrar spinner inmediatamente al cambiar un filtro
+  buscandoFondos.value = true;
   debounceTimeout = setTimeout(() => {
-    paginaActual.value = 1; // Resetear a la página 1 con cada nueva búsqueda
-    obtenerFondos();
+    const canSearchCodigo = newFiltro.codigo_fondo.length === 0 || newFiltro.codigo_fondo.length >= MIN_SEARCH_LENGTH;
+    const canSearchResponsable = newFiltro.responsable_name.length === 0 || newFiltro.responsable_name.length >= MIN_SEARCH_LENGTH;
+    if ((canSearchCodigo && canSearchResponsable) || newFiltro.estado !== oldFiltro.estado || newFiltro.area_id !== oldFiltro.area_id) {
+        paginaActual.value = 1;
+        obtenerFondos();
+    } else {
+        buscandoFondos.value = false;
+    }
   }, 500);
 }, { deep: true });
 // --- Ciclo de Vida ---
@@ -575,11 +548,7 @@ onMounted(async () => {
   try {
     await obtenerUsuarioAutenticado();
     await obtenerAreas();
-
-    // Esto modificará `filtro.value` y disparará el watcher para la carga inicial de datos.
     aplicarFiltrosDesdeURL();
-
-    // Si no hay filtros en la URL, el watcher no se dispara, así que forzamos la primera carga.
     if (!route.query.alerta) {
       await obtenerFondos();
     }
@@ -593,9 +562,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Las transiciones del modal y los estilos del scrollbar personalizados se mantienen aquí
-   porque son estilos específicos del componente y no utilidades de Tailwind. */
-
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -606,11 +572,8 @@ onMounted(async () => {
   opacity: 0;
   transform: translateY(20px);
 }
-
-/* Estilos para el spinner de carga en los inputs */
 .relative input[type="text"],
 .relative input[type="date"] {
   padding-right: 2.5rem;
-  /* Espacio para el spinner */
 }
 </style>
