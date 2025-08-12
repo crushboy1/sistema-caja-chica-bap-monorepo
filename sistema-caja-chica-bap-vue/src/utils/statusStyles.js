@@ -32,7 +32,7 @@ const masterStatusConfig = new Map([
     ['período reabierto', { theme: 'reabierto', icon: 'M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 18.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z' }],
     ['excepcion otorgada', { theme: 'autorizacion', icon: 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }],
     ['excepcion revocada', { theme: 'revocacion', icon: 'M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }],
-    ['cerrado', { theme: 'neutro', icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z' }],
+    ['cerrado', { theme: 'cerrado', icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z' }],
 ]);
 const defaultConfig = {
   theme: 'default',
@@ -52,12 +52,12 @@ export function getMasterConfig(estado) {
 // DEFINICIÓN DE ESTILOS POR COMPONENTE
 const badgeThemes = {
   validacionDj: 'bg-purple-100 text-purple-800 border-purple-300',
-  alerta: 'bg-estado-alerta-bg text-estado-alerta-text border-yellow-300',
-  info: 'bg-estado-info-bg text-estado-info-text border-blue-300',
-  advertencia: 'bg-estado-advertencia-bg text-estado-advertencia-text border-orange-300',
-  exito: 'bg-estado-exito-bg text-estado-exito-text border-green-300',
-  error: 'bg-estado-error-bg text-estado-error-text border-red-300',
-  neutro: 'bg-estado-neutro-bg text-estado-neutro-text border-gray-300',
+  alerta: 'bg-estado-alerta-bg text-estado-alerta-text border-amarillo-bap',
+  info: 'bg-estado-info-bg text-estado-info-text border-azul-bap',
+  advertencia: 'bg-estado-advertencia-bg text-estado-advertencia-text border-naranja-bap',
+  exito: 'bg-estado-exito-bg text-estado-exito-text border-verde-bap',
+  error: 'bg-estado-error-bg text-estado-error-text border-rojo-bap',
+  neutro: 'bg-estado-neutro-bg text-estado-neutro-text border-gris-bap',
   cyan: 'bg-cyan-100 text-cyan-800 border-cyan-300',
   teal: 'bg-teal-100 text-teal-800 border-teal-300',
   indigo: 'bg-indigo-100 text-indigo-800 border-indigo-300',
@@ -84,40 +84,40 @@ const solicitudHistorialCardThemes = {
     userIcon: 'text-purple-600 bg-purple-100/20',
   },
   alerta: {
-    card: 'bg-estado-alerta-bg text-estado-alerta-text border-yellow-300/20',
-    revisadoPor: 'text-estado-alerta-text bg-estado-alerta-bg/30',
-    userIcon: 'text-estado-alerta-text bg-estado-alerta-bg/20',
-  },
-  info: {
-    card: 'bg-estado-info-bg text-estado-info-text border-blue-300/20',
-    revisadoPor: 'text-estado-info-text bg-estado-info-bg/30',
-    userIcon: 'text-estado-info-text bg-estado-info-bg/20',
-  },
-  advertencia: {
-    card: 'bg-estado-advertencia-bg text-estado-advertencia-text border-orange-300/20',
-    revisadoPor: 'text-estado-advertencia-text bg-estado-advertencia-bg/30',
-    userIcon: 'text-estado-advertencia-text bg-estado-advertencia-bg/20',
-  },
-  exito: {
-    card: 'bg-estado-exito-bg text-estado-exito-text border-green-300/20',
-    revisadoPor: 'text-estado-exito-text bg-estado-exito-bg/30',
-    userIcon: 'text-estado-exito-text bg-estado-exito-bg/20',
-  },
-  error: {
-    card: 'bg-estado-error-bg text-estado-error-text border-red-300/20',
-    revisadoPor: 'text-estado-error-text bg-estado-error-bg/30',
-    userIcon: 'text-estado-error-text bg-estado-error-bg/20',
-  },
-  neutro: {
-    card: 'bg-estado-neutro-bg text-estado-neutro-text border-gray-300/20',
-    revisadoPor: 'text-estado-neutro-text bg-estado-neutro-bg/30',
-    userIcon: 'text-estado-neutro-text bg-estado-neutro-bg/20',
-  },
-  default: {
-    card: 'bg-gray-100 text-gray-700 border-gray-300/20',
-    revisadoPor: 'text-gray-600 bg-gray-100/60',
-    userIcon: 'text-gray-500 bg-gray-100',
-  },
+        card: 'bg-estado-alerta-bg text-estado-alerta-text border-amarillo-bap/20',
+        revisadoPor: 'text-estado-alerta-text bg-amarillo-bap-light/30',
+        userIcon: 'text-estado-alerta-text bg-amarillo-bap-light/20',
+    },
+    info: {
+        card: 'bg-estado-info-bg text-estado-info-text border-azul-bap/20',
+        revisadoPor: 'text-estado-info-text bg-azul-bap-light/30',
+        userIcon: 'text-estado-info-text bg-azul-bap-light/20',
+    },
+    advertencia: {
+        card: 'bg-estado-advertencia-bg text-estado-advertencia-text border-naranja-bap/20',
+        revisadoPor: 'text-estado-advertencia-text bg-naranja-bap-light/30',
+        userIcon: 'text-estado-advertencia-text bg-naranja-bap-light/20',
+    },
+    exito: {
+        card: 'bg-estado-exito-bg text-estado-exito-text border-verde-bap/20',
+        revisadoPor: 'text-estado-exito-text bg-verde-bap-light/30',
+        userIcon: 'text-estado-exito-text bg-verde-bap-light/20',
+    },
+    error: {
+        card: 'bg-estado-error-bg text-estado-error-text border-rojo-bap/20',
+        revisadoPor: 'text-estado-error-text bg-rojo-bap-light/30',
+        userIcon: 'text-estado-error-text bg-rojo-bap-light/20',
+    },
+    neutro: {
+        card: 'bg-estado-neutro-bg text-estado-neutro-text border-gris-bap/20',
+        revisadoPor: 'text-estado-neutro-text bg-gris-bap-light/30',
+        userIcon: 'text-estado-neutro-text bg-gris-bap-light/20',
+    },
+    default: {
+        card: 'bg-gris-bap-light text-gris-bap-dark border-gris-bap/20',
+        revisadoPor: 'text-gris-bap-dark bg-gris-bap-light/60',
+        userIcon: 'text-gris-bap-dark bg-gris-bap-light',
+    },
 }
 // Define solo la clase de color de texto para cada tema.
 const textColorThemes = {

@@ -1,13 +1,13 @@
 <template>
   <div class="min-h-screen bg-verde-bap-extralight p-6">
-    <div class="max-w-7xl mx-auto space-y-8">
+    <div class="max-w-screen-2xl mx-auto space-y-8">
 
       <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
         <div class="text-center">
-          <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gray-700 text-shadow">
+          <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gris-bap-dark text-shadow">
             MÓDULO DE SOLICITUDES
           </h1>
-          <p class="text-gray-600 max-w-4xl mx-auto text-base leading-relaxed">
+          <p class="text-gris-bap max-w-4xl mx-auto text-base leading-relaxed">
             ¡Bienvenido al Módulo de Gestión de Solicitudes de Caja Chica! A través de esta plataforma
             podrás realizar de manera ágil y segura tus solicitudes de apertura y modificaciones de caja
             chica. Además, tendrás la posibilidad de consultar el estado de cada solicitud en tiempo real,
@@ -16,11 +16,11 @@
         </div>
       </div>
 
-      <!-- [CORRECCIÓN] La visibilidad de las cards ahora se basa en las nuevas propiedades computadas de permisos -->
+      <!-- La visibilidad de las cards ahora se basa en las nuevas propiedades computadas de permisos -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
 
         <!-- Card 1: Apertura de Fondos -->
-        <div v-if="canCreateSolicitud" @click="handleCardClick('apertura')" @mouseenter="handleMouseEnter"
+        <div v-if="canCreateSolicitud" @click="handleCardClick('apertura')"
           @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
                            bg-gradient-to-br from-verde-bap to-verde-bap-dark
                            transition-all duration-500 ease-out
@@ -265,12 +265,10 @@
 <script setup>
 import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
 import api from '@/plugins/axios'
-
-// Importar componentes
 import AperturaFondos from '@/components/solicitudes/AperturaFondos.vue'
 import ModificacionFondos from '@/components/solicitudes/ModificacionFondos.vue'
 import SeguimientoSolicitudes from '@/components/solicitudes/SeguimientoSolicitudes.vue'
-// [CAMBIO] Se define la prop 'user' para recibir los datos del usuario desde el componente padre (MainLayout).
+//Se define la prop 'user' para recibir los datos del usuario desde el componente padre (MainLayout).
 const props = defineProps({
   user: {
     type: Object,
@@ -337,11 +335,6 @@ const handleCardClick = async (section) => {
   }
 }
 
-const handleMouseEnter = (event) => {
-  // Efecto de sonido sutil (opcional)
-  // new Audio('/sounds/hover.mp3').play().catch(() => {})
-}
-
 const handleMouseLeave = (event) => {
   // Limpiar cualquier estado temporal
 }
@@ -392,7 +385,6 @@ const showSuccessNotification = (message) => {
 onMounted(async () => {
   isLoading.value = true;
   try {
-    // [CAMBIO] Se elimina la llamada a /auth/user. Ahora solo se cargan los catálogos
     // necesarios para los sub-componentes de esta vista.
     const [proyectosResponse, gastosProyectadosResponse, areasResponse] = await Promise.all([
       api.get('/v1/proyectos'),

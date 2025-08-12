@@ -4,10 +4,10 @@
 
       <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in-down">
         <div class="text-center">
-          <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gray-700 text-shadow">
+          <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-gris-bap-dark text-shadow">
             MÓDULO DE DECLARACIÓN DE GASTOS
           </h1>
-          <p class="text-gray-600 max-w-4xl mx-auto text-base leading-relaxed">
+          <p class="text-gris-bap max-w-4xl mx-auto text-base leading-relaxed">
             ¡Bienvenido! En este espacio podrás registrar toda la información relacionada con los montos utilizados,
             adjuntar los comprobantes o justificantes correspondientes y detallar cada gasto realizado. Este proceso
             garantiza la transparencia y el adecuado control de los fondos asignados.
@@ -132,7 +132,7 @@ const ALL_CARDS = [
     tab: 'seguimiento',
     title: 'MIS GASTOS',
     subtitle: 'Seguimiento y correcciones',
-    permission: 'declaraciones.create', // Mismo permiso que crear
+    permission: 'declaraciones.create',
     gradient: 'bg-gradient-to-br from-blue-500 to-blue-700',
     textColor: 'text-white',
     subtitleColor: 'text-white/90 group-hover:text-white',
@@ -147,7 +147,7 @@ const ALL_CARDS = [
     permission: 'declaraciones.approve.jefe',
     gradient: 'bg-gradient-to-br from-amarillo-bap to-yellow-600',
     textColor: 'text-gray-800',
-    subtitleColor: 'text-gray-700 group-hover:text-gray-800',
+    subtitleColor: 'text-white/90 group-hover:text-white',
     iconBg: 'bg-white/40 group-hover:bg-white/50',
     iconColor: 'text-amarillo-bap-dark',
     iconPath: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
@@ -156,7 +156,7 @@ const ALL_CARDS = [
     tab: 'validacionContable',
     title: 'BANDEJA DE VALIDACIÓN CONTABLE',
     subtitle: 'Auditoría y contabilización',
-    permission: ['declaraciones.approve.adm', 'declaraciones.view.all'], // Array para múltiples permisos
+    permission: ['declaraciones.approve.adm', 'declaraciones.view.all'],
     gradient: 'bg-gradient-to-br from-rojo-bap to-rojo-bap-dark',
     textColor: 'text-white',
     subtitleColor: 'text-white/90 group-hover:text-white',
@@ -164,13 +164,12 @@ const ALL_CARDS = [
     iconColor: 'text-white',
     iconPath: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4s8-4 8-4"></path><line x1="4" y1="12" x2="4" y2="12"></line><line x1="4" y1="17" x2="4" y2="17"></line><line x1="20" y1="12" x2="20" y2="12"></line>',
   },
-  // NUEVO: Card para Reporte de Gastos
   {
     tab: 'reportes',
     title: 'REPORTE DE GASTOS',
     subtitle: 'Generar reportes para SAP',
-    permission: ['declaraciones.view.reports', 'declaraciones.view.all'], // Asumiendo que solo Admins/SuperAdmins pueden generar reportes para SAP
-    gradient: 'bg-gradient-to-br from-purple-500 to-purple-700', // Un nuevo color para diferenciar
+    permission: ['declaraciones.view.reports', 'declaraciones.view.all'], 
+    gradient: 'bg-gradient-to-br from-purple-500 to-purple-700', 
     textColor: 'text-white',
     subtitleColor: 'text-white/90 group-hover:text-white',
     iconBg: 'bg-white/25 group-hover:bg-white/35',
@@ -240,8 +239,8 @@ const getCardClasses = (tab) => {
     case 'validacionContable':
       glowClass = 'hover:shadow-glow-rojo';
       break;
-    case 'reportes': // NUEVO: Clase de glow para reportes
-      glowClass = 'hover:shadow-glow-purple'; // Asumiendo un color púrpura para el glow
+    case 'reportes': 
+      glowClass = 'hover:shadow-glow-purple';
       break;
   }
   return `${baseClass} ${glowClass}`;
@@ -263,14 +262,11 @@ onMounted(() => {
 .fade-slide-leave-active {
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
-
 .fade-slide-enter-from,
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(20px);
 }
-
-/* CORRECCIÓN: Asegurar que las cards mantengan dimensiones fijas */
 .group {
   /* Altura mínima fija para todas las cards */
   min-height: 140px;
@@ -278,13 +274,13 @@ onMounted(() => {
   height: 140px;
 }
 
-/* CORRECCIÓN: Evitar que el contenedor interno cambie de tamaño */
+/* Evitar que el contenedor interno cambie de tamaño */
 .group>div {
   height: 100%;
   width: 100%;
 }
 
-/* CORRECCIÓN: Controlar el texto para evitar cambios de línea */
+/*  Controlar el texto para evitar cambios de línea */
 .group h3 {
   /* Altura fija para el título */
   min-height: 2.5rem;
@@ -294,15 +290,12 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* Evitar el tracking-wide que causa expansión */
   letter-spacing: normal !important;
-  /* Controlar el ancho del texto */
   padding: 0 0.5rem;
   line-height: 1.25;
 }
 
 .group p {
-  /* Altura fija para el subtítulo */
   min-height: 1.5rem;
   max-height: 1.5rem;
   height: 1.5rem;
@@ -314,18 +307,16 @@ onMounted(() => {
   line-height: 1.25;
 }
 
-/* CORRECCIÓN: Solo permitir efectos que no cambien el layout */
+/* Solo permitir efectos que no cambien el layout */
 .group:hover h3 {
   /* Remover el tracking-wide que causa expansión */
   letter-spacing: normal !important;
 }
-
 /* Mantener los efectos visuales sin cambiar dimensiones */
 .group:hover {
   /* Solo cambiar sombra y efectos visuales, NO transform scale */
   transform: translateY(-2px);
 }
-
 /* Asegurar que el ícono no cause expansión */
 .group .w-12.h-12 {
   flex-shrink: 0;
@@ -336,16 +327,13 @@ onMounted(() => {
   max-width: 3rem;
   max-height: 3rem;
 }
-
 /* Controlar el grid para evitar expansiones */
 .grid {
   align-items: start;
 }
-
 .grid>* {
   align-self: stretch;
 }
-
 /* Estilos para las sombras de "glow" adaptadas a los colores BAP */
 .shadow-glow-verde {
   box-shadow: 0 0 25px 0 rgba(118, 196, 157, 0.4);
@@ -379,18 +367,13 @@ onMounted(() => {
   box-shadow: 0 0 35px 5px rgba(59, 130, 246, 0.5);
 }
 
-/* NUEVO: Estilos para la sombra de "glow" púrpura */
 .shadow-glow-purple {
   box-shadow: 0 0 25px 0 rgba(168, 85, 247, 0.4);
-  /* Tailwind purple-500 */
 }
 
 .hover\:shadow-glow-purple:hover {
   box-shadow: 0 0 35px 5px rgba(168, 85, 247, 0.5);
 }
-
-
-/* CORRECCIÓN ADICIONAL: Para texto largo que pueda causar problemas */
 .group h3,
 .group p {
   word-break: break-word;
@@ -398,11 +381,9 @@ onMounted(() => {
   text-align: center;
 }
 
-/* Para la card de "BANDEJA DE VALIDACIÓN CONTABLE" que es más larga */
 @media (max-width: 768px) {
   .group h3 {
     font-size: 0.875rem;
-    /* Reducir tamaño en móviles si es necesario */
   }
 }
 

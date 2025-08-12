@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require('tailwindcss/defaultTheme');
 export default {
   content: [
     './index.html',
@@ -8,22 +9,37 @@ export default {
     './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
   theme: {
+    fontFamily:{
+      sans: ['Montserrat', ...defaultTheme.fontFamily.sans],
+    },
     extend: {
       colors: {
         // Colores principales de BAP
-        'verde-bap': '#76C49D',
-        'verde-bap-dark': '#5da887', // Tono más oscuro para el gradiente de fondo
-        'verde-bap-light': '#D1FAE5', // Tono más claro para estado activo y glow
-        'verde-bap-extralight': '#F0FDF4', // Un verde muy, muy tenue (similar a green-50 de Tailwind)
+        'verde-bap': '#73C59C',
+        'verde-bap-dark': '#477E63',
+        'verde-bap-light': '#E4F8EE',
+        'verde-bap-extralight': '#F0FDF4',
 
-        'amarillo-bap': '#FEDE72',
-        'amarillo-bap-dark': '#CA8A04', // Tono más oscuro para texto/iconos en amarillo
-        'amarillo-bap-light': '#FEF3C7', // Tono más claro para estado activo y glow
+        'amarillo-bap': '#FFDF69',
+        'amarillo-bap-dark': '#EEC11A', 
+        'amarillo-bap-light': '#FFFBEC',
 
-        'rojo-bap': '#DB3D47',
-        'rojo-bap-dark': '#B91C1C', // Tono más oscuro para el gradiente de fondo
-        'rojo-bap-light': '#FEE2E2', // Tono más claro para estado activo y glow
+        'rojo-bap': '#F0555F',
+        'rojo-bap-dark': '#DB3D47',
+        'rojo-bap-light': '#FABEC2', 
 
+        'naranja-bap': '#F9A755',
+        'naranja-bap-dark': '#E2882D',
+        'naranja-bap-light': '#FFF0E1',
+
+        'azul-bap': '#0089C6',
+        'azul-bap-dark': '#034F71',
+        'azul-bap-light': '#BFE9FC',
+
+        'gris-bap': '#808284',
+        'gris-bap-dark': '#2B2C2E',
+        'gris-bap-light': '#F0EFEF',
+        
         // Colores hover personalizados (usando valores directos de Tailwind para consistencia)
         'verde-bap-hover': '#22C55E', // green-600
         'rojo-bap-hover': '#DC2626', // red-600
@@ -31,29 +47,25 @@ export default {
         'observar-bap-hover': '#C2410C', // orange-600 (para observación)
         'descargo-bap-hover': '#2563EB', // blue-600 (para descargo)
 
-        // Amarillo/Ámbar para estados que requieren atención o acción del usuario
-        'estado-alerta-bg': '#FEF3C7', // bg-yellow-100 / amber-100
-        'estado-alerta-text': '#B45309', // text-amber-700
+        // COLORES SEMÁNTICOS PARA ESTADOS 
+        'estado-exito-bg': '#E4F8EE',       
+        'estado-exito-text': '#477E63',     
+        
+        'estado-error-bg': '#FABEC2',       
+        'estado-error-text': '#DB3D47',     
+        
+        'estado-alerta-bg': '#FFFBEC',      
+        'estado-alerta-text': '#EEC11A',    
+        
+        'estado-advertencia-bg': '#FFF0E1', 
+        'estado-advertencia-text': '#E2882D', 
+        
+        'estado-info-bg': '#BFE9FC',        
+        'estado-info-text': '#034F71',      
+        
+        'estado-neutro-bg': '#F0EFEF',      
+        'estado-neutro-text': '#2B2C2E',    
 
-        // Azul para estados informativos o en proceso
-        'estado-info-bg': '#DBEAFE', // bg-blue-100
-        'estado-info-text': '#1E40AF', // text-blue-800
-
-        // Verde para estados de éxito o finalizados positivamente
-        'estado-exito-bg': '#D1FAE5', // bg-green-100
-        'estado-exito-text': '#065F46', // text-green-800
-
-        // Naranja para estados de advertencia o que necesitan corrección
-        'estado-advertencia-bg': '#FFEDD5', // bg-orange-100
-        'estado-advertencia-text': '#C2410C', // text-orange-800
-
-        // Rojo para estados de error o rechazo
-        'estado-error-bg': '#FEE2E2', // bg-red-100
-        'estado-error-text': '#991B1B', // text-red-800
-
-        // Gris para estados neutrales, cerrados o completados
-        'estado-neutro-bg': '#E5E7EB', // bg-gray-200
-        'estado-neutro-text': '#374151', // text-gray-700
         // Colores adicionales para glassmorphism y efectos modernos
         'glass-white': 'rgba(255, 255, 255, 0.85)',
         'glass-border': 'rgba(255, 255, 255, 0.2)',
@@ -325,9 +337,9 @@ export default {
       const newUtilities = {
         // Glassmorphism effect
         '.glass': {
-          background: 'rgba(255, 255, 255, 0.85)', // Ajustado para ser más visible
-          backdropFilter: 'blur(20px) saturate(180%)', // Ajustado
-          border: '1px solid rgba(255, 255, 255, 0.3)', // Ajustado
+          background: 'rgba(255, 255, 255, 0.85)', 
+          backdropFilter: 'blur(20px) saturate(180%)', 
+          border: '1px solid rgba(255, 255, 255, 0.3)', 
         },
         // Glassmorphism mejorado específico para el modal
         '.glass-modal': {

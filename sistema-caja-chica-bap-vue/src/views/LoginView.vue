@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '@/plugins/axios'; // Solo usa esta instancia
+import api from '@/plugins/axios';
 
 import AuthCard from '@/components/layout/AuthCard.vue';
 import AuthFooter from '@/components/layout/AuthFooter.vue';
@@ -89,16 +89,17 @@ const testConnection = async () => {
     <header class="w-full bg-white shadow py-4 flex justify-center">
       <img src="/src/assets/images/logo-wt.svg" alt="Logo del BAP" class="h-20" />
     </header>
-
+    
     <main class="flex-grow flex items-center justify-center p-4">
       <AuthCard class=" min-h-[580px]">
-        <h2 class="text-3xl font-bold text-gray-800 text-center mb-8">Iniciar sesión</h2>
+        <h2 class="text-3xl font-bold text-gris-bap-dark text-center mb-8">Iniciar Sesión</h2>
 
-        <div v-if="errorMessage" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6">
+        <div v-if="errorMessage"
+          class="bg-estado-error-bg border border-rojo-bap text-estado-error-text px-4 py-3 rounded-lg relative mb-6 animate-shake">
           <strong class="font-bold">¡Error!</strong>
-          <span class="block sm:inline whitespace-pre-line">{{ errorMessage }}</span>
+          <span class="block sm:inline ml-2">{{ errorMessage }}</span>
         </div>
-
+        
         <form @submit.prevent="handleLogin" class="space-y-4">
           <BaseInput type="email" v-model="email" placeholder="correo@ejemplo.com" autocomplete="email"
             :disabled="isLoading" />
@@ -117,9 +118,9 @@ const testConnection = async () => {
           </button>
         </div>
 
-        <div class="text-center mt-6 text-sm text-gray-500">
+        <div class="text-center mt-6 text-sm text-gris-bap">
           <p>¿Olvidaste tu contraseña?</p>
-          <p>Comunícate con el Administrador del sistema</p>
+          <p>Comunícate con el Administrador del sistema.</p>
         </div>
 
         <AuthFooter />
