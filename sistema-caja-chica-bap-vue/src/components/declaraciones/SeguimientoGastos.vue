@@ -26,8 +26,18 @@
             <!-- Card Monto Total -->
             <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out p-6 flex flex-col justify-between border border-gray-200">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Monto Total</p>
-                    <p class="text-4xl font-bold text-gray-800 mt-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-verde-bap/10 text-verde-bap flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8v.01M12 16v.01M19 12h3m-3 0l1.5-1.5M19 12l1.5 1.5" />
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wider">Monto Total</p>
+                        </div>
+                    </div>
+                    <p class="text-4xl font-bold text-verde-bap-dark mt-3">
                         {{ currencyFormatter.format(contadores.montos.total) }}
                     </p>
                 </div>
@@ -37,8 +47,17 @@
             <!-- Card # Gastos -->
             <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out p-6 flex flex-col justify-between border border-gray-200">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wider"># Gastos</p>
-                    <p class="text-4xl font-bold text-gray-800 mt-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-lg bg-azul-bap/10 text-azul-bap flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h4l3 10 4-18 3 8h4" />
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wider"># Gastos</p>
+                        </div>
+                    </div>
+                    <p class="text-4xl font-bold text-azul-bap mt-3">
                         {{ contadores.estados.total }}
                     </p>
                 </div>
@@ -46,80 +65,7 @@
             </div>
         </div>
 
-        <!-- Divisor -->
-        <div class="border-t border-gray-200 my-6"></div>
-
-        <!-- Panel de Contadores por Estado -->
-        <div>
-            <h3 class="text-lg font-semibold text-gray-700 mb-4">Desglose por Estado (Resultados Filtrados)</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Pendiente de Aprobación -->
-                <div class="p-4 bg-yellow-100 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-yellow-600 font-bold">Pend. Aprobación</p>
-                        <p class="text-xl font-bold text-yellow-800">{{ contadores.estados.pendientesAprobacion }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-yellow-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesAprobacion.total) }}</span></p>
-                    </div>
-                </div>
-
-                <!-- Pendiente de Validación DJ -->
-                <div class="p-4 bg-orange-100 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-orange-600 font-bold">Pend. Val. DJ</p>
-                        <p class="text-xl font-bold text-orange-800">{{ contadores.estados.pendientesValidacionDJ }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-orange-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionDJ.total) }}</span></p>
-                    </div>
-                </div>
-
-                <!-- Pendiente de Validación Contable -->
-                <div class="p-4 bg-purple-100 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-purple-600 font-bold">Pend. Val. Contable</p>
-                        <p class="text-xl font-bold text-purple-800">{{ contadores.estados.pendientesValidacionContable }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-purple-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.pendientesValidacionContable.total) }}</span></p>
-                    </div>
-                </div>
-
-                <!-- Observado -->
-                <div class="p-4 bg-red-100 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-red-600 font-bold">Observados</p>
-                        <p class="text-xl font-bold text-red-800">{{ contadores.estados.observados }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-red-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.observados.total) }}</span></p>
-                    </div>
-                </div>
-
-                <!-- Rechazado -->
-                <div class="p-4 bg-gray-200 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-gray-600 font-bold">Rechazados</p>
-                        <p class="text-xl font-bold text-gray-800">{{ contadores.estados.rechazados }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-gray-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.rechazados.total) }}</span></p>
-                    </div>
-                </div>
-
-                <!-- Contabilizado -->
-                <div class="p-4 bg-green-100 rounded-lg shadow-sm">
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-green-600 font-bold">Contabilizados</p>
-                        <p class="text-xl font-bold text-green-800">{{ contadores.estados.contabilizados }}</p>
-                    </div>
-                    <div class="mt-2 text-right">
-                        <p class="text-sm text-green-900">Total: <span class="font-semibold">{{ currencyFormatter.format(contadores.montos.contabilizados.total) }}</span></p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- Barra de Filtros y Búsqueda -->
         <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-200 shadow-soft">
@@ -155,10 +101,25 @@
 
             <!-- Tabla o Mensaje de Vacío (envuelto en un solo bloque condicional) -->
             <div v-else class="overflow-x-auto">
+                <div class="mb-4 text-sm text-gray-600 text-center" v-if="totalPages > 0">
+                    Mostrando <strong>{{ (currentPage - 1) * itemsPerPage + 1 }}</strong> -
+                    <strong>{{ Math.min(currentPage * itemsPerPage, totalItems) }}</strong>
+                    de <strong>{{ totalItems }}</strong> gastos
+                </div>
                 <table class="min-w-full divide-y  divide-gray-200" style="table-layout: fixed; min-width: 900px;">
                     <thead class="bg-gray-50 ">
                         <tr>
-                            
+                            <!-- Columna de selección (checkbox maestro) -->
+                            <th scope="col"
+                                class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-10">
+                                <input
+                                    type="checkbox"
+                                    v-model="todosSeleccionados"
+                                    :disabled="gastosFiltrados.filter(esConsolidable).length === 0"
+                                    class="rounded border-gray-300 text-verde-bap focus:ring-verde-bap cursor-pointer"
+                                    aria-label="Seleccionar todos los gastos consolidables del fondo visible"
+                                />
+                            </th>
                             <th scope="col"
                                 class="px-3 py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 Código</th>
@@ -186,9 +147,19 @@
                     </thead>
                     <!-- CAMBIO: tbody es ahora el tag de transition-group -->
                     <transition-group name="gasto-list" tag="tbody" class="bg-white divide-y divide-gray-200">
-                        <tr v-for="gasto in gastosFiltrados" :key="gasto.id"
+                        <tr v-for="gasto in gastosPaginados" :key="gasto.id"
                             class="hover:bg-verde-bap-extralight transition-colors duration-200">
-                            
+                            <!-- Checkbox por fila -->
+                            <td class="px-4 py-4 whitespace-nowrap text-center align-middle">
+                                <input
+                                    type="checkbox"
+                                    :disabled="esCheckboxDeshabilitado(gasto)"
+                                    :checked="gastosSeleccionados.includes(gasto.id)"
+                                    @change="onToggleSeleccion(gasto, $event.target.checked)"
+                                    class="rounded border-gray-300 text-verde-bap focus:ring-verde-bap cursor-pointer disabled:opacity-40"
+                                    :aria-label="`Seleccionar gasto ${gasto.codigo_gasto}`"
+                                />
+                            </td>
                             <td
                                 class="px-4 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900 align-middle">
                                 {{ gasto.codigo_gasto }}</td>
@@ -233,7 +204,7 @@
                     </transition-group>
                 </table>
                 <!-- Mensaje de "Sin resultados" si los filtros no devuelven nada -->
-                <div v-if="gastosFiltrados.length === 0 && !cargando" class="p-10 text-center text-gray-500">
+                <div v-if="gastosPaginados.length === 0 && !cargando" class="p-10 text-center text-gray-500">
                     <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -242,6 +213,39 @@
                     <h3 class="font-semibold text-lg text-gray-700">No se encontraron gastos</h3>
                     <p class="text-sm mt-1">Ajusta tus filtros o registra nuevos gastos.</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Controles de Paginación -->
+        <div class="mt-6" v-if="totalPages > 0">
+            <div class="flex justify-center items-center space-x-1">
+                <button @click="paginaAnterior" :disabled="currentPage === 1"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
+                    :class="currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Anterior
+                </button>
+                <button v-for="pagina in paginasVisibles" :key="pagina" @click="irAPagina(pagina)"
+                    class="w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200 border"
+                    :class="[
+                        currentPage === pagina ? 'bg-verde-bap text-white border-verde-bap-dark shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200',
+                        pagina === '...' ? 'cursor-default' : ''
+                    ]">
+                    {{ pagina }}
+                </button>
+                <button @click="paginaSiguiente" :disabled="currentPage === totalPages"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
+                    :class="currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'">
+                    Siguiente
+                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="text-center text-sm text-gray-500 mt-2">
+                Página {{ currentPage }} de {{ totalPages }}
             </div>
         </div>
 
@@ -345,79 +349,56 @@ const gastosFiltrados = computed(() => {
     return gastosFiltrados;
 });
 
-const contadores = computed(() => {
-    const createInitialMontos = () => ({ total: 0, proyectado: 0, original: 0 });
+// Paginación al estilo Reporte de Gastos
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+const totalItems = computed(() => gastosFiltrados.value.length);
+const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage.value));
+const gastosPaginados = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    return gastosFiltrados.value.slice(start, start + itemsPerPage.value);
+});
+const paginasVisibles = computed(() => {
+    if (totalPages.value <= 7) {
+        return Array.from({ length: totalPages.value }, (_, i) => i + 1);
+    }
+    if (currentPage.value < 5) {
+        return [1, 2, 3, 4, 5, '...', totalPages.value];
+    }
+    if (currentPage.value > totalPages.value - 4) {
+        return [1, '...', totalPages.value - 4, totalPages.value - 3, totalPages.value - 2, totalPages.value - 1, totalPages.value];
+    }
+    return [1, '...', currentPage.value - 1, currentPage.value, currentPage.value + 1, '...', totalPages.value];
+});
+const irAPagina = (pagina) => {
+    if (typeof pagina === 'number' && pagina >= 1 && pagina <= totalPages.value) {
+        currentPage.value = pagina;
+    }
+};
+const paginaAnterior = () => { if (currentPage.value > 1) currentPage.value--; };
+const paginaSiguiente = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
 
+const contadores = computed(() => {
     const initial = {
         estados: {
             total: 0,
-            pendientesAprobacion: 0,
-            pendientesValidacionDJ: 0,
-            pendientesValidacionContable: 0,
-            observados: 0,
-            rechazados: 0,
-            contabilizados: 0,
         },
         montos: {
             total: 0,
             proyectado: 0,
             original: 0,
-            pendientesAprobacion: createInitialMontos(),
-            pendientesValidacionDJ: createInitialMontos(),
-            pendientesValidacionContable: createInitialMontos(),
-            observados: createInitialMontos(),
-            rechazados: createInitialMontos(),
-            contabilizados: createInitialMontos(),
         }
     };
 
     return gastosFiltrados.value.reduce((acc, gasto) => {
         const monto = parseFloat(gasto.monto_total) || 0;
-        // Un gasto puede o no estar asociado a una proyección.
-        // Si tiene una proyección, ese es el monto proyectado/original.
-        // Si no (es un gasto directo), su monto "proyectado" y "original" es su propio monto total.
         const montoProyectado = parseFloat(gasto.monto_proyectado_original) || monto;
         const montoOriginal = montoProyectado;
 
-        // Contadores generales
         acc.estados.total++;
         acc.montos.total += monto;
         acc.montos.proyectado += montoProyectado;
         acc.montos.original += montoOriginal;
-
-        const updateMontos = (estado) => {
-            estado.total += monto;
-            estado.proyectado += montoProyectado;
-            estado.original += montoOriginal;
-        };
-
-        // Contadores por estado
-        switch (gasto.estado) {
-            case 'Pendiente de Aprobación':
-                acc.estados.pendientesAprobacion++;
-                updateMontos(acc.montos.pendientesAprobacion);
-                break;
-            case 'Pendiente de Validación DJ':
-                acc.estados.pendientesValidacionDJ++;
-                updateMontos(acc.montos.pendientesValidacionDJ);
-                break;
-            case 'Pendiente de Validación Contable':
-                acc.estados.pendientesValidacionContable++;
-                updateMontos(acc.montos.pendientesValidacionContable);
-                break;
-            case 'Observado':
-                acc.estados.observados++;
-                updateMontos(acc.montos.observados);
-                break;
-            case 'Rechazado':
-                acc.estados.rechazados++;
-                updateMontos(acc.montos.rechazados);
-                break;
-            case 'Contabilizado':
-                acc.estados.contabilizados++;
-                updateMontos(acc.montos.contabilizados);
-                break;
-        }
         return acc;
     }, initial);
 });
@@ -483,6 +464,23 @@ const puedeReconsolidarDJ = computed(() => {
 // --- MÉTODOS ---
 const resetearFiltros = () => {
     filtros.value = { busqueda: '', estado: '' };
+};
+
+// Maneja el toggle de selección por fila
+const onToggleSeleccion = (gasto, checked) => {
+    if (checked) {
+        if (!esConsolidable(gasto)) return;
+        if (gastosSeleccionados.value.includes(gasto.id)) return;
+        // Si ya hay un fondo activo, no permitir seleccionar de otro fondo (los inputs ya están deshabilitados)
+        if (fondoActivoParaConsolidacion.value && gasto.id_fondo_efectivo !== fondoActivoParaConsolidacion.value) return;
+        gastosSeleccionados.value = [...gastosSeleccionados.value, gasto.id];
+        if (!fondoActivoParaConsolidacion.value) {
+            fondoActivoParaConsolidacion.value = gasto.id_fondo_efectivo;
+        }
+    } else {
+        gastosSeleccionados.value = gastosSeleccionados.value.filter(id => id !== gasto.id);
+        // Cuando se quite el último, el watcher limpiará el fondo activo
+    }
 };
 
 const formatDate = (dateString) => {
@@ -564,6 +562,7 @@ const handleDjReconsolidada = () => {
 // Observa cambios en los filtros para recargar los gastos
 watch(filtros, () => {
     gastosSeleccionados.value = [];
+    currentPage.value = 1; // Resetear paginación al cambiar filtros
 }, { deep: true }); // Observación profunda para detectar cambios en las propiedades del objeto filtros
 
 watch(gastosSeleccionados, (nuevosSeleccionados, viejosSeleccionados) => {

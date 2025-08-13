@@ -844,7 +844,7 @@ onMounted(() => {
                     </button>
                     <button v-for="pagina in paginasVisibles" :key="pagina" @click="irAPagina(pagina)"
                         class="w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200 border" :class="[
-                            paginaActual === pagina ? 'bg-purple-600 text-white border-purple-700 shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200',
+                            paginaActual === pagina ? 'bg-verde-bap text-white border-verde-bap-dark shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200',
                             pagina === '...' ? 'cursor-default' : ''
                         ]">
                         {{ pagina }}
