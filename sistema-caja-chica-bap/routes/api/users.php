@@ -15,7 +15,7 @@ use App\Http\Controllers\API\UserController;
 
 Route::get('/users/list-for-select', [UserController::class, 'listForSelect'])
     ->name('users.listForSelect')
-    ->middleware('check.permission:navigate.dashboard');
+    ->middleware('check.permission:users.list.view');
 
 Route::get('/users/list-for-audit', [UserController::class, 'listForAuditFilter'])
     ->name('users.listForAudit')

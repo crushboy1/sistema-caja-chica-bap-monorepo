@@ -54,7 +54,7 @@ const router = createRouter({
           path: 'administracion',
           name: 'administracion',
           component: () => import('@/views/AdministracionView.vue'),
-          meta: { roles: ['jefe_administracion', 'super_admin'] },
+          meta: { permission: 'navigate.administracion' },
         },
       ],
     },
@@ -85,10 +85,22 @@ router.beforeEach(async (to, from, next) => {
   try {
     const data = await getCurrentUser()
     const userRole = data?.role?.name || data?.user?.role?.name
+    
+    // Verificar permisos en lugar de roles
+    const requiredPermission = to.meta.permission || to.matched.find(r => r.meta?.permission)?.meta?.permission
+    if (requiredPermission) {
+      const hasPermission = data?.role?.permissions?.some(p => p.name === requiredPermission)
+      if (!hasPermission) {
+        return next('/dashboard')
+      }
+    }
+    
+    // Mantener compatibilidad con roles (para otras rutas)
     const requiredRoles = to.meta.roles || to.matched.find(r => r.meta?.roles)?.meta?.roles
     if (requiredRoles && !requiredRoles.includes(userRole)) {
       return next('/dashboard')
     }
+    
     return next()
   } catch (e) {
     return next('/login')

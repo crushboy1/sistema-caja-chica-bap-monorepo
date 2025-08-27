@@ -115,9 +115,6 @@ class UserController extends Controller
      */
     public function listForSelect()
     {
-        if (!Auth::user()->hasAnyRole(['super_admin', 'jefe_administracion'])) {
-            return response()->json(['message' => 'Acción no autorizada.'], 403);
-        }
 
         $users = User::where('activo', true)
             ->orderBy('name')
@@ -154,7 +151,7 @@ class UserController extends Controller
         $superAdminRole = Role::where('name', 'super_admin')->first();
         if ($superAdminRole && $user->role_id == $superAdminRole->id) {
             return response()->json(['message' => 'La cuenta del Administrador del Sistema no puede ser desactivada.'], 403);
-        }   
+        }
         // Un administrador no puede desactivarse a sí mismo.
         if ($user->id === Auth::id()) {
             return response()->json(['message' => 'No puedes desactivar tu propia cuenta.'], 409);

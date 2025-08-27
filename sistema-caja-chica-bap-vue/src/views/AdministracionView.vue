@@ -17,139 +17,35 @@
 
             <!-- Grid de Cards con animaciones escalonadas mejoradas -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
-
-                <!-- Card 1: Panel de Catálogos -->
-                <div v-if="canViewCatalogos" @click="handleCardClick('catalogos')"
-                    @keydown="handleKeydown($event, 'catalogos')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
-                    transition-all duration-300 ease-out shadow-soft
-                    bg-gradient-to-br from-blue-500 to-blue-700
-                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-blue-400/50
-                    hover:shadow-glow-blue"
-                    :class="[getCardClasses('catalogos'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.1s" tabindex="0" role="button"
-                    :aria-pressed="activeSection === 'catalogos'" aria-label="Abrir Panel de Catálogos">
+                <div v-for="(card, index) in visibleCards" :key="card.section" @click="handleCardClick(card.section)"
+                    @keydown="handleKeydown($event, card.section)"
+                    class="group relative overflow-hidden rounded-3xl cursor-pointer transform transition-all duration-300 ease-out shadow-soft animate-fade-in-up card-float focus:outline-none"
+                    :class="[getCardClasses(card), getCardBackgroundClass(card.section), { 'pointer-events-none': isProcessingClick }]"
+                    :style="{ animationDelay: `${(index + 1) * 0.1}s` }" tabindex="0" role="button"
+                    :aria-pressed="activeSection === card.section" :aria-label="`Abrir ${card.title}`">
 
                     <!-- Efecto shimmer -->
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
-                      transition-transform duration-1000 ease-out"></div>
+                    <div
+                        class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out">
+                    </div>
 
                     <!-- Contenido de la card -->
                     <div
                         class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
                         <div class="mb-3 flex justify-center">
-                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
-                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
-                                <FolderOpen :size="20" class="text-white" />
+                            <div
+                                class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
+                                <component :is="card.icon" :size="20" class="text-white" />
                             </div>
                         </div>
-                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">CATÁLOGOS</h3>
+                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">{{ card.title }}
+                        </h3>
                         <p
                             class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
-                            Gestionar Proyectos, Gastos y Cuentas.
+                            {{ card.subtitle }}
                         </p>
                     </div>
                 </div>
-
-                <!-- Card 2: Cierres Contables -->
-                <div v-if="canViewCierres" @click="handleCardClick('cierres')"
-                    @keydown="handleKeydown($event, 'cierres')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
-                    transition-all duration-300 ease-out shadow-soft
-                    bg-gradient-to-br from-orange-500 to-red-600
-                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-orange-400/50
-                    hover:shadow-glow-orange"
-                    :class="[getCardClasses('cierres'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.2s" tabindex="0" role="button" :aria-pressed="activeSection === 'cierres'"
-                    aria-label="Abrir Panel de Cierres Contables">
-
-                    <!-- Efecto shimmer -->
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
-                      transition-transform duration-1000 ease-out"></div>
-
-                    <!-- Contenido de la card -->
-                    <div
-                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
-                        <div class="mb-3 flex justify-center">
-                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
-                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
-                                <Calendar :size="20" class="text-white" />
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">CIERRES</h3>
-                        <p
-                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
-                            Períodos y excepciones de registro.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Card 3: Panel de Usuarios -->
-                <div v-if="canViewUsuarios" @click="handleCardClick('usuarios')"
-                    @keydown="handleKeydown($event, 'usuarios')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
-                    transition-all duration-300 ease-out shadow-soft
-                    bg-gradient-to-br from-slate-600 to-slate-800
-                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-slate-400/50
-                    hover:shadow-glow-slate"
-                    :class="[getCardClasses('usuarios'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.3s" tabindex="0" role="button"
-                    :aria-pressed="activeSection === 'usuarios'" aria-label="Abrir Panel de Usuarios">
-
-                    <!-- Efecto shimmer -->
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
-                      transition-transform duration-1000 ease-out"></div>
-
-                    <!-- Contenido de la card -->
-                    <div
-                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
-                        <div class="mb-3 flex justify-center">
-                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
-                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
-                                <Users :size="20" class="text-white" />
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">USUARIOS</h3>
-                        <p
-                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
-                            Usuarios, roles y permisos del sistema.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Card 4: Panel de Auditoría -->
-                <div v-if="canViewAuditoria" @click="handleCardClick('auditoria')"
-                    @keydown="handleKeydown($event, 'auditoria')" class="group relative overflow-hidden rounded-3xl cursor-pointer transform 
-                    transition-all duration-300 ease-out shadow-soft
-                    bg-gradient-to-br from-emerald-500 to-green-700
-                    animate-fade-in-up card-float focus:outline-none focus:ring-4 focus:ring-green-400/50
-                    hover:shadow-glow-verde"
-                    :class="[getCardClasses('auditoria'), { 'pointer-events-none': isProcessingClick }]"
-                    style="animation-delay: 0.4s" tabindex="0" role="button"
-                    :aria-pressed="activeSection === 'auditoria'" aria-label="Abrir Panel de Auditoría">
-
-                    <!-- Efecto shimmer -->
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                      transform -skew-x-12 -translate-x-full group-hover:translate-x-full 
-                      transition-transform duration-1000 ease-out"></div>
-
-                    <!-- Contenido de la card -->
-                    <div
-                        class="relative z-10 p-6 text-center text-white h-full flex flex-col justify-center min-h-[160px]">
-                        <div class="mb-3 flex justify-center">
-                            <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center 
-                          transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 shadow-medium">
-                                <Shield :size="20" class="text-white" />
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-bold mb-2 transition-all duration-300 leading-tight">AUDITORÍA</h3>
-                        <p
-                            class="text-xs text-white/90 group-hover:text-white transition-all duration-300 leading-tight">
-                            Historial de cambios y acciones.
-                        </p>
-                    </div>
-                </div>
-
             </div>
 
             <!-- Estado de carga mientras se procesa el clic -->
@@ -212,12 +108,58 @@ const hasPermission = (permissionName) => {
     }
     return props.user.role.permissions.some(p => p.name === permissionName);
 };
-
+const ALL_ADMIN_CARDS = [
+    {
+        section: 'catalogos',
+        permission: 'admin.catalogos.manage',
+        title: 'Panel de Catálogos',
+        subtitle: 'Gestionar proyectos, cuentas, etc.',
+        icon: FolderOpen,
+    },
+    {
+        section: 'usuarios',
+        permission: 'admin.users.manage',
+        title: 'Panel de Usuarios',
+        subtitle: 'Administrar accesos y roles',
+        icon: Users,
+    },
+    {
+        section: 'cierres',
+        permission: 'admin.cierres.manage',
+        title: 'Cierres Contables',
+        subtitle: 'Gestionar períodos de registro',
+        icon: Calendar,
+    },
+    {
+        section: 'auditoria',
+        permission: 'admin.audit.view',
+        title: 'Panel de Auditoría',
+        subtitle: 'Revisar historial de cambios',
+        icon: Shield,
+    }
+];
 // --- PROPIEDADES COMPUTADAS PARA VISIBILIDAD DE CARDS ---
-const canViewCatalogos = computed(() => hasPermission('admin.catalogos.manage'));
-const canViewUsuarios = computed(() => hasPermission('admin.users.manage'));
-const canViewCierres = computed(() => hasPermission('admin.cierres.manage'));
-const canViewAuditoria = computed(() => hasPermission('admin.audit.view'));
+const visibleCards = computed(() => {
+    if (!props.user || !props.user.role) return [];
+    const userRoleName = props.user.role.name;
+
+    return ALL_ADMIN_CARDS.filter(card => {
+        // 1. Verificar si el usuario tiene el permiso necesario para la tarjeta.
+        const hasRequiredPermission = hasPermission(card.permission);
+        if (!hasRequiredPermission) {
+            return false;
+        }
+
+        // 2. Aplicar reglas de negocio específicas por rol.
+        // Regla: El Gerente General solo debe ver la tarjeta de Auditoría.
+        if (userRoleName === 'gerente_general' && card.section !== 'auditoria') {
+            return false;
+        }
+
+        // Si todas las validaciones pasan, la tarjeta es visible.
+        return true;
+    });
+});
 
 // --- MÉTODOS MEJORADOS ---
 
@@ -316,11 +258,11 @@ const handleKeydown = (event, section) => {
 /**
  * Devuelve clases CSS dinámicas para resaltar la card activa.
  */
-const getCardClasses = (section) => {
-    const baseClass = activeSection.value === section ? 'ring-4 ring-white/50' : '';
+const getCardClasses = (card) => {
+    const baseClass = activeSection.value === card.section ? 'ring-4 ring-white/50' : '';
     let glowClass = '';
 
-    switch (section) {
+    switch (card.section) {
         case 'catalogos':
             glowClass = 'hover:shadow-glow-blue';
             break;
@@ -335,6 +277,24 @@ const getCardClasses = (section) => {
             break;
     }
     return `${baseClass} ${glowClass}`;
+};
+
+/**
+ * Devuelve la clase de color de fondo para cada card
+ */
+const getCardBackgroundClass = (section) => {
+    switch (section) {
+        case 'catalogos':
+            return 'bg-gradient-to-br from-blue-500 to-blue-700';
+        case 'usuarios':
+            return 'bg-gradient-to-br from-slate-500 to-slate-700';
+        case 'cierres':
+            return 'bg-gradient-to-br from-orange-500 to-orange-700';
+        case 'auditoria':
+            return 'bg-gradient-to-br from-emerald-500 to-emerald-700';
+        default:
+            return 'bg-gradient-to-br from-gray-500 to-gray-700';
+    }
 };
 </script>
 
