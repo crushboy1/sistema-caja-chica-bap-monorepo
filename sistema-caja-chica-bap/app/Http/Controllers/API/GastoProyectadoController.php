@@ -18,8 +18,11 @@ class GastoProyectadoController extends Controller
      */
     public function index(Request $request)
     {
-        $query = GastoProyectado::with('cuentaContable:id,codigo_cuenta,descripcion')
-            ->orderBy('descripcion');
+        $query = GastoProyectado::with([
+            'cuentaContable:id,codigo_cuenta,descripcion',
+            'clasificacionBienServicio:id_clasificacion_bien_servicio,nombre',
+            'tipoImpuesto:id_tipo_impuesto,nombre'
+        ])->orderBy('descripcion');
 
         // Filtros personalizados
         if ($request->filled('descripcion')) {
@@ -32,7 +35,7 @@ class GastoProyectadoController extends Controller
             $search = $request->cuenta_contable;
             $query->whereHas('cuentaContable', function ($q) use ($search) {
                 $q->where('codigo_cuenta', 'like', "%$search%")
-                  ->orWhere('descripcion', 'like', "%$search%") ;
+                    ->orWhere('descripcion', 'like', "%$search%");
             });
         }
         if ($request->has('activo') && $request->activo !== '') {
@@ -57,13 +60,14 @@ class GastoProyectadoController extends Controller
         }
         $validatedData = $request->validate([
             'descripcion' => 'required|string|max:255|unique:gastos_proyectados,descripcion',
-            'id_cuenta_contable' => 'required|exists:cuentas_contables,id',
-            // [CORREGIDO] Se usa 'activo' en lugar de 'activa' para coherencia.
+            'id_cuenta_contable' => ['required', Rule::exists('cuentas_contables', 'id')->where('activo', true)],
+            'clasificacion_bien_servicio_id' => ['required', Rule::exists('clasificaciones_bien_servicio', 'id_clasificacion_bien_servicio')->where('activo', true)],
+            'tipo_impuesto_id' => ['required', Rule::exists('tipos_impuesto', 'id_tipo_impuesto')->where('activo', true)],
             'activo' => 'sometimes|boolean',
         ]);
 
         $gastoProyectado = GastoProyectado::create($validatedData);
-        $gastoProyectado->load('cuentaContable');
+        $gastoProyectado->load('cuentaContable', 'clasificacionBienServicio', 'tipoImpuesto');
 
         return response()->json([
             'message' => 'Gasto proyectado creado exitosamente.',
@@ -81,13 +85,15 @@ class GastoProyectadoController extends Controller
         }
 
         $validatedData = $request->validate([
-            'descripcion' => ['required', 'string', 'max:255', Rule::unique('gastos_proyectados')->ignore($gastoProyectado)],
-            'id_cuenta_contable' => 'required|exists:cuentas_contables,id',
+            'descripcion' => ['required', 'string', 'max:255', Rule::unique('gastos_proyectados')->ignore($gastoProyectado->id_gasto_proyectado, 'id_gasto_proyectado')],
+            'id_cuenta_contable' => ['required', Rule::exists('cuentas_contables', 'id')->where('activo', true)],
+            'clasificacion_bien_servicio_id' => ['required', Rule::exists('clasificaciones_bien_servicio', 'id_clasificacion_bien_servicio')->where('activo', true)],
+            'tipo_impuesto_id' => ['required', Rule::exists('tipos_impuesto', 'id_tipo_impuesto')->where('activo', true)],
             'activo' => 'sometimes|boolean',
         ]);
 
         $gastoProyectado->update($validatedData);
-
+        $gastoProyectado->load('cuentaContable', 'clasificacionBienServicio', 'tipoImpuesto');
         return response()->json([
             'message' => 'Gasto proyectado actualizado exitosamente.',
             'gasto_proyectado' => $gastoProyectado->load('cuentaContable')
@@ -139,7 +145,8 @@ class GastoProyectadoController extends Controller
         }
         $gastoProyectado->activo = true;
         $gastoProyectado->save();
-
+        $gastoProyectado->load('cuentaContable', 'clasificacionBienServicio', 'tipoImpuesto');
+        
         return response()->json([
             'message' => 'Gasto proyectado activado exitosamente.',
             'gasto_proyectado' => $gastoProyectado->load('cuentaContable')

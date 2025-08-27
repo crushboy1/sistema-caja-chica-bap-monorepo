@@ -1,54 +1,58 @@
 <template>
-    <div class="w-full h-full">
+    <div class="w-full h-full flex flex-col">
         <!-- Controles del gráfico -->
-        <div v-if="showControls" class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-4">
+        <div v-if="showControls" class="flex-shrink-0 mb-4">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-4">
+                    <!-- Selector de período -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-600">Período:</label>
+                        <select v-model="periodoSeleccionado" @change="aplicarFiltro"
+                            class="text-sm border border-gray-300 rounded-md px-6 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-verde-bap focus:border-transparent transition-all">
+                            <option value="6">Últimos 6 meses</option>
+                            <option value="12">Último año</option>
+                            <option value="24">Últimos 2 años</option>
+                            <option value="all">Todo el período</option>
+                        </select>
+                    </div>
 
-                <!-- Selector de período -->
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-gray-600">Período:</label>
-                    <select v-model="periodoSeleccionado" @change="aplicarFiltro"
-                        class="text-sm border border-gray-300 rounded-md px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-verde-bap focus:border-transparent transition-all">
-                        <option value="6">Últimos 6 meses</option>
-                        <option value="12">Último año</option>
-                        <option value="24">Últimos 2 años</option>
-                        <option value="all">Todo el período</option>
-                    </select>
+                    <!-- Selector de tipo de datos -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-gray-600">Mostrar:</label>
+                        <select v-model="tipoVisualizacion"
+                            class="text-sm border border-gray-300 rounded-md px-6 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-verde-bap focus:border-transparent transition-all">
+                            <option value="ambos">Gastos y Presupuesto</option>
+                            <option value="gastos">Solo Gastos</option>
+                            <option value="diferencia">Diferencia</option>
+                        </select>
+                    </div>
                 </div>
 
-                <!-- Selector de tipo de datos -->
-                <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-gray-600">Mostrar:</label>
-                    <select v-model="tipoVisualizacion"
-                        class="text-sm border border-gray-300 rounded-md px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-verde-bap focus:border-transparent transition-all">
-                        <option value="ambos">Gastos y Presupuesto</option>
-                        <option value="gastos">Solo Gastos</option>
-                        <option value="diferencia">Diferencia</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Leyenda manual (opcional, Chart.js ya incluye su propia leyenda) -->
-            <div class="flex items-center gap-4 text-sm">
-                <div v-if="tipoVisualizacion === 'ambos' || tipoVisualizacion === 'gastos'"
-                    class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-verde-bap rounded-full"></div>
-                    <span class="text-gray-600">Gastos Ejecutados</span>
-                </div>
-                <div v-if="tipoVisualizacion === 'ambos'" class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <span class="text-gray-600">Presupuesto Asignado</span>
-                </div>
-                <div v-if="tipoVisualizacion === 'diferencia'" class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    <span class="text-gray-600">Diferencia</span>
+                <!-- Leyenda manual -->
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <div v-if="tipoVisualizacion === 'ambos' || tipoVisualizacion === 'gastos'"
+                        class="flex items-center gap-2">
+                        <div class="w-3 h-3 bg-verde-bap rounded-full"></div>
+                        <span class="text-gray-600">Gastos Ejecutados</span>
+                    </div>
+                    <div v-if="tipoVisualizacion === 'ambos'" class="flex items-center gap-2">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span class="text-gray-600">Presupuesto Asignado</span>
+                    </div>
+                    <div v-if="tipoVisualizacion === 'diferencia'" class="flex items-center gap-2">
+                        <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        <span class="text-gray-600">Diferencia</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Gráfico -->
-        <div class="relative w-full h-full">
-            <Line v-if="datosGrafico.datasets[0].data.length > 0" :data="datosGrafico" :options="chartOptions" />
+        <div class="flex-1 min-h-0 relative"
+            :style="{ height: showSummary ? 'calc(100% - 120px)' : 'calc(100% - 60px)' }">
+            <div v-if="datosGrafico.datasets[0].data.length > 0" class="w-full h-full">
+                <Line ref="chartRef" :data="datosGrafico" :options="chartOptions" class="w-full h-full" />
+            </div>
             <div v-else class="flex items-center justify-center h-full text-gray-400">
                 <div class="text-center">
                     <BarChart3 class="w-12 h-12 mx-auto mb-2" />
@@ -58,26 +62,37 @@
         </div>
 
         <!-- Estadísticas resumidas -->
-        <div v-if="showSummary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t">
-            <div class="text-center">
-                <div class="text-sm text-gray-500">Promedio Mensual</div>
-                <div class="text-lg font-semibold text-gray-800">{{ formatearMoneda(estadisticas.promedioMensual) }}
+        <div v-if="showSummary && datosProcesados.length > 0"
+            class="flex-shrink-0 h-20 bg-gray-50 rounded-lg mx-2 mb-2">
+            <div class="h-full flex items-center justify-center px-4">
+                <div class="grid grid-cols-4 gap-6 w-full">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 leading-tight">Promedio Mensual</div>
+                        <div class="text-sm font-semibold text-gray-800 mt-1">
+                            {{ formatearMoneda(estadisticas.promedioMensual) }}
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 leading-tight">Mes Máximo</div>
+                        <div class="text-sm font-semibold text-verde-bap mt-1">
+                            {{ formatearMoneda(estadisticas.maximoMes) }}
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 leading-tight">Tendencia</div>
+                        <div class="text-sm font-semibold mt-1"
+                            :class="estadisticas.tendencia >= 0 ? 'text-green-600' : 'text-red-600'">
+                            {{ estadisticas.tendencia >= 0 ? '↗' : '↘' }}
+                            {{ Math.abs(estadisticas.tendencia).toFixed(1) }}%
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-500 leading-tight">Total Período</div>
+                        <div class="text-sm font-semibold text-gray-800 mt-1">
+                            {{ formatearMoneda(estadisticas.totalPeriodo) }}
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="text-center">
-                <div class="text-sm text-gray-500">Mes Máximo</div>
-                <div class="text-lg font-semibold text-verde-bap">{{ formatearMoneda(estadisticas.maximoMes) }}</div>
-            </div>
-            <div class="text-center">
-                <div class="text-sm text-gray-500">Tendencia</div>
-                <div class="text-lg font-semibold"
-                    :class="estadisticas.tendencia >= 0 ? 'text-green-600' : 'text-red-600'">
-                    {{ estadisticas.tendencia >= 0 ? '↗' : '↘' }} {{ Math.abs(estadisticas.tendencia).toFixed(1) }}%
-                </div>
-            </div>
-            <div class="text-center">
-                <div class="text-sm text-gray-500">Total Período</div>
-                <div class="text-lg font-semibold text-gray-800">{{ formatearMoneda(estadisticas.totalPeriodo) }}</div>
             </div>
         </div>
     </div>
@@ -256,10 +271,17 @@ const chartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-        legend: { display: false },
+        legend: {
+            display: false
+        },
         tooltip: {
             mode: 'index',
             intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: 'white',
+            bodyColor: 'white',
+            borderColor: '#e5e7eb',
+            borderWidth: 1,
             callbacks: {
                 label: (context) => {
                     return `${context.dataset.label}: ${formatearMoneda(context.parsed.y)}`
@@ -272,24 +294,48 @@ const chartOptions = computed(() => ({
             display: true,
             title: {
                 display: true,
-                text: 'Período'
+                text: 'Período',
+                color: '#6b7280',
+                font: {
+                    size: 12,
+                    weight: 'bold'
+                }
             },
             grid: {
                 display: true,
-                color: '#e5e7eb'
+                color: '#f3f4f6',
+                drawBorder: false
+            },
+            ticks: {
+                color: '#6b7280',
+                font: {
+                    size: 11
+                },
+                maxRotation: 45,
+                minRotation: 0
             }
         },
         y: {
             display: true,
             title: {
                 display: true,
-                text: 'Monto (S/)'
+                text: 'Monto (S/)',
+                color: '#6b7280',
+                font: {
+                    size: 12,
+                    weight: 'bold'
+                }
             },
             grid: {
                 display: true,
-                color: '#e5e7eb'
+                color: '#f3f4f6',
+                drawBorder: false
             },
             ticks: {
+                color: '#6b7280',
+                font: {
+                    size: 11
+                },
                 callback: (value) => formatearMoneda(value)
             }
         }
@@ -298,6 +344,14 @@ const chartOptions = computed(() => ({
         mode: 'nearest',
         axis: 'x',
         intersect: false
+    },
+    elements: {
+        line: {
+            borderJoinStyle: 'round'
+        },
+        point: {
+            hoverBorderWidth: 3
+        }
     }
 }))
 
@@ -306,6 +360,26 @@ const aplicarFiltro = () => {
     emit('period-changed', periodoSeleccionado.value)
 }
 
+// Redimensionar gráfico cuando cambie el tamaño del contenedor
+const resizeChart = () => {
+    if (chartRef.value && chartRef.value.chart) {
+        chartRef.value.chart.resize()
+    }
+}
+
+// --- WATCHERS Y LIFECYCLE ---
+onMounted(() => {
+    nextTick(() => {
+        resizeChart()
+    })
+})
+
+// Watch para redimensionar cuando cambien los datos
+watch([datosProcesados, tipoVisualizacion], () => {
+    nextTick(() => {
+        resizeChart()
+    })
+}, { deep: true })
 
 </script>
 
@@ -333,11 +407,53 @@ select:hover {
     border-color: var(--color-verde-bap, #10b981);
 }
 
-canvas {
+/* Asegurar que el contenedor del gráfico use todo el espacio disponible */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Mejorar la visualización del canvas */
+:deep(canvas) {
     width: 100% !important;
     height: 100% !important;
     max-width: 100% !important;
     max-height: 100% !important;
-    display: block;
+    display: block !important;
+}
+
+/* Estilos para las estadísticas resumidas */
+.bg-gray-50 {
+    background-color: #f9fafb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .grid-cols-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    /* Ajustar altura de estadísticas en móvil */
+    .h-20 {
+        height: auto;
+        min-height: 5rem;
+        padding: 0.75rem 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .grid-cols-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    /* Estadísticas más compactas en móvil */
+    .h-20 {
+        height: auto;
+        min-height: 4rem;
+        padding: 0.5rem 0;
+    }
 }
 </style>

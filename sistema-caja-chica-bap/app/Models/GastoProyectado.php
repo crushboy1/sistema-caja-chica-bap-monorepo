@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\LogsActivity;
+
 class GastoProyectado extends Model
 {
     use HasFactory, LogsActivity;
@@ -19,6 +20,8 @@ class GastoProyectado extends Model
         'descripcion',
         'activo',
         'id_cuenta_contable',
+        'clasificacion_bien_servicio_id',
+        'tipo_impuesto_id',
     ];
     public function getRouteKeyName()
     {
@@ -31,7 +34,21 @@ class GastoProyectado extends Model
     {
         return $this->belongsTo(CuentaContable::class, 'id_cuenta_contable', 'id');
     }
+    /**
+     * Relación: Un Gasto Proyectado pertenece a una Clasificación de Bien y Servicio.
+     */
+    public function clasificacionBienServicio(): BelongsTo
+    {
+        return $this->belongsTo(ClasificacionBienServicio::class, 'clasificacion_bien_servicio_id', 'id_clasificacion_bien_servicio');
+    }
 
+    /**
+     * Relación: Un Gasto Proyectado pertenece a un Tipo de Impuesto.
+     */
+    public function tipoImpuesto(): BelongsTo
+    {
+        return $this->belongsTo(TipoImpuesto::class, 'tipo_impuesto_id', 'id_tipo_impuesto');
+    }
     /**
      * Relación: Un Gasto Proyectado puede estar en muchas Solicitudes de Fondos.
      */

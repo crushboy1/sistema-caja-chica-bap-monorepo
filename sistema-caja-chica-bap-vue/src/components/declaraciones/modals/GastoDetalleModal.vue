@@ -59,6 +59,7 @@ const cuentaContableInfo = computed(() => {
     if (!props.gasto?.cuenta_contable) return 'N/A';
     return `${props.gasto.cuenta_contable.codigo_cuenta} - ${props.gasto.cuenta_contable.descripcion}`;
 });
+const tipoDocumentoNombre = computed(() => props.gasto?.tipo_documento?.nombre || 'N/A');
 const montoTotal = computed(() => parseFloat(props.gasto?.monto_total || 0));
 const montoExcedidoAlRegistrar = computed(() => parseFloat(props.gasto?.monto_excedido_al_registrar || 0));
 const saldoDisponibleAlRegistrar = computed(() => parseFloat(props.gasto?.saldo_disponible_al_registrar || 0));
@@ -142,10 +143,10 @@ const cerrarModal = () => {
                                     <b class="text-rojo-bap">{{ currencyFormatter.format(montoTotal) }}</b>
                                     excedió el saldo disponible de la proyección (que era
                                     <b class="text-rojo-bap">{{ currencyFormatter.format(saldoDisponibleAlRegistrar)
-                                    }}</b>)
+                                        }}</b>)
                                     en
                                     <b class="text-rojo-bap">{{ currencyFormatter.format(montoExcedidoAlRegistrar)
-                                    }}</b>.
+                                        }}</b>.
                                 </span>
                             </div>
                             <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -161,21 +162,16 @@ const cerrarModal = () => {
                                 <span v-if="gasto?.comentario" class="text-gray-500 font-medium">Comentario
                                     Adicional:</span>
                                 <span v-if="gasto?.comentario" class="font-medium text-gray-800">{{ gasto.comentario
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-500 font-medium">Tipo de Documento:</span>
-                                <span class="font-medium text-gray-800">{{ gasto?.tipo_documento || 'N/A' }}</span>
-                                <template v-if="gasto?.tipo_documento !== 'Declaración Jurada'">
-                                    <span v-if="!gasto?.es_declaracion_jurada"
-                                        class="text-gray-500 font-medium">Comprobante:</span>
-                                    <span v-if="!gasto?.es_declaracion_jurada" class="font-medium text-gray-800">{{
-                                        gasto?.serie_documento || 'S/S' }} - {{ gasto?.correlativo_documento || 'S/C'
+                                <span class="font-medium text-gray-800">{{ tipoDocumentoNombre }}</span>
+                                <template v-if="tipoDocumentoNombre !== 'Declaración Jurada'">
+                                    <span class="text-gray-500 font-medium">Serie del Documento:</span>
+                                    <span class="font-medium text-gray-800">{{ gasto?.serie_documento || 'N/A' }}</span>
+
+                                    <span class="text-gray-500 font-medium">Correlativo del Documento:</span>
+                                    <span class="font-medium text-gray-800">{{ gasto?.correlativo_documento || 'N/A'
                                         }}</span>
-                                </template>
-                                <template v-else>
-                                    <span class="text-gray-500 font-medium">Serie:</span>
-                                    <span class="font-medium text-gray-800">N/A</span>
-                                    <span class="text-gray-500 font-medium">Correlativo:</span>
-                                    <span class="font-medium text-gray-800">N/A</span>
                                 </template>
                             </div>
                         </div>
@@ -312,7 +308,7 @@ const cerrarModal = () => {
                                             historial.usuario_accion.last_name }}</span>
                                         <span class="text-gray-500 font-medium">Fecha:</span>
                                         <span class="font-medium text-gray-800">{{ formatearFecha(historial.created_at)
-                                            }}</span>
+                                        }}</span>
                                     </div>
                                     <p v-if="historial.comentario" class="mt-2"><strong
                                             class="text-gray-600">Comentario:</strong> <em class="text-gray-700">"{{

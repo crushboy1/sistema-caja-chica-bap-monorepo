@@ -145,7 +145,7 @@
                 <td class="py-3 px-2 text-center">
                   <!-- Usa la propiedad de resumen del grupo directamente -->
                   <div class="font-bold text-lg text-blue-800">{{ currencyFormatter.format(item.monto_total_grupo || 0)
-                  }}</div>
+                    }}</div>
                   <div class="text-xs text-gray-500">Total consolidado</div>
                 </td>
                 <td class="py-3 px-2 text-center">
@@ -266,6 +266,15 @@
                 </td>
                 <td class="py-3 px-2">
                   <div class="font-mono text-sm font-medium text-verde-bap-dark">{{ item.gasto?.codigo_gasto }}</div>
+                  <div v-if="item.gasto?.fondo_efectivo?.proyecto"
+                    class="text-xs text-verde-bap font-semibold mt-1 p-1 bg-verde-bap-extralight rounded-md inline-block">
+                    <svg class="w-3 h-3 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 4h5m-5 4h5">
+                      </path>
+                    </svg>
+                    Proyecto
+                  </div>
                   <div class="text-xs text-verde-bap">Código único</div>
                 </td>
                 <td class="py-3 px-2 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
@@ -486,8 +495,10 @@ const paginasVisibles = computed(() => {
 const fetchGastos = async () => {
   cargando.value = true;
   try {
-    const response = await api.get('/v1/gastos/para-aprobacion');
-    items.value = response.data; // La data ya viene lista para usar.
+    const response = await api.get('/v1/gastos/para-aprobacion', {
+      params: { scope: 'aprobacion_jefe' }
+    });
+    items.value = response.data;
 
     // Ajusta la página actual si es necesario después de cargar los datos
     if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {

@@ -17,6 +17,9 @@ const dataSets = ref({
     proyectos: [],
     gastosProyectados: [],
     cuentasContables: [],
+    clasificaciones: [],
+    tiposImpuesto: [],
+    tiposDocumento: [],
 });
 
 // --- CONFIGURACIÓN CENTRALIZADA DE CATÁLOGOS ---
@@ -30,7 +33,6 @@ const catalogConfig = {
             { key: 'nombre', label: 'Nombre del Proyecto' },
         ],
         fields: [
-            // [MODIFICADO] Se añade 'disabledOnEdit' para que el código no sea editable.
             { key: 'codigo', label: 'Código del Proyecto', type: 'text', required: true, disabledOnEdit: true },
             { key: 'nombre', label: 'Nombre del Proyecto', type: 'text', required: true },
         ]
@@ -42,10 +44,40 @@ const catalogConfig = {
         columns: [
             { key: 'descripcion', label: 'Descripción' },
             { key: 'cuenta_contable.descripcion', label: 'Cuenta Contable Asociada' },
+            { key: 'clasificacion_bien_servicio.nombre', label: 'Clasificación B/S' },
+            { key: 'tipo_impuesto.nombre', label: 'Tipo Impuesto' },
         ],
         fields: [
             { key: 'descripcion', label: 'Descripción del Gasto', type: 'text', required: true },
-            { key: 'id_cuenta_contable', label: 'Cuenta Contable Asociada', type: 'select', options: 'cuentasContables', required: true },
+            {
+                key: 'id_cuenta_contable',
+                label: 'Cuenta Contable Asociada',
+                type: 'select',
+                options: 'cuentasContables',
+                optionLabel: 'descripcion',
+                optionValue: 'id',
+                displayFormat: 'codigo_cuenta - descripcion',
+                required: true
+            },
+            {
+                key: 'clasificacion_bien_servicio_id',
+                label: 'Clasificación B/S',
+                type: 'select',
+                options: 'clasificaciones',
+                optionLabel: 'nombre',
+                optionValue: 'id_clasificacion_bien_servicio',
+                displayFormat: 'codigo - nombre',
+                required: true
+            },
+            {
+                key: 'tipo_impuesto_id',
+                label: 'Tipo de Impuesto',
+                type: 'select',
+                options: 'tiposImpuesto',
+                optionLabel: 'nombre',
+                optionValue: 'id_tipo_impuesto',
+                required: true
+            },
         ]
     },
     cuentasContables: {
@@ -57,171 +89,185 @@ const catalogConfig = {
             { key: 'descripcion', label: 'Descripción' },
         ],
         fields: [
-            // Se añade 'disabledOnEdit' para que el código no sea editable.
             { key: 'codigo_cuenta', label: 'Código de Cuenta', type: 'text', required: true, disabledOnEdit: true },
             { key: 'descripcion', label: 'Descripción de la Cuenta', type: 'text', required: true },
+        ]
+    },
+    clasificaciones: {
+        title: 'Clasificación B/S',
+        endpoint: '/v1/clasificaciones',
+        pk: 'id_clasificacion_bien_servicio',
+        columns: [
+            { key: 'codigo', label: 'Código' },
+            { key: 'nombre', label: 'Nombre de la Clasificación' },
+        ],
+        fields: [
+            { key: 'codigo', label: 'Código', type: 'text', required: true },
+            { key: 'nombre', label: 'Nombre de la Clasificación', type: 'text', required: true },
+        ]
+    },
+    tiposImpuesto: {
+        title: 'Tipos de Impuesto',
+        endpoint: '/v1/tipos-impuesto',
+        pk: 'id_tipo_impuesto',
+        columns: [
+            { key: 'nombre', label: 'Nombre' },
+            { key: 'porcentaje', label: 'Porcentaje (%)' },
+            { key: 'factor_calculo', label: 'Factor de Cálculo' },
+        ],
+        fields: [
+            { key: 'nombre', label: 'Nombre', type: 'text', required: true },
+            { key: 'porcentaje', label: 'Porcentaje', type: 'number', required: true },
+            { key: 'factor_calculo', label: 'Factor de Cálculo', type: 'number', required: true },
+        ]
+    },
+    tiposDocumento: {
+        title: 'Tipos de Documento',
+        endpoint: '/v1/tipos-documento-comprobante',
+        pk: 'id',
+        columns: [
+            { key: 'codigo_comprobante', label: 'Código' },
+            { key: 'nombre', label: 'Nombre' },
+        ],
+        fields: [
+            { key: 'codigo_comprobante', label: 'Código', type: 'text', required: true },
+            { key: 'nombre', label: 'Nombre del Documento', type: 'text', required: true },
         ]
     }
 };
 
-// --- FILTROS REACTIVOS PARA PROYECTOS ---
-const filtrosProyectos = ref({
-    codigo: '',
-    nombre: '',
-    activo: '' // '', '1', '0'
+// --- FILTROS REACTIVOS ---
+const filtros = ref({
+    proyectos: { codigo: '', nombre: '', activo: '' },
+    gastosProyectados: { descripcion: '', cuenta_contable: '', activo: '' },
+    cuentasContables: { codigo_cuenta: '', descripcion: '', activo: '' }
 });
 
-// --- FILTROS REACTIVOS PARA GASTOS PROYECTADOS ---
-const filtrosGastosProyectados = ref({
-    descripcion: '',
-    cuenta_contable: '', // ahora texto, antes id_cuenta_contable
-    activo: '' // '', '1', '0'
-});
-
-// --- FILTROS REACTIVOS PARA CUENTAS CONTABLES ---
-const filtrosCuentasContables = ref({
-    codigo_cuenta: '',
-    descripcion: '',
-    activo: '' // '', '1', '0'
-});
-
-// --- DEBOUNCE PARA FILTROS DE TEXTO ---
+// --- DEBOUNCE PARA FILTROS ---
 let debounceTimeout = null;
 const DEBOUNCE_DELAY = 400;
-
-function fetchProyectosConFiltros() {
-    isLoading.value = true;
-    const params = { scope: 'management' };
-    if (filtrosProyectos.value.codigo) params.codigo = filtrosProyectos.value.codigo;
-    if (filtrosProyectos.value.nombre) params.nombre = filtrosProyectos.value.nombre;
-    if (filtrosProyectos.value.activo !== '') params.activo = filtrosProyectos.value.activo;
-    api.get('/v1/proyectos', { params })
-        .then(res => { dataSets.value.proyectos = res.data.proyectos; currentPage.value = 1; })
-        .catch(() => Swal.fire('Error', 'No se pudieron cargar los proyectos.', 'error'))
-        .finally(() => { isLoading.value = false; });
-}
-
-function triggerDebouncedFetchProyectos() {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(fetchProyectosConFiltros, DEBOUNCE_DELAY);
-}
-
-function limpiarFiltrosProyectos() {
-    filtrosProyectos.value = { codigo: '', nombre: '', activo: '' };
-    fetchProyectosConFiltros();
-}
-
-function fetchGastosProyectadosConFiltros() {
-    isLoading.value = true;
-    const params = { scope: 'management' };
-    if (filtrosGastosProyectados.value.descripcion) params.descripcion = filtrosGastosProyectados.value.descripcion;
-    if (filtrosGastosProyectados.value.cuenta_contable) params.cuenta_contable = filtrosGastosProyectados.value.cuenta_contable;
-    if (filtrosGastosProyectados.value.activo !== '') params.activo = filtrosGastosProyectados.value.activo;
-    api.get('/v1/gastos-proyectados', { params })
-        .then(res => { dataSets.value.gastosProyectados = res.data.gastos_proyectados; currentPage.value = 1; })
-        .catch(() => Swal.fire('Error', 'No se pudieron cargar los gastos proyectados.', 'error'))
-        .finally(() => { isLoading.value = false; });
-}
-
-function triggerDebouncedFetchGastosProyectados() {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(fetchGastosProyectadosConFiltros, DEBOUNCE_DELAY);
-}
-
-function limpiarFiltrosGastosProyectados() {
-    filtrosGastosProyectados.value = { descripcion: '', cuenta_contable: '', activo: '' };
-    fetchGastosProyectadosConFiltros();
-}
-
-function fetchCuentasContablesConFiltros() {
-    isLoading.value = true;
-    const params = { scope: 'management' };
-    if (filtrosCuentasContables.value.codigo_cuenta) params.codigo_cuenta = filtrosCuentasContables.value.codigo_cuenta;
-    if (filtrosCuentasContables.value.descripcion) params.descripcion = filtrosCuentasContables.value.descripcion;
-    if (filtrosCuentasContables.value.activo !== '') params.activo = filtrosCuentasContables.value.activo;
-    api.get('/v1/cuentas-contables', { params })
-        .then(res => { dataSets.value.cuentasContables = res.data.cuentas_contables; currentPage.value = 1; })
-        .catch(() => Swal.fire('Error', 'No se pudieron cargar las cuentas contables.', 'error'))
-        .finally(() => { isLoading.value = false; });
-}
-
-function triggerDebouncedFetchCuentasContables() {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(fetchCuentasContablesConFiltros, DEBOUNCE_DELAY);
-}
-
-function limpiarFiltrosCuentasContables() {
-    filtrosCuentasContables.value = { codigo_cuenta: '', descripcion: '', activo: '' };
-    fetchCuentasContablesConFiltros();
-}
-
-// --- LÓGICA DE DATOS Y API ---
-const fetchData = async () => {
-    isLoading.value = true;
-    try {
-        if (activeTab.value === 'proyectos') {
-            fetchProyectosConFiltros();
-            return;
-        }
-        if (activeTab.value === 'gastosProyectados') {
-            fetchGastosProyectadosConFiltros();
-            return;
-        }
-        if (activeTab.value === 'cuentasContables') {
-            fetchCuentasContablesConFiltros();
-            return;
-        }
-    } catch (error) {
-        console.error("Error al cargar los catálogos:", error);
-        Swal.fire('Error', 'No se pudieron cargar los datos de los catálogos.', 'error');
-    } finally {
-        isLoading.value = false;
-    }
-};
-
-onMounted(fetchData);
-
-// --- WATCHERS PARA FILTROS DE PROYECTOS ---
-watch(() => filtrosProyectos.value.codigo, triggerDebouncedFetchProyectos);
-watch(() => filtrosProyectos.value.nombre, triggerDebouncedFetchProyectos);
-watch(() => filtrosProyectos.value.activo, fetchProyectosConFiltros);
-
-// --- WATCHERS PARA FILTROS DE GASTOS PROYECTADOS ---
-watch(() => filtrosGastosProyectados.value.descripcion, triggerDebouncedFetchGastosProyectados);
-watch(() => filtrosGastosProyectados.value.cuenta_contable, triggerDebouncedFetchGastosProyectados);
-watch(() => filtrosGastosProyectados.value.activo, fetchGastosProyectadosConFiltros);
-
-// --- WATCHERS PARA FILTROS DE CUENTAS CONTABLES ---
-watch(() => filtrosCuentasContables.value.codigo_cuenta, triggerDebouncedFetchCuentasContables);
-watch(() => filtrosCuentasContables.value.descripcion, triggerDebouncedFetchCuentasContables);
-watch(() => filtrosCuentasContables.value.activo, fetchCuentasContablesConFiltros);
 
 // --- PROPIEDADES COMPUTADAS ---
 const activeDataSet = computed(() => dataSets.value[activeTab.value] || []);
 const activeConfig = computed(() => catalogConfig[activeTab.value]);
-// [NUEVO] Propiedad computada para saber si estamos en modo edición.
 const isEditing = computed(() => !!editingItem.value);
-
-const totalPages = computed(() => Math.ceil(activeDataSet.value.length / itemsPerPage.value));
+const activeFiltros = computed(() => filtros.value[activeTab.value] || {});
+const totalPages = computed(() => {
+    const list = Array.isArray(activeDataSet.value) ? activeDataSet.value : [];
+    const pages = Math.ceil(list.length / itemsPerPage.value || 1);
+    return pages || 1;
+});
 const paginatedItems = computed(() => {
+    const list = Array.isArray(activeDataSet.value) ? activeDataSet.value : [];
     const start = (currentPage.value - 1) * itemsPerPage.value;
     const end = start + itemsPerPage.value;
-    return activeDataSet.value.slice(start, end);
+    return list.slice(start, end);
 });
 
-// --- MÉTODOS ---
+// --- LÓGICA DE DATOS Y API OPTIMIZADA ---
+const fetchDataWithFilters = () => {
+    isLoading.value = true;
+
+    const config = activeConfig.value;
+    const currentFilters = filtros.value[activeTab.value];
+    const params = { scope: 'management' };
+
+    if (currentFilters) {
+        Object.entries(currentFilters).forEach(([key, value]) => {
+            if (value !== '' && value !== null && value !== undefined) params[key] = value;
+        });
+    }
+
+    api.get(config.endpoint, { params })
+        .then(res => {
+            const rows = extractRowsSafely(res.data, activeTab.value);
+            dataSets.value[activeTab.value] = rows;
+            currentPage.value = 1;
+        })
+        .catch(err => {
+            console.error('[Catálogos] fetch error:', err?.response?.data || err);
+            Swal.fire('Error', `No se pudieron cargar los datos de ${config.title}.`, 'error');
+            // Asegura dejar el dataset como array vacío para no romper renders
+            dataSets.value[activeTab.value] = [];
+        })
+        .finally(() => {
+            isLoading.value = false;
+        });
+};
+// Helper para extraer arrays de distintas formas de respuesta
+const extractRowsSafely = (payload) => {
+    // 1) Si la respuesta YA es un array
+    if (Array.isArray(payload)) return payload;
+    // 2) Si viene en { data: [...] }
+    if (payload && Array.isArray(payload.data)) return payload.data;
+    // 3) Si viene en { clasificaciones: [...] }, { proyectos: [...] }, etc.
+    const firstArray = Object.values(payload || {}).find(v => Array.isArray(v));
+    if (Array.isArray(firstArray)) return firstArray;
+    // 4) Fallback seguro
+    return [];
+};
+
+const triggerDebouncedFetch = () => {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(fetchDataWithFilters, DEBOUNCE_DELAY);
+};
+
+const limpiarFiltros = () => {
+    const currentFilters = filtros.value[activeTab.value];
+    if (currentFilters) {
+        Object.keys(currentFilters).forEach(key => {
+            currentFilters[key] = '';
+        });
+        fetchDataWithFilters();
+    }
+};
+
+// Carga datos para selectores (una sola vez)
+const fetchSelectOptions = async () => {
+    try {
+        // Se añade la llamada para 'tiposDocumento'.
+        const [cuentasRes, clasificacionesRes, tiposImpuestoRes, tiposDocumentoRes] = await Promise.all([
+            api.get(catalogConfig.cuentasContables.endpoint),
+            api.get(catalogConfig.clasificaciones.endpoint),
+            api.get(catalogConfig.tiposImpuesto.endpoint),
+            api.get(catalogConfig.tiposDocumento.endpoint)
+        ]);
+
+        dataSets.value.cuentasContables = extractRowsSafely(cuentasRes.data, 'cuentasContables');
+        dataSets.value.clasificaciones = extractRowsSafely(clasificacionesRes.data, 'clasificaciones');
+        dataSets.value.tiposImpuesto = extractRowsSafely(tiposImpuestoRes.data, 'tiposImpuesto');
+        dataSets.value.tiposDocumento = extractRowsSafely(tiposDocumentoRes.data, 'tiposDocumento');
+
+    } catch (error) {
+        console.error("Error al cargar opciones para selectores:", error);
+        Swal.fire('Error', 'No se pudieron cargar las opciones para los selectores.', 'error');
+    }
+};
+
+// --- WATCHERS OPTIMIZADOS ---
+// Crear watchers dinámicamente para evitar repetición
+const createFilterWatcher = (tabName, fieldName, immediate = false) => {
+    watch(() => filtros.value[tabName]?.[fieldName],
+        immediate ? fetchDataWithFilters : triggerDebouncedFetch
+    );
+};
+
+// Watchers para todos los filtros
+['proyectos', 'gastosProyectados', 'cuentasContables'].forEach(tab => {
+    const fields = Object.keys(filtros.value[tab]);
+    fields.forEach(field => {
+        createFilterWatcher(tab, field, field === 'activo');
+    });
+});
+
+watch(() => activeTab.value, () => {
+    clearTimeout(debounceTimeout);
+});
+
+// --- MÉTODOS DE NAVEGACIÓN ---
 const changeTab = (tab) => {
     activeTab.value = tab;
-    currentPage.value = 1;
-    if (tab === 'proyectos') {
-        fetchProyectosConFiltros();
-    } else if (tab === 'gastosProyectados') {
-        fetchGastosProyectadosConFiltros();
-    } else if (tab === 'cuentasContables') {
-        fetchCuentasContablesConFiltros();
-    } else {
-        fetchData();
-    }
+    fetchDataWithFilters();
 };
 
 const goToPage = (page) => {
@@ -231,25 +277,22 @@ const goToPage = (page) => {
 };
 
 // --- MÉTODOS DEL MODAL Y CRUD ---
-const openCreateModal = () => {
-    editingItem.value = null;
+const resetCurrentItem = () => {
     currentItem.value = { activo: true };
     activeConfig.value.fields.forEach(field => {
-        currentItem.value[field.key] = field.type === 'select' ? null : '';
+        currentItem.value[field.key] = field.type === 'select' ? null : (field.type === 'number' ? 0 : '');
     });
-    currentItem.value.activo = true;
-    if (activeTab.value === 'gastosProyectados') {
-        fetchCuentasContablesConFiltros();
-    }
+};
+
+const openCreateModal = () => {
+    editingItem.value = null;
+    resetCurrentItem();
     isModalOpen.value = true;
 };
 
 const openEditModal = (item) => {
     editingItem.value = item;
     currentItem.value = { ...item };
-    if (activeTab.value === 'gastosProyectados') {
-        fetchCuentasContablesConFiltros();
-    }
     isModalOpen.value = true;
 };
 
@@ -269,10 +312,9 @@ const handleSave = async () => {
     try {
         const response = await api[method](endpoint, currentItem.value);
         Swal.fire('¡Éxito!', response.data.message, 'success');
-        fetchData();
+        fetchDataWithFilters();
         closeModal();
     } catch (error) {
-        console.error("Error al guardar:", error);
         const errorMessage = error.response?.data?.message || 'Ocurrió un error al guardar el registro.';
         Swal.fire('Error', errorMessage, 'error');
     }
@@ -282,7 +324,7 @@ const handleDesactivate = async (item) => {
     const config = activeConfig.value;
     const result = await Swal.fire({
         title: '¿Estás seguro?',
-        text: `Estás a punto de desactivar este registro.`,
+        text: 'Estás a punto de desactivar este registro.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -295,7 +337,7 @@ const handleDesactivate = async (item) => {
         try {
             await api.delete(`${config.endpoint}/${item[config.pk]}`);
             Swal.fire('¡Desactivado!', 'El registro ha sido desactivado.', 'success');
-            fetchData();
+            fetchDataWithFilters();
         } catch (error) {
             Swal.fire('Error', error.response?.data?.message || 'No se pudo desactivar el registro.', 'error');
         }
@@ -307,16 +349,60 @@ const handleActivate = async (item) => {
     try {
         await api.post(`${config.endpoint}/${item[config.pk]}/activate`);
         Swal.fire('¡Activado!', 'El registro ha sido activado exitosamente.', 'success');
-        fetchData();
+        fetchDataWithFilters();
     } catch (error) {
         Swal.fire('Error', error.response?.data?.message || 'No se pudo activar el registro.', 'error');
     }
 };
 
+// --- MÉTODOS DE UTILIDAD ---
 const getNestedValue = (obj, path) => {
     return path.split('.').reduce((value, key) => value && value[key], obj);
 };
 
+const getSelectOptions = (field) => {
+    const options = dataSets.value[field.options];
+
+    return Array.isArray(options)
+        ? options.filter(o => o && String(o.activo) === '1') // o.activo debe ser 1 o '1'
+        : [];
+};
+
+const getSimpleOptionLabel = (option, field) => {
+    if (!option) return 'Sin datos';
+
+    try {
+        // Formato personalizado
+        if (field.displayFormat) {
+            const parts = field.displayFormat.split(' - ');
+            const values = parts.map(key => option[key] || '').filter(v => v !== '');
+            if (values.length > 0) return values.join(' - ');
+        }
+
+        // Usar optionLabel o fallbacks
+        const labelField = field.optionLabel || 'descripcion';
+        return String(option[labelField] || option.nombre || option.codigo || `ID: ${getSimpleOptionValue(option, field)}`);
+    } catch {
+        return 'Error';
+    }
+};
+
+const getSimpleOptionValue = (option, field) => {
+    if (!option) return null;
+
+    const valueField = field.optionValue || 'id';
+    return option[valueField] || option.id || option.id_clasificacion_bien_servicio || option.id_tipo_impuesto || null;
+};
+
+const handleSelectInput = (selectedOption, field) => {
+    currentItem.value[field.key] = selectedOption ? getSimpleOptionValue(selectedOption, field) : null;
+};
+
+// --- INICIALIZACIÓN ---
+onMounted(async () => {
+    await fetchSelectOptions();
+    await fetchDataWithFilters();
+});
 </script>
 
 <template>
@@ -330,6 +416,7 @@ const getNestedValue = (obj, path) => {
                 <X class="w-5 h-5 text-gray-500" />
             </button>
         </div>
+
         <!-- Pestañas de Navegación -->
         <div class="border-b border-gray-200 mb-6">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
@@ -340,87 +427,32 @@ const getNestedValue = (obj, path) => {
             </nav>
         </div>
 
-        <!-- FILTROS SOLO PARA PROYECTOS -->
-        <div v-if="activeTab === 'proyectos'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
+        <!-- Filtros Dinámicos -->
+        <div v-if="activeFiltros && Object.keys(activeFiltros).length > 0"
+            class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Código:</label>
-                    <input v-model="filtrosProyectos.codigo" type="text" class="form-input"
-                        placeholder="Buscar por código" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre:</label>
-                    <input v-model="filtrosProyectos.nombre" type="text" class="form-input"
-                        placeholder="Buscar por nombre" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-                    <select v-model="filtrosProyectos.activo" class="form-input">
+                <div v-for="(value, key) in activeFiltros" :key="key">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ key === 'codigo' ? 'Código' :
+                            key === 'nombre' ? 'Nombre' :
+                                key === 'descripcion' ? 'Descripción' :
+                                    key === 'codigo_cuenta' ? 'Código de Cuenta' :
+                                        key === 'cuenta_contable' ? 'Cuenta Contable' :
+                                            key === 'activo' ? 'Estado' : key }}:
+                    </label>
+                    <select v-if="key === 'activo'" v-model="activeFiltros[key]" class="form-input">
                         <option value="">Todos</option>
                         <option value="1">Activo</option>
                         <option value="0">Inactivo</option>
                     </select>
+                    <input v-else v-model="activeFiltros[key]" type="text" class="form-input" :placeholder="`Buscar por ${key === 'codigo' ? 'código' :
+                        key === 'nombre' ? 'nombre' :
+                            key === 'descripcion' ? 'descripción' :
+                                key === 'codigo_cuenta' ? 'código de cuenta' :
+                                    key === 'cuenta_contable' ? 'cuenta contable' : key}`" />
                 </div>
-                <div class="flex items-end">
-                    <button @click="limpiarFiltrosProyectos"
-                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
-                        Limpiar Filtros
-                    </button>
-                </div>
-            </div>
-        </div>
-        <!-- FILTROS SOLO PARA GASTOS PROYECTADOS -->
-        <div v-if="activeTab === 'gastosProyectados'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
-                    <input v-model="filtrosGastosProyectados.descripcion" type="text" class="form-input"
-                        placeholder="Buscar por descripción" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cuenta Contable:</label>
-                    <input v-model="filtrosGastosProyectados.cuenta_contable" type="text" class="form-input"
-                        placeholder="Buscar por cuenta contable" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-                    <select v-model="filtrosGastosProyectados.activo" class="form-input">
-                        <option value="">Todos</option>
-                        <option value="1">Activo</option>
-                        <option value="0">Inactivo</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button @click="limpiarFiltrosGastosProyectados"
-                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
-                        Limpiar Filtros
-                    </button>
-                </div>
-            </div>
-        </div>
-        <!-- FILTROS SOLO PARA CUENTAS CONTABLES -->
-        <div v-if="activeTab === 'cuentasContables'" class="mb-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Código de Cuenta:</label>
-                    <input v-model="filtrosCuentasContables.codigo_cuenta" type="text" class="form-input"
-                        placeholder="Buscar por código" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción:</label>
-                    <input v-model="filtrosCuentasContables.descripcion" type="text" class="form-input"
-                        placeholder="Buscar por descripción" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-                    <select v-model="filtrosCuentasContables.activo" class="form-input">
-                        <option value="">Todos</option>
-                        <option value="1">Activo</option>
-                        <option value="0">Inactivo</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button @click="limpiarFiltrosCuentasContables"
+                <div class="flex items-end" v-if="Object.keys(activeFiltros).length > 0">
+                    <button @click="limpiarFiltros"
                         class="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium">
                         Limpiar Filtros
                     </button>
@@ -472,28 +504,31 @@ const getNestedValue = (obj, path) => {
                             <td class="py-3 px-4 text-center">
                                 <div class="flex item-center justify-center space-x-2">
                                     <button @click="openEditModal(item)"
-                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors" title="Editar"><svg
-                                            class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor"
+                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors" title="Editar">
+                                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
                                             </path>
-                                        </svg></button>
+                                        </svg>
+                                    </button>
                                     <button v-if="item.activo" @click="handleDesactivate(item)"
-                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors"
-                                        title="Desactivar"><svg class="w-5 h-5 text-red-500" fill="none"
-                                            stroke="currentColor" viewBox="0 0 24 24">
+                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors" title="Desactivar">
+                                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636">
                                             </path>
-                                        </svg></button>
+                                        </svg>
+                                    </button>
                                     <button v-else @click="handleActivate(item)"
-                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors"
-                                        title="Activar"><svg class="w-5 h-5 text-green-500" fill="none"
-                                            stroke="currentColor" viewBox="0 0 24 24">
+                                        class="p-2 rounded-full hover:bg-gray-200 transition-colors" title="Activar">
+                                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg></button>
+                                        </svg>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -502,6 +537,8 @@ const getNestedValue = (obj, path) => {
                 <p v-if="!paginatedItems.length" class="text-center py-10 text-gray-500">No hay registros para mostrar.
                 </p>
             </div>
+
+            <!-- Paginación -->
             <div v-if="!isLoading && totalPages > 1"
                 class="mt-6 flex justify-between items-center text-sm text-gray-600">
                 <span>Página <strong>{{ currentPage }}</strong> de <strong>{{ totalPages }}</strong></span>
@@ -536,25 +573,56 @@ const getNestedValue = (obj, path) => {
                         </div>
                         <div class="p-6 space-y-4">
                             <div v-for="field in activeConfig.fields" :key="field.key">
-                                <label class="form-label">{{ field.label }}<span v-if="field.required"
-                                        class="text-rojo-bap">*</span></label>
-                                <!-- [MODIFICADO] Se añade :disabled para los campos de código en modo edición -->
+                                <label class="form-label">
+                                    {{ field.label }}
+                                    <span v-if="field.required" class="text-rojo-bap">*</span>
+                                </label>
+
+                                <!-- Input de texto -->
                                 <input v-if="field.type === 'text'" v-model="currentItem[field.key]" type="text"
                                     class="form-input" :required="field.required"
                                     :disabled="isEditing && field.disabledOnEdit">
-                                <v-select v-if="field.type === 'select'" v-model="currentItem[field.key]"
-                                    :reduce="option => option.id"
-                                    :options="dataSets[field.options].filter(o => o.activo)" label="descripcion"
-                                    placeholder="Seleccione una cuenta" class="mt-1" :required="field.required" />
 
+                                <!-- Input de número -->
+                                <input v-if="field.type === 'number'" v-model.number="currentItem[field.key]"
+                                    type="number" step="any" class="form-input" :required="field.required">
+
+                                <!-- Select -->
+                                <div v-if="field.type === 'select'" class="mt-1">
+                                    <v-select v-model="currentItem[field.key]" :options="getSelectOptions(field)"
+                                        :label="field.optionLabel || 'descripcion'"
+                                        :track-by="field.optionValue || 'id'" :placeholder="`Seleccione ${field.label}`"
+                                        :required="field.required" :clearable="!field.required"
+                                        :reduce="option => option[field.optionValue || 'id']"
+                                        @input="handleSelectInput($event, field)">
+                                        <template #option="option">
+                                            <div class="py-1">
+                                                {{ getSimpleOptionLabel(option, field) }}
+                                                <small class="block text-gray-400">ID: {{ getSimpleOptionValue(option,
+                                                    field) }}</small>
+                                            </div>
+                                        </template>
+                                        <template #singleLabel="props">
+                                            {{ getSimpleOptionLabel(props.option, field) }}
+                                        </template>
+                                        <template #no-options>
+                                            <div class="text-center py-2 text-gray-500">
+                                                No hay opciones disponibles
+                                            </div>
+                                        </template>
+                                    </v-select>
+                                </div>
                             </div>
                         </div>
                         <div class="p-6 bg-gray-50 rounded-b-2xl flex justify-end space-x-4">
                             <button type="button" @click="closeModal"
-                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Cancelar</button>
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">
+                                Cancelar
+                            </button>
                             <button type="submit"
-                                class="bg-verde-bap hover:bg-verde-bap-dark text-white font-bold py-2 px-4 rounded-lg transition-colors">{{
-                                    isEditing ? 'Actualizar' : 'Guardar' }}</button>
+                                class="bg-verde-bap hover:bg-verde-bap-dark text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                {{ isEditing ? 'Actualizar' : 'Guardar' }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -564,6 +632,19 @@ const getNestedValue = (obj, path) => {
 </template>
 
 <style scoped lang="postcss">
+/* Estilos para v-select */
+.vs__dropdown-toggle {
+    @apply mt-1 block w-full p-0 border border-gray-300 rounded-md shadow-sm;
+}
+
+.vs__selected-options {
+    @apply p-2;
+}
+
+.vs--open .vs__dropdown-toggle {
+    @apply border-verde-bap ring-1 ring-verde-bap;
+}
+
 .form-label {
     @apply block text-sm font-medium text-gray-700 mb-1;
 }
@@ -580,5 +661,37 @@ const getNestedValue = (obj, path) => {
 .modal-backdrop-enter-from,
 .modal-backdrop-leave-to {
     opacity: 0;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes modal-scale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out;
+}
+
+.animate-modal-scale {
+    animation: modal-scale 0.3s ease-out;
 }
 </style>

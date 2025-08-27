@@ -22,12 +22,12 @@ class UniqueComprobante implements Rule
         }
 
         // Si faltan campos clave, se asume que pasa (otras reglas se encargarán de la obligatoriedad)
-        if (empty($value['tipo_documento']) || empty($value['serie_documento']) || empty($value['correlativo_documento'])) {
-            return true;
+        if (empty($value['id_tipo_documento_comprobante']) || empty($value['serie_documento']) || empty($value['correlativo_documento'])) {
+            return true; 
         }
 
         // Realiza la consulta para verificar la existencia del comprobante
-        return !Gasto::where('tipo_documento', $value['tipo_documento'])
+        return !Gasto::where('id_tipo_documento_comprobante', $value['id_tipo_documento_comprobante'])
             ->where('serie_documento', $value['serie_documento'])
             ->where('correlativo_documento', $value['correlativo_documento'])
             ->exists();

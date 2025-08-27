@@ -4,7 +4,7 @@
             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <Transition name="modal-content" appear>
                 <div
-                    class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
+                    class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
                     <!-- Header con gradiente y mejor jerarquía visual -->
                     <div class="bg-gradient-to-r from-slate-50 to-gray-100 p-6 border-b border-gray-200">
                         <div class="flex items-center justify-between">
@@ -187,14 +187,14 @@
                                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                                 Tipo de Documento <span class="text-red-500">*</span>
                                             </label>
-                                            <select v-model="gastoEditable.tipo_documento"
+                                            <select v-model="gastoEditable.id_tipo_documento_comprobante"
                                                 @change="onTipoDocumentoChange"
-                                                class="w-full p-3 border border-gray-300 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 bg-white"
+                                                class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500"
                                                 required>
-                                                <option value="">Seleccione un tipo</option>
-                                                <option>Boleta de Venta</option>
-                                                <option>Factura</option>
-                                                <option>Declaración Jurada</option>
+                                                <option :value="null" disabled>Seleccione un tipo</option>
+                                                <option v-for="doc in tiposDocumento" :key="doc.id" :value="doc.id">
+                                                    {{ doc.nombre }}
+                                                </option>
                                             </select>
                                         </div>
 
@@ -204,7 +204,7 @@
                                                     Serie Documento <span class="text-red-500">*</span>
                                                 </label>
                                                 <input type="text" v-model="gastoEditable.serie_documento"
-                                                    class="w-full p-3 border border-gray-300 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400"
+                                                    class="w-full p-3 border border-gray-300 rounded-lg"
                                                     placeholder="Ej: B001"
                                                     :required="!gastoEditable.es_declaracion_jurada" />
                                             </div>
@@ -213,7 +213,7 @@
                                                     Correlativo Documento <span class="text-red-500">*</span>
                                                 </label>
                                                 <input type="text" v-model="gastoEditable.correlativo_documento"
-                                                    class="w-full p-3 border border-gray-300 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400"
+                                                    class="w-full p-3 border border-gray-300 rounded-lg"
                                                     placeholder="Ej: 000123"
                                                     :required="!gastoEditable.es_declaracion_jurada" />
                                             </div>
@@ -378,7 +378,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import { cloneDeep, isEqual } from 'lodash-es';
@@ -406,7 +406,23 @@ const gastoEditable = ref({});
 const gastoOriginal = ref(null);
 const nuevaEvidenciaFile = ref(null);
 const enviando = ref(false);
-
+const tiposDocumento = ref([]);
+// --- CARGA DE DATOS ---
+onMounted(async () => {
+    // Carga el catálogo de tipos de documento cuando el componente se monta
+    try {
+        const response = await api.get('/v1/tipos-documento-comprobante');
+        tiposDocumento.value = response.data;
+    } catch (error) {
+        console.error("Error al cargar tipos de documento:", error);
+        Swal.fire('Error', 'No se pudo cargar el catálogo de tipos de documento.', 'error');
+    }
+});
+// --- FUNCIONES AUXILIARES ---
+const getTipoDocumento = (gasto) => {
+    if (!gasto.id_tipo_documento_comprobante) return null;
+    return tiposDocumento.value.find(doc => doc.id === gasto.id_tipo_documento_comprobante);
+};
 // --- PROPIEDADES COMPUTADAS PARA VALIDACIÓN Y ESTADO ---
 const currencyFormatter = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
 
@@ -446,14 +462,17 @@ const hayCambios = computed(() => {
 });
 // Determina si el botón de guardar debe estar deshabilitado
 const isGuardarDisabled = computed(() => {
+    const tipoDocSeleccionado = getTipoDocumento(gastoEditable.value);
+    const requiereComprobante = tipoDocSeleccionado && !tipoDocSeleccionado.nombre.includes('Declaración Jurada');
+
     return enviando.value ||
         !gastoEditable.value.monto_total ||
         !gastoEditable.value.glosa ||
         !gastoEditable.value.fecha_documento ||
         !!fechaDocumentoInvalida.value ||
-        !gastoEditable.value.tipo_documento ||
-        (!gastoEditable.value.es_declaracion_jurada && (!gastoEditable.value.serie_documento || !gastoEditable.value.correlativo_documento)) ||
-        (!gastoEditable.value.es_declaracion_jurada && !gastoEditable.value.ruta_evidencia && !nuevaEvidenciaFile.value)
+        !gastoEditable.value.id_tipo_documento_comprobante ||
+        (requiereComprobante && (!gastoEditable.value.serie_documento || !gastoEditable.value.correlativo_documento)) ||
+        (requiereComprobante && !gastoEditable.value.ruta_evidencia && !nuevaEvidenciaFile.value);
 });
 //helperformat
 const formatDateForInput = (isoDateString) => {
@@ -467,27 +486,15 @@ const formatDateForInput = (isoDateString) => {
 watch(() => props.gasto, (newGasto) => {
     if (newGasto) {
         const gastoClonado = cloneDeep(newGasto);
-
-        // Tu lógica de inicialización se mantiene intacta.
-        if (!gastoClonado.tipo_documento) {
-            gastoClonado.tipo_documento = gastoClonado.es_declaracion_jurada ? 'Declaración Jurada' : '';
-        }
-        if (gastoClonado.es_declaracion_jurada) {
-            gastoClonado.serie_documento = '';
-            gastoClonado.correlativo_documento = '';
-        }
         if (gastoClonado.fecha_documento) {
             gastoClonado.fecha_documento = formatDateForInput(gastoClonado.fecha_documento);
         }
         gastoClonado.comentario_subsanacion = '';
-
         gastoEditable.value = gastoClonado;
-        // Se guarda una copia profunda del estado inicial para la comparación.
         gastoOriginal.value = cloneDeep(gastoClonado);
-
         nuevaEvidenciaFile.value = null;
     }
-}, { immediate: true, deep: true });// 'immediate' para que se ejecute al montar, 'deep' para objetos anidados
+}, { immediate: true, deep: true });
 
 // Maneja la selección de un nuevo archivo de evidencia.
 const handleFileChange = (event) => {
@@ -514,12 +521,12 @@ const handleFileChange = (event) => {
 
 // Sincroniza 'es_declaracion_jurada' y 'tipo_documento'
 const onTipoDocumentoChange = () => {
-    gastoEditable.value.es_declaracion_jurada = (gastoEditable.value.tipo_documento === 'Declaración Jurada');
+    const tipoDoc = getTipoDocumento(gastoEditable.value);
+    gastoEditable.value.es_declaracion_jurada = tipoDoc && tipoDoc.nombre.includes('Declaración Jurada');
     if (gastoEditable.value.es_declaracion_jurada) {
         gastoEditable.value.serie_documento = '';
         gastoEditable.value.correlativo_documento = '';
     }
-    // Si se cambia de DJ a otro tipo, los campos de serie/correlativo se habilitan automáticamente
 };
 
 // --- LÓGICA DE ENVÍO ---
@@ -576,7 +583,7 @@ const enviarCorreccionFinal = async () => {
     // Adjuntamos todos los campos editables del gasto.
     for (const key in gastoEditable.value) {
         // Excluir IDs temporales y propiedades que no deben ir al backend o ya se manejan
-        if (['id', 'gasto_proyectado', 'registrador', 'fondo_efectivo', 'cuenta_contable', 'historial_aprobaciones', 'observador_adm', 'dj_consolidada', 'evidencia_url'].includes(key)) {
+        if (['id', 'gasto_proyectado', 'registrador', 'fondo_efectivo', 'cuenta_contable', 'historial_aprobaciones', 'observador_adm', 'dj_consolidada', 'evidencia_url', 'tipo_documento'].includes(key)) {
             continue;
         }
 

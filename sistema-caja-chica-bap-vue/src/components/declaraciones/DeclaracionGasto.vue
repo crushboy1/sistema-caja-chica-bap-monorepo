@@ -93,8 +93,8 @@
                                         <p class="text-sm text-gray-500 mt-1">
                                             Monto: <span class="font-semibold text-verde-bap-dark">{{
                                                 currencyFormatter.format(gasto.monto_total || 0) }}</span>
-                                            <span v-if="gasto.tipo_documento" class="ml-2">• {{ gasto.tipo_documento
-                                                }}</span>
+                                            <span v-if="getTipoDocumentoNombre(gasto)" class="ml-2">• {{
+                                            getTipoDocumentoNombre(gasto) }}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -125,7 +125,7 @@
                                             {{ index + 1 }}
                                         </span>
                                         <h3 class="text-xl font-semibold text-gray-800">Detalle del Gasto #{{ index + 1
-                                            }}</h3>
+                                        }}</h3>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <button type="button" @click="minimizarGasto(index)"
@@ -205,14 +205,15 @@
                                                         Tipo de Documento <span class="text-rojo-bap">*</span>
                                                     </label>
                                                     <select :id="'tipo_documento_' + index"
-                                                        v-model="gasto.tipo_documento"
+                                                        v-model="gasto.id_tipo_documento_comprobante"
                                                         @change="onTipoDocumentoChange(gasto)"
                                                         class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                                                         required>
-                                                        <option disabled value="">Selecciona un tipo</option>
-                                                        <option>Boleta de Venta</option>
-                                                        <option>Factura</option>
-                                                        <option>Declaración Jurada</option>
+                                                        <option disabled :value="null">Selecciona un tipo</option>
+                                                        <option v-for="doc in tiposDocumento" :key="doc.id"
+                                                            :value="doc.id">
+                                                            {{ doc.nombre }}
+                                                        </option>
                                                     </select>
                                                 </div>
 
@@ -282,35 +283,33 @@
                                                 <!-- Serie del Documento -->
                                                 <div>
                                                     <label :for="'serie_documento_' + index"
-                                                        class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Serie del Documento
-                                                        <span
-                                                            v-if="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
-                                                            class="text-rojo-bap">*</span>
-                                                    </label>
+                                                    class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Serie del Documento
+                                                    <span v-if="requiereSerieYCorrelativo(gasto)"
+                                                        class="text-rojo-bap">*</span>
+                                                </label>
                                                     <input type="text" :id="'serie_documento_' + index"
-                                                        v-model="gasto.serie_documento"
-                                                        :disabled="gasto.tipo_documento === 'Declaración Jurada'"
-                                                        :required="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                        placeholder="Ej: F001" />
+                                                    v-model="gasto.serie_documento"
+                                                    :disabled="!requiereSerieYCorrelativo(gasto)"
+                                                    :required="requiereSerieYCorrelativo(gasto)"
+                                                    class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                    placeholder="Ej: F38Q" />
                                                 </div>
 
                                                 <!-- Correlativo del Documento -->
                                                 <div>
                                                     <label :for="'correlativo_documento_' + index"
-                                                        class="block text-sm font-medium text-gray-700 mb-2">
-                                                        Correlativo del Documento
-                                                        <span
-                                                            v-if="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
-                                                            class="text-rojo-bap">*</span>
-                                                    </label>
+                                                    class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Correlativo del Documento
+                                                    <span v-if="requiereSerieYCorrelativo(gasto)"
+                                                        class="text-rojo-bap">*</span>
+                                                </label>
                                                     <input type="text" :id="'correlativo_documento_' + index"
-                                                        v-model="gasto.correlativo_documento"
-                                                        :disabled="gasto.tipo_documento === 'Declaración Jurada'"
-                                                        :required="gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura'"
-                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                        placeholder="Ej: 0012345" />
+                                                    v-model="gasto.correlativo_documento"
+                                                    :disabled="!requiereSerieYCorrelativo(gasto)"
+                                                    :required="requiereSerieYCorrelativo(gasto)"
+                                                    class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                    placeholder="Ej: 8983" />
                                                 </div>
                                             </div>
                                         </div>
@@ -591,6 +590,7 @@ const fondosActivos = ref([]);
 const fondoSeleccionadoId = ref(null);
 const gastosProyectadosDisponibles = ref([]);
 const cuentasContables = ref([]);
+const tiposDocumento = ref([]);
 const cargandoInicial = ref(true);
 const cargandoGastosProyectados = ref(false);
 const enviando = ref(false);
@@ -604,8 +604,8 @@ onMounted(async () => {
     await Promise.all([
 
         obtenerFondosActivos(),
-        obtenerCuentasContables()
-
+        obtenerCuentasContables(),
+        obtenerTiposDocumento(),
     ]);
     cargandoInicial.value = false;
 });
@@ -633,50 +633,63 @@ const obtenerCuentasContables = async () => {
             cuentasContables.value = response.data;
         } else {
             console.error("La respuesta de la API de cuentas contables no tiene el formato esperado:", response.data);
-            cuentasContables.value = []; // Asignar array vacío para prevenir errores.
+            cuentasContables.value = [];
         }
     } catch (error) {
         console.error("Error al obtener cuentas contables:", error);
-        cuentasContables.value = []; // Asegurarse de que sea un array en caso de error.
+        cuentasContables.value = [];
+    }
+};
+const obtenerTiposDocumento = async () => {
+    try {
+        const response = await api.get('/v1/tipos-documento-comprobante');
+        tiposDocumento.value = response.data;
+    } catch (error) {
+        console.error("Error al obtener tipos de documento:", error);
+        Swal.fire('Error', 'No se pudo cargar el catálogo de tipos de documento.', 'error');
     }
 };
 // --- COMPUTED PROPERTIES ---
-// MODIFICACIÓN: Propiedad computada para mostrar la sección de DJ consolidada
+//  Propiedad computada para mostrar la sección de DJ consolidada
 const mostrarSeccionDJConsolidada = computed(() => {
-    return gastosADeclarar.value.some(gasto => gasto.es_declaracion_jurada || gasto.tipo_documento === 'Declaración Jurada');
+    // Se usa la función auxiliar para la lógica
+    return gastosADeclarar.value.some(gasto => {
+        const tipoDoc = getTipoDocumento(gasto);
+        return tipoDoc && tipoDoc.nombre.includes('Declaración Jurada');
+    });
 });
 const puedeGenerarDJConsolidada = computed(() => {
-    const gastosParaDJ = gastosADeclarar.value.filter(g => g.es_declaracion_jurada || g.tipo_documento === 'Declaración Jurada');
-    if (gastosParaDJ.length === 0) {
-        return false;
-    }
-    // El botón se habilita solo si TODOS los gastos para DJ tienen monto y glosa.
+    const gastosParaDJ = gastosADeclarar.value.filter(g => {
+        const tipoDoc = getTipoDocumento(g);
+        return tipoDoc && tipoDoc.nombre.includes('Declaración Jurada');
+    });
+    if (gastosParaDJ.length === 0) return false;
     return gastosParaDJ.every(g => g.monto_total && g.glosa);
 });
 // Determina qué secciones son visibles para un gasto específico
 const seccionesVisibles = (gasto) => {
+    const tieneDocumento = !!gasto.id_tipo_documento_comprobante;
     return {
         documento: !!gasto.id_gasto_proyectado,
-        clasificacion: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento,
-        adicional: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
-        evidencia: !!gasto.id_gasto_proyectado && !!gasto.tipo_documento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
+        clasificacion: !!gasto.id_gasto_proyectado && tieneDocumento && !!gasto.monto_total && !!gasto.fecha_documento,
+        adicional: !!gasto.id_gasto_proyectado && tieneDocumento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
+        evidencia: !!gasto.id_gasto_proyectado && tieneDocumento && !!gasto.monto_total && !!gasto.fecha_documento && !!gasto.glosa,
     };
 };
 const minimizarGasto = (index) => {
     if (gastoActivoIndex.value === index) {
-        gastoActivoIndex.value = null; // Cierra la sección si se hace clic en la activa
+        gastoActivoIndex.value = null; 
     }
 };
 const minimizarYContinuar = (index) => {
     minimizarGasto(index);
-    // Si hay más gastos, abrir el siguiente
     if (index + 1 < gastosADeclarar.value.length) {
         maximizarGasto(index + 1);
     }
 };
 
 const maximizarGasto = (index) => {
-    gastoActivoIndex.value = index; // Abre la sección de gasto en la que se hizo clic
+    gastoActivoIndex.value = index;
 };
 
 // Propiedad computada para obtener el objeto completo del fondo seleccionado
@@ -751,11 +764,10 @@ const agregarGasto = async () => {
         fecha_documento: '',
         fecha_registro: new Date().toISOString().slice(0, 10),
         moneda: 'PEN',
-        tipo_documento: '',
+        id_tipo_documento_comprobante: null,
         serie_documento: '',
         correlativo_documento: '',
         monto_total: null,
-
         comentario: '',
         evidencia: null,
         es_declaracion_jurada: false,
@@ -854,15 +866,28 @@ const esOpcionDeshabilitada = () => {
     return false;
 };
 // --- MÉTODOS DE EVENTOS ---
+const getTipoDocumento = (gasto) => {
+    if (!gasto.id_tipo_documento_comprobante) return null;
+    return tiposDocumento.value.find(doc => doc.id === gasto.id_tipo_documento_comprobante);
+};
+const getTipoDocumentoNombre = (gasto) => {
+    return getTipoDocumento(gasto)?.nombre;
+};
+const requiereSerieYCorrelativo = (gasto) => {
+    const tipoDoc = getTipoDocumento(gasto);
+    if (!tipoDoc) return false;
+    // Esta lógica se puede expandir si se añaden más tipos de documento
+    return ['Factura', 'Boleta de Venta'].includes(tipoDoc.nombre);
+};
 // Manejar cambio en tipo de documento
 const onTipoDocumentoChange = (gasto) => {
-    if (gasto.tipo_documento === 'Declaración Jurada') {
+    const tipoDoc = getTipoDocumento(gasto);
+    if (tipoDoc && tipoDoc.nombre.includes('Declaración Jurada')) {
         gasto.es_declaracion_jurada = true;
         gasto.serie_documento = '';
         gasto.correlativo_documento = '';
     } else {
         gasto.es_declaracion_jurada = false;
-        // Habilitar campos serie y correlativo cuando no es DJ
     }
 };
 const removerArchivo = (index) => {
@@ -880,23 +905,25 @@ const formatFileSize = (bytes) => {
 // Manejar cambio en checkbox de declaración jurada
 const onDeclaracionJuradaChange = (gasto) => {
     if (gasto.es_declaracion_jurada) {
-        gasto.tipo_documento = 'Declaración Jurada';
-        gasto.serie_documento = '';
-        gasto.correlativo_documento = '';
+        const dj = tiposDocumento.value.find(doc => doc.nombre.includes('Declaración Jurada'));
+        if (dj) {
+            gasto.id_tipo_documento_comprobante = dj.id;
+            gasto.serie_documento = '';
+            gasto.correlativo_documento = '';
+        }
     } else {
-        // Si desmarca DJ, cambiar a Boleta de Venta por defecto
-        gasto.tipo_documento = 'Boleta de Venta';
+        gasto.id_tipo_documento_comprobante = null;
     }
 };
 // Manejar cambio de archivo
 const handleFileChange = (event, index) => {
     gastosADeclarar.value[index].evidencia = event.target.files[0];
 };
-// MODIFICACIÓN: Nuevo método para manejar el cambio de archivo de la DJ consolidada
+// Nuevo método para manejar el cambio de archivo de la DJ consolidada
 const handleDJConsolidadaFileChange = (event) => {
     djConsolidadaFile.value = event.target.files[0];
 };
-// MODIFICACIÓN: Nuevo método para generar la DJ consolidada
+// Nuevo método para generar la DJ consolidada
 const generarDJConsolidada = async () => {
     const gastosValidosParaDJ = gastosADeclarar.value.filter(g => g.es_declaracion_jurada && isGastoCompleto(g));
 
@@ -934,8 +961,8 @@ const generarDJConsolidada = async () => {
         // Enviar los datos completos de los gastos al backend para la generación de la plantilla
         // El backend VALIDARÁ estos datos y usará los que necesite para la plantilla PDF.
         const response = await api.post('/v1/documentos/generar-dj-nuevos', formDataForDJGen, {
-            responseType: 'blob', // Para manejar la descarga del archivo
-            headers: { 'Content-Type': 'multipart/form-data' } // Importante para FormData, ya que incluye archivos
+            responseType: 'blob',
+            headers: { 'Content-Type': 'multipart/form-data' }
         });
 
         const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -974,7 +1001,7 @@ const generarDJConsolidada = async () => {
 //validación
 const isGastoCompleto = (gasto) => {
     const camposBaseCompletos = gasto.id_gasto_proyectado &&
-        gasto.tipo_documento &&
+        gasto.id_tipo_documento_comprobante &&
         gasto.fecha_documento &&
         gasto.monto_total &&
         gasto.glosa;
@@ -987,7 +1014,7 @@ const isGastoCompleto = (gasto) => {
     } else {
         // Si no es DJ, necesita su propia evidencia y, si aplica, serie/correlativo.
         const evidenciaCompleta = !!gasto.evidencia;
-        const comprobanteCompleto = (gasto.tipo_documento === 'Boleta de Venta' || gasto.tipo_documento === 'Factura')
+        const comprobanteCompleto = requiereSerieYCorrelativo(gasto)
             ? (!!gasto.serie_documento && !!gasto.correlativo_documento)
             : true;
         return evidenciaCompleta && comprobanteCompleto;
@@ -1010,9 +1037,10 @@ const confirmarEnvio = () => {
             <h4 class="font-bold text-center text-base">Resumen de Gastos a Declarar</h4>
             ${gastosADeclarar.value.map((gasto, index) => {
         const proyeccion = gastosProyectadosDisponibles.value.find(p => p.id_gasto_proyectado === gasto.id_gasto_proyectado);
+        const documento = getTipoDocumentoNombre(gasto);
         return `<div class="border-t pt-2 mt-2">
                             <div class="flex justify-between"><strong>Gasto #${index + 1}:</strong><span class="text-right pl-2">${proyeccion?.descripcion || 'N/A'}</span></div>
-                            <div class="flex justify-between"><strong>Documento:</strong><span>${gasto.tipo_documento}</span></div>
+                            <div class="flex justify-between"><strong>Documento:</strong><span>${documento || 'N/A'}</span></div>
                             <div class="flex justify-between font-semibold"><strong>Monto:</strong><span>${currencyFormatter.format(gasto.monto_total || 0)}</span></div>
                         </div>`;
     }).join('')}
@@ -1064,7 +1092,7 @@ const enviarFormulario = async () => {
             // No enviar el ID temporal del frontend.
             if (key === 'id') return;
             // Determinar si el gasto actual es una DJ.
-            const esDJ = gasto.es_declaracion_jurada || gasto.tipo_documento === 'Declaración Jurada';
+            const esDJ = getTipoDocumentoNombre(gasto)?.includes('Declaración Jurada');
             // Si el gasto es una DJ, NO se envía su evidencia individual.
             if (key === 'evidencia' && esDJ) {
                 return;
@@ -1191,6 +1219,7 @@ const enviarFormulario = async () => {
     20%,
     80% {
         transform: translate3d(2px, 0, 0);
+
     }
 
     30%,

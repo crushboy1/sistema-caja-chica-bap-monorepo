@@ -175,11 +175,15 @@ const canFinalizeGasto = (item) => {
 };
 
 const canObserveGastoAdm = (item) => {
+    const esMiPropioGasto = props.usuarioActual.id === item.gasto?.id_registrador;
+    if (esMiPropioGasto && item.gasto?.estado === 'Pendiente de Validación Contable') {
+        return true; // Permitir auto-observación
+    }
+
+    // Lógica original para observar gastos de otros.
     const tienePermiso = hasPermission('declaraciones.approve.adm');
     const estadosValidos = ['Pendiente de Validación Contable', 'Pendiente de Validación DJ'];
     if (item.es_grupo) {
-        // La acción de observar siempre es a nivel de gasto individual, no de grupo completo.
-        // Por lo tanto, el botón de observar no debe aparecer en la fila principal del grupo.
         return false;
     } else {
         return tienePermiso && estadosValidos.includes(item.gasto?.estado);
@@ -207,12 +211,12 @@ const canValidateDjDocument = (item) => {
 const fetchGastos = async () => {
     cargando.value = true;
     try {
-        const params = { ...filtros.value, scope: 'aprobaciones' }; // Asegurarse de enviar el scope correcto
+       const params = { ...filtros.value, scope: 'validacion_contable' }; // Asegurarse de enviar el scope correcto
         // Los filtros de longitud mínima se aplican en la propiedad computada itemsFiltrados
         // y en los watchers, no es necesario borrarlos aquí.
 
         const response = await api.get('/v1/gastos/para-aprobacion', { params });
-        items.value = response.data; // La data ya viene lista y agrupada/formateada del backend
+        items.value = response.data;
 
         // Ajusta la página actual si es necesario después de cargar los datos
         if (paginaActual.value > totalPaginas.value && totalPaginas.value > 0) {
