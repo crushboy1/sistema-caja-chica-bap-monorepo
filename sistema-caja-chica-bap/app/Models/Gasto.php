@@ -37,7 +37,7 @@ class Gasto extends Model
         'id_validador_adm',
         'id_cuenta_contable',
         'fecha_documento',
-        'tipo_documento',
+        'id_tipo_documento_comprobante',
         'serie_documento',
         'correlativo_documento',
         'monto_total',
@@ -80,7 +80,7 @@ class Gasto extends Model
      *
      * @var array
      */
-    protected $appends = ['evidencia_url'];
+    protected $appends = ['evidencia_url','base_imponible'];
 
     /**
      * El método "booted" del modelo.
@@ -106,7 +106,10 @@ class Gasto extends Model
     | RELACIONES DE ELOQUENT
     |--------------------------------------------------------------------------
     */
-
+    public function tipoDocumento(): BelongsTo
+    {
+        return $this->belongsTo(TipoDocumentoComprobante::class, 'id_tipo_documento_comprobante');
+    }
     /**
      * Un gasto pertenece a un tipo de Gasto Proyectado del catálogo.
      */
@@ -190,6 +193,31 @@ class Gasto extends Model
     | ACCESSORS & MUTATORS
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Calcula la base imponible del gasto dinámicamente.
+     *
+     * @return float|null
+     */
+    public function getBaseImponibleAttribute(): ?float
+    {
+        // 1. Accedemos al GastoProyectado relacionado con este Gasto.
+        $gastoProyectado = $this->gastoProyectado;
+
+        // 2. A través de GastoProyectado, accedemos a su TipoImpuesto.
+        // Se usa 'optional()' para evitar errores si alguna relación es nula.
+        $tipoImpuesto = optional(optional($gastoProyectado)->tipoImpuesto);
+
+        // 3. Verificamos que tengamos toda la información necesaria.
+        if ($this->monto_total && $tipoImpuesto->factor_calculo) {
+            // 4. Realizamos el cálculo y redondeamos a 2 decimales.
+            return round($this->monto_total / $tipoImpuesto->factor_calculo, 2);
+        }
+
+        // Si no se puede calcular, devolvemos el monto total como fallback,
+        // tal como indica la regla para 'EXO'.
+        return (float) $this->monto_total;
+    }
 
     /**
      * Obtiene la URL completa del archivo de evidencia.

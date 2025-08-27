@@ -15,7 +15,7 @@ const emit = defineEmits(['close', 'accionRealizada']);
 const isLoading = ref(false);
 const accionActual = ref(null);
 const motivoRechazo = ref('');
-// NUEVO: Estado para el tipo de cambio
+// Estado para el tipo de cambio
 const tipoCambio = ref(null);
 
 // --- COMPUTED PROPS ---
@@ -24,7 +24,7 @@ const esGastoPropio = computed(() => {
     return props.gasto.id_registrador === props.usuarioActual.id;
 });
 
-// NUEVO: Calcula el monto convertido para mostrarlo en la UI
+//  Calcula el monto convertido para mostrarlo en la UI
 const montoConvertido = computed(() => {
     if (props.gasto?.moneda === 'USD' && tipoCambio.value > 0) {
         return (props.gasto.monto_total * tipoCambio.value).toFixed(2);
@@ -32,7 +32,7 @@ const montoConvertido = computed(() => {
     return '0.00';
 });
 
-// NUEVO: Deshabilita el botón de aprobar si es USD y no hay tipo de cambio
+//  Deshabilita el botón de aprobar si es USD y no hay tipo de cambio
 const isAprobarDisabled = computed(() => {
     if (isLoading.value) return true;
     if (props.gasto?.moneda === 'USD' && (!tipoCambio.value || tipoCambio.value <= 0)) {

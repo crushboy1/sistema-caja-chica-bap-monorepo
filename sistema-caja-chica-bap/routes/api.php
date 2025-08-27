@@ -29,6 +29,9 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:120,1'])->group(funct
     require base_path('routes/api/cuentas_contables.php');
     require base_path('routes/api/proyectos.php');
     require base_path('routes/api/gastos_proyectados.php');
+    require base_path('routes/api/clasificaciones.php');
+    require base_path('routes/api/tipos_impuesto.php');
+    require base_path('routes/api/tipos_documento.php');
     require base_path('routes/api/areas.php');
     require base_path('routes/api/users.php');
     require base_path('routes/api/roles.php');

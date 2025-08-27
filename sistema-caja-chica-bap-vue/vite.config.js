@@ -33,7 +33,11 @@ export default defineConfig({
           });
         },
       },
-
+      //Regla para que apunte a /sanctum
+      '/sanctum': {
+        target: 'http://app:80', // Apunta al contenedor de Laravel
+        changeOrigin: true,
+      },
       // Regla específica para sanctum/csrf-cookie: ¡reescribe el /api/!
       '/api/sanctum/csrf-cookie': {
         target: 'http://caja-chica-app:80', // Apunta al puerto interno de Apache en el contenedor Laravel

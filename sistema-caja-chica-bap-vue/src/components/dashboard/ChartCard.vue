@@ -43,7 +43,7 @@
         </div>
 
         <!-- Chart Content -->
-        <div class="bg-white rounded-xl shadow-sm p-4 overflow-hidden relative" :class="height">
+        <div class="bg-white rounded-xl shadow-sm p-6 overflow-hidden relative" :class="height">
             <!-- Loading overlay -->
             <div v-if="loading"
                 class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
@@ -78,11 +78,11 @@
                 </div>
                 <p class="text-gray-500 mb-2">{{ emptyMessage || 'No hay datos disponibles' }}</p>
                 <p class="text-xs text-gray-400">{{ emptySubtext || 'Los datos aparecerán aquí cuando estén disponibles'
-                    }}</p>
+                }}</p>
             </div>
 
             <!-- Chart content -->
-            <div v-else :class="{ 'opacity-50': loading }">
+            <div v-else :class="{ 'opacity-50': loading }" class="w-full h-full">
                 <slot></slot>
             </div>
         </div>
@@ -166,7 +166,7 @@ const props = defineProps({
     },
     height: {
         type: String,
-        default: 'h-80'
+        default: 'h-96' // Aumentado de h-80 a h-96 por defecto
     }
 })
 
@@ -214,6 +214,46 @@ const formatDate = (date) => {
 }
 
 .chart-placeholder {
-    @apply flex flex-col items-center justify-center text-center py-12;
+    @apply flex flex-col items-center justify-center text-center py-16;
+    /* Aumentado de py-12 a py-16 */
+}
+
+/* Estilos adicionales para mejorar la visualización */
+:deep(.chart-container) {
+    min-height: 280px;
+    /* Altura mínima para los gráficos */
+}
+
+:deep(.bar-chart) {
+    min-height: 320px;
+    /* Altura específica para gráficos de barras */
+}
+
+:deep(.pie-chart) {
+    min-height: 280px;
+    /* Altura específica para gráficos de torta */
+}
+
+:deep(.line-chart) {
+    min-height: 300px;
+    /* Altura específica para gráficos de línea */
+}
+
+/* Mejoras para etiquetas largas */
+:deep(.chart-labels) {
+    font-size: 0.75rem;
+    line-height: 1.2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Mejora para tooltips y leyendas */
+:deep(.chart-legend) {
+    padding: 0.5rem 0;
+}
+
+:deep(.chart-tooltip) {
+    max-width: 200px;
+    word-wrap: break-word;
 }
 </style>

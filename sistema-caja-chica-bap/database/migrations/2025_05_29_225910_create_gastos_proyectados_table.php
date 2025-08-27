@@ -16,10 +16,23 @@ return new class extends Migration
             $table->id('id_gasto_proyectado');
             $table->string('descripcion')->unique();
             $table->boolean('activo')->default(true);
+
             // Relación: Cada Gasto Proyectado pertenece a UNA cuenta contable.
             $table->foreignId('id_cuenta_contable')
                 ->constrained('cuentas_contables', 'id')
                 ->onDelete('cascade');
+
+            // Se añade la clave foránea para la clasificación de bienes y servicios.
+            $table->foreignId('clasificacion_bien_servicio_id')
+                ->nullable() 
+                ->constrained('clasificaciones_bien_servicio', 'id_clasificacion_bien_servicio')
+                ->onDelete('set null'); 
+
+            // Se añade la clave foránea para el tipo de impuesto.
+            $table->foreignId('tipo_impuesto_id')
+                ->nullable()
+                ->constrained('tipos_impuesto', 'id_tipo_impuesto')
+                ->onDelete('set null'); 
 
             $table->timestamps();
         });

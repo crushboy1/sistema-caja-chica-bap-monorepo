@@ -136,26 +136,33 @@
 
           <!-- Gráficos de Gastos -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <ChartCard title="Top 10 Gastos por Categoría">
-              <GraficoBarras v-if="datosGraficoBarras" :chart-data="datosGraficoBarras" />
+            <!-- Gráfico de Barras -->
+            <ChartCard title="Top 10 Gastos por Categoría" height="h-[450px]" class="chart-container-bars"
+              :loading="isChartLoading('gastos-categoria')" @refresh="() => refreshSingleChart('gastos-categoria')"
+              allow-refresh>
+              <GraficoBarras v-if="datosGraficoBarras" :chart-data="datosGraficoBarras" class="min-h-[380px]" />
             </ChartCard>
 
-            <ChartCard title="Distribución de Gastos por Estado">
-              <GraficoCircular v-if="datosGraficoEstados" :chart-data="datosGraficoEstados" />
+            <!-- Gráfico Circular - Estados -->
+            <ChartCard title="Distribución de Gastos por Estado" height="h-[450px]" class="chart-container-pie"
+              :loading="isChartLoading('gastos-estado')" @refresh="() => refreshSingleChart('gastos-estado')"
+              allow-refresh>
+              <GraficoCircular v-if="datosGraficoEstados" :chart-data="datosGraficoEstados" class="min-h-[380px]" />
             </ChartCard>
 
-            <ChartCard title="Evolución Mensual: Presupuesto vs Gasto Ejecutado" height="h-[420px]">
+            <!-- Gráfico de Evolución Mensual -->
+            <ChartCard title="Evolución Mensual: Presupuesto vs Gasto Ejecutado" height="h-[500px]"
+              :loading="isChartLoading('evolucion-mensual')" @refresh="() => refreshSingleChart('evolucion-mensual')"
+              allow-refresh>
               <GraficoEvolucionMensual v-if="datosEvolucionMensual && datosEvolucionMensual.length > 0"
                 :chart-data="datosEvolucionMensual" :show-controls="true" :show-summary="true" :default-period="12"
                 @period-changed="actualizarPeriodoEvolucion" />
-              <div v-else class="chart-placeholder">
-                <TrendingUp class="w-12 h-12 text-gray-400 mb-2" />
-                <p class="text-gray-500">Datos en preparación</p>
-              </div>
             </ChartCard>
 
-            <ChartCard title="Distribución de Fondos por Tipo">
-              <GraficoCircular v-if="datosGraficoTipos" :chart-data="datosGraficoTipos" />
+            <!-- Gráfico Circular - Fondos por Tipo -->
+            <ChartCard title="Distribución de Fondos por Tipo" height="h-[480px]" class="chart-container-funds"
+              :loading="isChartLoading('fondos-tipo')" @refresh="() => refreshSingleChart('fondos-tipo')" allow-refresh>
+              <GraficoCircular v-if="datosGraficoTipos" :chart-data="datosGraficoTipos" class="min-h-[400px]" />
             </ChartCard>
           </div>
         </section>
@@ -283,11 +290,9 @@
         <section>
           <SectionHeader title="🚨 Centro de Alertas y Control" />
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- COMENTARIO BAP: Se ajusta el `find` para buscar los nuevos tipos de alerta del backend. -->
             <KpiCard titulo="Sobregiro de Fondos"
               :valor="dashboardData.alertas.find(a => a.tipo === 'sobregiro_fondo')?.cantidad || 0"
               icono="AlertTriangle" color="red" />
-            <!-- COMENTARIO BAP: Se añade un nuevo KPI para la nueva alerta de Desviación de Proyección. -->
             <KpiCard titulo="Desviación de Proyección"
               :valor="dashboardData.alertas.find(a => a.tipo === 'desviacion_proyeccion')?.cantidad || 0"
               icono="AlertCircle" color="blue" />
@@ -324,7 +329,9 @@
             </div>
 
             <!-- Evolución Mensual de Gastos por Categoría -->
-            <ChartCard title="Evolución Mensual de Gastos por Categoría" height="h-[420px]">
+            <ChartCard title="Evolución Mensual de Gastos por Categoría" height="h-[420px]"
+              :loading="isChartLoading('evolucion-categoria')"
+              @refresh="() => refreshSingleChart('evolucion-categoria')" allow-refresh>
               <GraficoBarras v-if="datosGraficoEvolucionCategoria" :chart-data="datosGraficoEvolucionCategoria"
                 :stacked="true" />
               <div v-else class="chart-placeholder">
@@ -355,16 +362,21 @@ import ChartCard from '@/components/dashboard/ChartCard.vue';
 import GraficoEvolucionMensual from '@/components/dashboard/GraficoEvolucionMensual.vue';
 import MapaCalorCumplimiento from '@/components/dashboard/MapaCalorCumplimiento.vue';
 import TimelineCicloDeVida from '@/components/dashboard/TimelineCicloDeVida.vue';
+
 const props = defineProps({
   user: {
     type: Object,
     required: true,
   }
 });
+
 const router = useRouter();
+
 // Estado
 const cargando = ref(true);
 const dashboardData = ref(null);
+const currentRefreshing = ref(null);
+
 const getLocalDateISOString = (date) => {
   const tzoffset = date.getTimezoneOffset() * 60000;
   const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, 10);
@@ -377,6 +389,7 @@ const filtros = ref({
   area_id: null,
   responsable_id: null,
 });
+
 const areas = ref([]);
 const usuarios = ref([]);
 
@@ -430,25 +443,28 @@ const datosGraficoBarras = computed(() => {
 });
 
 const datosEvolucionMensual = computed(() => {
-  // 1. Verificar que los datos existan. Si no, devolver null para ocultar el gráfico.
   if (!dashboardData.value?.evolucionMensual || dashboardData.value.evolucionMensual.length === 0) {
     return null;
   }
   return dashboardData.value.evolucionMensual;
 });
+
 const datosGraficoEvolucionCategoria = computed(() => {
   if (!dashboardData.value?.evolucionGastosPorCategoria) return null;
   return dashboardData.value.evolucionGastosPorCategoria;
 });
+
 const datosMapaCalor = computed(() => {
   if (!dashboardData.value?.cumplimientoPorArea) return null;
   return dashboardData.value.cumplimientoPorArea;
 });
+
 const datosTimeline = computed(() => {
   if (!dashboardData.value?.timelines) return null;
   return dashboardData.value.timelines;
 });
-// Métodos
+
+// Métodos principales
 const fetchDashboardData = async () => {
   cargando.value = true;
   dashboardData.value = null;
@@ -462,6 +478,28 @@ const fetchDashboardData = async () => {
     cargando.value = false;
   }
 };
+
+// Función para actualizar gráfico individual
+const refreshSingleChart = async (chartName) => {
+  currentRefreshing.value = chartName;
+
+  try {
+    const response = await api.get('/v1/dashboard', { params: filtros.value });
+    dashboardData.value = response.data;
+  } catch (error) {
+    console.error(`Error al actualizar gráfico ${chartName}:`, error);
+  } finally {
+    setTimeout(() => {
+      currentRefreshing.value = null;
+    }, 300);
+  }
+};
+
+// Función para verificar si un gráfico está cargando
+const isChartLoading = (chartName) => {
+  return currentRefreshing.value === chartName || cargando.value;
+};
+
 const fetchFiltersData = async () => {
   if (puedeVerFiltrosAdmin.value) {
     try {
@@ -517,9 +555,9 @@ const exportarDatos = async () => {
     });
   }
 };
+
 const actualizarPeriodoEvolucion = (nuevoPeriodo) => {
   console.log(`El período del gráfico de evolución ha cambiado a: ${nuevoPeriodo} meses`);
-  // Aquí podríamos añadir lógica en el futuro si fuera necesario.
 };
 
 const getRankingClass = (index) => {
@@ -538,9 +576,7 @@ const getPercentageWidth = (valor, maximo) => {
   return (valor / maximo) * 100;
 };
 
-//Captura evento de click de los botones de alertas.
 const handleAlertaAction = (alerta) => {
-  // Se define un mapa de acciones para cada tipo de alerta. Esto es más limpio que un switch.
   const actions = {
     'sobregiro_fondo': () => {
       const codigos = (alerta.detalles || []).map(d => d.codigo_fondo).join(',');
@@ -572,6 +608,7 @@ const handleAlertaAction = (alerta) => {
     console.warn('Acción no definida para el tipo de alerta:', alerta.tipo);
   }
 };
+
 // Lifecycle
 onMounted(() => {
   fetchDashboardData();

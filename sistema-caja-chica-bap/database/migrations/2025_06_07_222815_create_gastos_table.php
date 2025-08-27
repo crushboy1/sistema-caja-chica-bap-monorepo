@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreignId('id_dj_consolidada')->nullable()->constrained('djs_consolidadas', 'id_dj_consolidada')->onDelete('set null');
             // --- Información del Documento ---
             $table->date('fecha_documento');
-            $table->string('tipo_documento');
+            $table->foreignId('id_tipo_documento_comprobante')->constrained('tipos_documento_comprobante');
             $table->string('serie_documento')->nullable();
             $table->string('correlativo_documento')->nullable();
 
@@ -37,12 +37,12 @@ return new class extends Migration
             $table->decimal('tipo_cambio_referencial', 8, 4)->nullable();
             $table->decimal('tipo_cambio', 8, 4)->nullable();
             $table->decimal('monto_final_pen', 10, 2)->nullable();
-            
+
             // --- Descripción y Clasificación ---
             $table->foreignId('id_gasto_proyectado')->constrained('gastos_proyectados', 'id_gasto_proyectado');
             $table->text('glosa');
             $table->text('comentario')->nullable();
-            
+
 
             // --- Evidencia ---
             $table->string('ruta_evidencia')->nullable();
@@ -58,12 +58,12 @@ return new class extends Migration
                 'Contabilizado',                  // Aprobado final por ADM, descontado y listo para reposición
                 'Repuesto'                        // El gasto ya fue incluido en una reposición
             ])->default('Pendiente de Aprobación');
-        
+
             // --- CAMPOS PARA EL FLUJO DE OBSERVACIÓN Y CORRECCIÓN ---
-            
+
             // Guarda el motivo de la observación que ingresa el Jefe de Administración.
             $table->text('motivo_observacion_adm')->nullable();
-            
+
             // Guarda el ID del administrador que realizó la observación para trazabilidad.
             $table->foreignId('id_observador_adm')->nullable()->constrained('users', 'id');
 

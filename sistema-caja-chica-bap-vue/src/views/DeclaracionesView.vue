@@ -190,7 +190,33 @@ const hasCardPermission = (cardPermission) => {
 
 // --- CARDS VISIBLES (ÚNICA REACTIVIDAD) ---
 const visibleCards = computed(() => {
-  return ALL_CARDS.filter(card => hasCardPermission(card.permission));
+    // CAMBIO CLAVE: Se añade una capa de filtrado por rol después de verificar los permisos.
+    // Esto nos permite manejar excepciones específicas como la del Gerente General de forma limpia.
+    if (!props.user || !props.user.role) return []; // Guarda de seguridad
+
+    return ALL_CARDS.filter(card => {
+        // 1. Verificar si el usuario tiene el permiso necesario para la tarjeta.
+        const hasRequiredPermission = hasCardPermission(card.permission);
+        if (!hasRequiredPermission) {
+            return false;
+        }
+
+        // 2. Aplicar reglas de negocio específicas por rol para ocultar tarjetas.
+        const userRoleName = props.user.role.name;
+
+        // Regla: El Gerente General no debe ver la bandeja de aprobación de área.
+        if (card.tab === 'aprobacionArea' && userRoleName === 'gerente_general') {
+            return false;
+        }
+
+        // Regla: El Gerente General no debe ver la bandeja de validación contable.
+        if (card.tab === 'validacionContable' && userRoleName === 'gerente_general') {
+            return false;
+        }
+
+        // Si todas las validaciones pasan, la tarjeta es visible.
+        return true;
+    });
 });
 
 // --- MÉTODOS ---
