@@ -44,6 +44,8 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.view.all',
                 'declaraciones.create', 
                 'declaraciones.resubmit',
+                //Lista de usuarios
+                'users.list.view',
             ],
 
             'jefe_administracion' => [
@@ -71,6 +73,8 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.resubmit',
                 'declaraciones.reposition',
                 'declaraciones.view.reports',
+                //Lista de usuarios
+                'users.list.view',
             ],
 
             'jefe_area' => [
@@ -88,6 +92,8 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.create',
                 'declaraciones.approve.jefe',
                 'declaraciones.resubmit',
+                //Lista de usuarios
+                'users.list.view',
             ],
 
             'colaborador' => [
@@ -98,6 +104,8 @@ class PermissionRoleSeeder extends Seeder
                 'declaraciones.view.own',
                 'declaraciones.create',
                 'declaraciones.resubmit',
+                //Lista de usuarios
+                'users.list.view',
             ],
         ];
 

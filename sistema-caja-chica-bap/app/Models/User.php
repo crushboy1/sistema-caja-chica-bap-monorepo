@@ -143,7 +143,7 @@ class User extends Authenticatable
         // Comprueba si el nombre del rol del usuario está en el array de roles proporcionado.
         return in_array($this->role->name, $roles);
     }
-
+    
     /**
      * Verifica si el usuario es un jefe de área.
      * @return bool
@@ -188,4 +188,5 @@ class User extends Authenticatable
     {
         return $this->hasRole('colaborador');
     }
+    
 }

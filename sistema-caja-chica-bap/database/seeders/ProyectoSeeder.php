@@ -13,7 +13,7 @@ class ProyectoSeeder extends Seeder
     /**
      * Run the database seeds.
      *
-     * [CAMBIO] Seeder actualizado con la lista oficial de proyectos de BAP.
+     * Seeder actualizado con la lista oficial de proyectos de BAP.
      * Se eliminó la lógica de asociación de áreas, ya que se manejará en otro lugar si es necesario.
      */
     public function run(): void

@@ -26,7 +26,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'navigate.declaraciones', 'display_name' => 'Navegar a Declaraciones', 'description' => 'Permite ver el enlace al Módulo de Declaraciones.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'navigate.fondos', 'display_name' => 'Navegar a Fondos', 'description' => 'Permite ver el enlace al Módulo de Fondos.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'navigate.administracion', 'display_name' => 'Navegar a Administracion', 'description' => 'Permite ver el enlace a Administracion.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-
+            
             // === PERMISOS DE ADMINISTRACIÓN DEL SISTEMA ===
             ['name' => 'admin.users.manage', 'display_name' => 'Gestionar Usuarios y Roles', 'description' => 'Permite crear, editar y eliminar usuarios y sus roles.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'admin.catalogos.manage', 'display_name' => 'Gestionar Catálogos', 'description' => 'Permite gestionar listas maestras (proyectos, cuentas contables, gastos proyectados).', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
@@ -51,6 +51,9 @@ class PermissionSeeder extends Seeder
             ['name' => 'declaraciones.resubmit', 'display_name' => 'Reenviar Gasto Observado', 'description' => 'Permite a un colaborador corregir y reenviar un gasto observado.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'declaraciones.reposition', 'display_name' => 'Reponer Fondos', 'description' => 'Permite a ADM ejecutar la reposición de un fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'declaraciones.view.reports', 'display_name' => 'Ver Reportes de Gastos', 'description' => 'Permite generar y ver reportes de gastos (incluyendo contabilizados) para análisis y exportación.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
+
+            // Este permiso controlará el acceso a las listas de usuarios para los filtros de la UI.
+            ['name' => 'users.list.view', 'display_name' => 'Ver Listas de Usuarios', 'description' => 'Permite ver listas de usuarios en selectores y filtros de la UI.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
         ];
         foreach ($permissions as &$permission) {
             if (!isset($permission['created_at'])) {

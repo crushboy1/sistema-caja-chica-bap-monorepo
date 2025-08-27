@@ -26,7 +26,6 @@ class CheckPermission
         // Cargar los permisos del rol una sola vez para eficiencia.
         $user->load('role.permissions');
         $userPermissions = $user->role->permissions->pluck('name');
-
         $hasPermission = false;
         // Iterar sobre todos los permisos requeridos por la ruta.
         foreach ($permissions as $permissionName) {
