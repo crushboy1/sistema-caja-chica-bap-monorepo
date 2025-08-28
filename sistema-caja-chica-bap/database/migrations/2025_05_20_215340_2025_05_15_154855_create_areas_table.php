@@ -12,18 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('areas', function (Blueprint $table) {
-                // Clave primaria auto-incremental.
-                $table->id();
-
-                // Nombre del área (ej: 'Administración', 'Contabilidad', 'TI').
-                $table->string('name')->unique();
-                //generar códigos de solicitud únicos y legibles.
-                $table->string('acronym', 10)->nullable();
-                // Descripción opcional del área.
-                $table->string('description')->nullable();
-                // Timestamps para created_at y updated_at.
-                $table->timestamps();
-            });
+            $table->id();
+            $table->string('name')->unique();
+            $table->string('acronym', 10)->nullable();
+            $table->string('description')->nullable();
+            $table->foreignId('centro_costo_id')
+                ->nullable()
+                ->unique()
+                ->constrained('centros_costo')
+                ->onUpdate('cascade')
+                ->onDelete('set null');
+            $table->boolean('activo')->default(true);
+            $table->timestamps();
+        });
     }
 
     /**

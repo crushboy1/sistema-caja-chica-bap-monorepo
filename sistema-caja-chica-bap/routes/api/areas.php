@@ -1,17 +1,26 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\ProyectoController;
+use App\Http\Controllers\API\AreaController;
 
 /*
 |--------------------------------------------------------------------------
-| Rutas de API para la Administración de Areas
+| Rutas de API para la Administración de Áreas
 |--------------------------------------------------------------------------
-| Estas rutas ya están protegidas por 'auth:sanctum' desde api.php.
+| El endpoint 'index' para la lista pública se define en 'recursos.php'.
+| Las siguientes rutas son para la gestión y la autorización se maneja
+| directamente dentro del AreaController para ser consistente.
 */
 
-// Rutas protegidas por rol para el CRUD de Proyectos.
-Route::middleware(['role:jefe_administracion|super_admin'])->group(function () {
-    // El método 'index' no se incluye aquí porque se define en recursos.php sin restricción de rol.
-    Route::apiResource('areas', ProyectoController::class)->except(['index']);
-});
+/**
+ * Rutas para el CRUD (store, show, update, destroy) de Áreas.
+ * Se excluye 'index' porque ya está definido de forma pública.
+ */
+Route::apiResource('areas', AreaController::class)
+    ->parameters(['areas' => 'area'])
+    ->except(['index']);
+
+/**
+ * Ruta para activar un área que fue desactivada.
+ */
+Route::post('areas/{area}/activate', [AreaController::class, 'activate']);

@@ -507,7 +507,7 @@ const fetchFiltersData = async () => {
         api.get('/v1/areas'),
         api.get('/v1/users/list-for-select')
       ]);
-      areas.value = areasRes.data.areas;
+      areas.value = areasRes.data.data;
       usuarios.value = usuariosRes.data;
     } catch (error) {
       console.error("Error al cargar datos para filtros:", error);

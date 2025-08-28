@@ -393,7 +393,7 @@ const obtenerFondos = async () => {
 const obtenerAreas = async () => {
   try {
     const response = await api.get('/v1/areas');
-    areasDisponibles.value = response.data.areas;
+    areasDisponibles.value = response.data.data;
   } catch (error) {
     console.error('Error al obtener áreas:', error);
     Swal.fire({
