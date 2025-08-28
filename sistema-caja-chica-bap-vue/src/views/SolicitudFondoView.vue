@@ -394,7 +394,7 @@ onMounted(async () => {
 
     proyectos.value = proyectosResponse.data.proyectos;
     gastosProyectadosCatalogo.value = gastosProyectadosResponse.data.gastos_proyectados;
-    areas.value = areasResponse.data.areas;
+    areas.value = areasResponse.data.data;
   } catch (error) {
     console.error('Error al cargar datos iniciales para SolicitudFondoView:', error);
   } finally {

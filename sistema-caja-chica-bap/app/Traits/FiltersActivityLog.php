@@ -3,7 +3,7 @@
 namespace App\Traits;
 
 use App\Models\ActivityLog;
-use App\Models\User; 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -161,6 +161,10 @@ trait FiltersActivityLog
             'App\\Models\\CuentaContable' => 'Plan de Cuentas',
             'App\\Models\\CierreMensual' => 'Control de Períodos',
             'App\\Models\\ExcepcionCierre' => 'Manejo de Excepciones',
+            'App\\Models\\ClasificacionBs' => 'Clasificación BS',
+            'App\\Models\\TipoImpuesto'     => 'Tipos de Impuesto',
+            'App\\Models\\TipoDocumento'    => 'Tipos de Documento',
+            'App\\Models\\User'             => 'Gestión de Usuarios',
         ];
 
         return $modelNames[$subjectType] ?? class_basename($subjectType);

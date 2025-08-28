@@ -38,7 +38,7 @@ class UserSeeder extends Seeder
         $gestionSocialArea = Area::where('name', 'Gestión Social')->firstOrFail();
         $proyectosArea = Area::where('name', 'Proyectos')->firstOrFail();
         $tiArea = Area::where('name', 'Tecnología de la Información')->firstOrFail();
-        $alianzasArea = Area::where('name', 'Alianzas y Estrategias')->firstOrFail();
+        $alianzasArea = Area::where('name', 'Estrategia (Gestion Corporativa)')->firstOrFail();
 
         // --- Creación de Usuarios ---
 

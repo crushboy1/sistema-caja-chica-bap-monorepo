@@ -8,6 +8,7 @@ use App\Http\Controllers\API\ProyectoController;
 use App\Http\Controllers\API\GastoProyectadoController;
 use App\Http\Controllers\API\ClasificacionBienServicioController;
 use App\Http\Controllers\API\TipoImpuestoController;
+use App\Http\Controllers\API\CentroCostoController;
 use App\Http\Controllers\API\TipoDocumentoComprobanteController;
 
 // Listas para Selectores
@@ -18,6 +19,7 @@ Route::get('/gastos-proyectados', [GastoProyectadoController::class, 'index']);
 Route::get('/clasificaciones', [ClasificacionBienServicioController::class, 'index']);
 Route::get('/tipos-impuesto', [TipoImpuestoController::class, 'index']);
 Route::get('/tipos-documento-comprobante', [TipoDocumentoComprobanteController::class, 'index']);
+Route::get('/centros-costo', [CentroCostoController::class, 'index']);
 // Generación de Documentos
 Route::post('/documentos/generar-dj', [DocumentoController::class, 'generarDJ']);
 

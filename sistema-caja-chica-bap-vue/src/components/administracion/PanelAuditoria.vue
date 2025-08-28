@@ -6,7 +6,7 @@
                 <div>
                     <h2 class="text-2xl font-bold text-gray-800">Log de Auditoría del Sistema</h2>
                     <p class="text-gray-500 mt-1 md:mt-0">Historial de cambios y acciones administrativas.</p>
-                    
+
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-2 mt-4 md:mt-0">
@@ -596,10 +596,19 @@ const exportarLogs = async () => {
 // --- MÉTODOS DE FORMATO Y UTILIDAD ---
 const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
+    const [datePart, timePart] = dateString.split(' ');
+    if (!datePart || !timePart) return 'Formato inválido';
+    const [day, month, year] = datePart.split('/');
+    const isoString = `${year}-${month}-${day}T${timePart}`;
+    const date = new Date(isoString);
+    if (isNaN(date)) {
+        return 'Fecha inválida';
+    }
+
+    return date.toLocaleString('es-PE', {
         year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',

@@ -5,7 +5,7 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 
 // --- ESTADO REACTIVO ---
-const activeTab = ref('proyectos');
+const activeTab = ref('centrosCosto');
 const isLoading = ref(true);
 const isModalOpen = ref(false);
 const editingItem = ref(null);
@@ -14,16 +14,56 @@ const currentPage = ref(1);
 const itemsPerPage = ref(10);
 
 const dataSets = ref({
+    centrosCosto: [],
     proyectos: [],
     gastosProyectados: [],
     cuentasContables: [],
     clasificaciones: [],
     tiposImpuesto: [],
     tiposDocumento: [],
+    areas: [],
 });
 
 // --- CONFIGURACIÓN CENTRALIZADA DE CATÁLOGOS ---
 const catalogConfig = {
+    centrosCosto: {
+        title: 'Centros de Costo',
+        endpoint: '/v1/centros-costo',
+        pk: 'id',
+        columns: [
+            { key: 'codigo', label: 'Código' },
+            { key: 'descripcion', label: 'Descripción' },
+        ],
+        fields: [
+            { key: 'codigo', label: 'Código', type: 'text', required: true },
+            { key: 'descripcion', label: 'Descripción', type: 'text', required: true },
+        ]
+    },
+    areas: {
+        title: 'Áreas',
+        endpoint: '/v1/areas',
+        pk: 'id',
+        columns: [
+            { key: 'name', label: 'Nombre del Área' },
+            { key: 'acronym', label: 'Acrónimo' },
+            { key: 'centro_costo.codigo', label: 'Centro de Costo' },
+        ],
+        fields: [
+            { key: 'name', label: 'Nombre del Área', type: 'text', required: true },
+            { key: 'acronym', label: 'Acrónimo (para códigos)', type: 'text', required: false },
+            { key: 'description', label: 'Descripción', type: 'text', required: false },
+            { 
+                key: 'centro_costo_id',
+                label: 'Centro de Costo',
+                type: 'select',
+                options: 'centrosCosto', 
+                optionLabel: 'descripcion',
+                optionValue: 'id',
+                displayFormat: 'codigo - descripcion',
+                required: false 
+            },
+        ]
+    },
     proyectos: {
         title: 'Proyectos',
         endpoint: '/v1/proyectos',
@@ -138,6 +178,8 @@ const catalogConfig = {
 
 // --- FILTROS REACTIVOS ---
 const filtros = ref({
+    centrosCosto: { codigo: '', descripcion: '', activo: '' },
+    areas: { name: '', acronym: '', activo: '' },
     proyectos: { codigo: '', nombre: '', activo: '' },
     gastosProyectados: { descripcion: '', cuenta_contable: '', activo: '' },
     cuentasContables: { codigo_cuenta: '', descripcion: '', activo: '' }
@@ -225,18 +267,19 @@ const limpiarFiltros = () => {
 // Carga datos para selectores (una sola vez)
 const fetchSelectOptions = async () => {
     try {
-        // Se añade la llamada para 'tiposDocumento'.
-        const [cuentasRes, clasificacionesRes, tiposImpuestoRes, tiposDocumentoRes] = await Promise.all([
+        const [cuentasRes, clasificacionesRes, tiposImpuestoRes, tiposDocumentoRes, centrosCostoRes] = await Promise.all([
             api.get(catalogConfig.cuentasContables.endpoint),
             api.get(catalogConfig.clasificaciones.endpoint),
             api.get(catalogConfig.tiposImpuesto.endpoint),
-            api.get(catalogConfig.tiposDocumento.endpoint)
+            api.get(catalogConfig.tiposDocumento.endpoint),
+            api.get(catalogConfig.centrosCosto.endpoint)
         ]);
 
         dataSets.value.cuentasContables = extractRowsSafely(cuentasRes.data, 'cuentasContables');
         dataSets.value.clasificaciones = extractRowsSafely(clasificacionesRes.data, 'clasificaciones');
         dataSets.value.tiposImpuesto = extractRowsSafely(tiposImpuestoRes.data, 'tiposImpuesto');
         dataSets.value.tiposDocumento = extractRowsSafely(tiposDocumentoRes.data, 'tiposDocumento');
+        dataSets.value.centrosCosto = extractRowsSafely(centrosCostoRes.data, 'centrosCosto');
 
     } catch (error) {
         console.error("Error al cargar opciones para selectores:", error);
@@ -253,7 +296,7 @@ const createFilterWatcher = (tabName, fieldName, immediate = false) => {
 };
 
 // Watchers para todos los filtros
-['proyectos', 'gastosProyectados', 'cuentasContables'].forEach(tab => {
+Object.keys(filtros.value).forEach(tab => {
     const fields = Object.keys(filtros.value[tab]);
     fields.forEach(field => {
         createFilterWatcher(tab, field, field === 'activo');
@@ -364,7 +407,7 @@ const getSelectOptions = (field) => {
     const options = dataSets.value[field.options];
 
     return Array.isArray(options)
-        ? options.filter(o => o && String(o.activo) === '1') // o.activo debe ser 1 o '1'
+        ? options.filter(o => o && String(o.activo) === '1')
         : [];
 };
 
@@ -401,7 +444,7 @@ const handleSelectInput = (selectedOption, field) => {
 // --- INICIALIZACIÓN ---
 onMounted(async () => {
     await fetchSelectOptions();
-    await fetchDataWithFilters();
+    fetchDataWithFilters();
 });
 </script>
 

@@ -5,10 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
+use App\Traits\LogsActivity;
 class ClasificacionBienServicio extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $table = 'clasificaciones_bien_servicio';
     protected $primaryKey = 'id_clasificacion_bien_servicio';

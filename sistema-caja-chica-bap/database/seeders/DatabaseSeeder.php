@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             PermissionRoleSeeder::class,
 
             // Estructura Organizacional y Catálogos
+            CentroCostoSeeder::class,
             AreaSeeder::class,
             TipoDocumentoIdentidadSeeder::class,
             CuentaContableSeeder::class,

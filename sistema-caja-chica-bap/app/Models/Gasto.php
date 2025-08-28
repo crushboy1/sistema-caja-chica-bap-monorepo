@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -80,7 +81,7 @@ class Gasto extends Model
      *
      * @var array
      */
-    protected $appends = ['evidencia_url','base_imponible'];
+    protected $appends = ['evidencia_url', 'base_imponible'];
 
     /**
      * El método "booted" del modelo.
@@ -106,6 +107,17 @@ class Gasto extends Model
     | RELACIONES DE ELOQUENT
     |--------------------------------------------------------------------------
     */
+    public function area(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Area::class,          
+            FondoEfectivo::class, 
+            'id_fondo',         
+            'id',                 
+            'id_fondo_efectivo',  
+            'id_area'             
+        );
+    }
     public function tipoDocumento(): BelongsTo
     {
         return $this->belongsTo(TipoDocumentoComprobante::class, 'id_tipo_documento_comprobante');
