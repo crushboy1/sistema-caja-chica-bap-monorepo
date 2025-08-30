@@ -30,15 +30,23 @@
                 <div>
                     <label for="fondo" class="form-label">Fondo de Caja Chica <span
                             class="text-rojo-bap">*</span></label>
-                    <select id="fondo" v-model="fondoSeleccionadoId"
-                        class="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                        required>
-                        <option :value="null" disabled>-- Seleccione un fondo --</option>
-                        <option v-for="fondo in fondosActivos" :key="fondo.id_fondo" :value="fondo.id_fondo">
-                            {{ fondo.codigo_fondo }} - (Saldo Disp: {{ currencyFormatter.format(fondo.monto_disponible)
-                            }})
-                        </option>
-                    </select>
+                    <v-select
+                        id="fondo"
+                        v-model="fondoSeleccionadoId"
+                        :options="fondosActivos"
+                        label="codigo_fondo"
+                        :reduce="fondo => fondo.id_fondo"
+                        placeholder="-- Seleccione un fondo --"
+                        class="mt-1"
+                        required
+                    >
+                        <template #option="{ codigo_fondo, monto_disponible }">
+                            <div class="flex justify-between items-center">
+                                <span>{{ codigo_fondo }}</span>
+                                <span class="text-sm text-gray-500">Saldo: {{ currencyFormatter.format(monto_disponible) }}</span>
+                            </div>
+                        </template>
+                    </v-select>
                     <transition name="fade-in">
                         <p v-if="fondoSeleccionadoId"
                             class="text-sm text-gray-600 mt-2 p-2 rounded-lg border-l-4 border-verde-bap bg-verde-bap-extralight">
@@ -167,19 +175,26 @@
                                             <label :for="'proyeccion_' + index"
                                                 class="block text-sm font-medium text-gray-700">Gasto Proyectado <span
                                                     class="text-rojo-bap">*</span></label>
-                                            <select :id="'proyeccion_' + index" v-model="gasto.id_gasto_proyectado"
-                                                class="mt-1 block w-full p-3 border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap"
-                                                required>
-                                                <option :value="null" disabled>Seleccione un Gasto Proyectado</option>
-                                                <option v-for="proyeccion in gastosProyectadosDisponibles"
-                                                    :key="proyeccion.id_gasto_proyectado"
-                                                    :value="proyeccion.id_gasto_proyectado"
-                                                    :disabled="esOpcionDeshabilitada(proyeccion, gasto)">
-                                                    {{ proyeccion.descripcion }} (Saldo: {{
-                                                        currencyFormatter.format(getSaldoMaximoParaGasto(proyeccion.id_gasto_proyectado,
-                                                            index)) }})
-                                                </option>
-                                            </select>
+                                            <v-select
+                                                :id="'proyeccion_' + index"
+                                                v-model="gasto.id_gasto_proyectado"
+                                                :options="gastosProyectadosDisponibles"
+                                                label="descripcion"
+                                                :reduce="proyeccion => proyeccion.id_gasto_proyectado"
+                                                placeholder="Seleccione un Gasto Proyectado"
+                                                class="mt-1"
+                                                required
+                                                :selectable="proyeccion => !esOpcionDeshabilitada(proyeccion, gasto)"
+                                            >
+                                                <template #option="{ descripcion, id_gasto_proyectado }">
+                                                    <div class="flex justify-between items-center">
+                                                        <span>{{ descripcion }}</span>
+                                                        <span class="text-sm text-gray-500">
+                                                            Saldo: {{ currencyFormatter.format(getSaldoMaximoParaGasto(id_gasto_proyectado, index)) }}
+                                                        </span>
+                                                    </div>
+                                                </template>
+                                            </v-select>
                                         </div>
                                     </div>
 
@@ -310,6 +325,21 @@
                                                     :required="requiereSerieYCorrelativo(gasto)"
                                                     class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
                                                     placeholder="Ej: 8983" />
+                                                </div>
+
+                                                <!-- RUC del Proveedor (Opcional para reportes) -->
+                                                <div>
+                                                    <label :for="'ruc_proveedor_' + index"
+                                                    class="block text-sm font-medium text-gray-700 mb-2">
+                                                    RUC del Proveedor
+                                                    <span class="text-gray-500 text-xs">(Opcional - para reportes)</span>
+                                                </label>
+                                                    <input type="text" :id="'ruc_proveedor_' + index"
+                                                    v-model="gasto.ruc_proveedor"
+                                                    maxlength="11"
+                                                    pattern="[0-9]{11}"
+                                                    class="mt-1 block w-full p-3 border border-gray-300 rounded-lg focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                    placeholder="Ej: 20123456789 (opcional)" />
                                                 </div>
                                             </div>
                                         </div>
@@ -767,6 +797,7 @@ const agregarGasto = async () => {
         id_tipo_documento_comprobante: null,
         serie_documento: '',
         correlativo_documento: '',
+        ruc_proveedor: '',
         monto_total: null,
         comentario: '',
         evidencia: null,
@@ -879,6 +910,11 @@ const requiereSerieYCorrelativo = (gasto) => {
     // Esta lógica se puede expandir si se añaden más tipos de documento
     return ['Factura', 'Boleta de Venta'].includes(tipoDoc.nombre);
 };
+
+const requiereRUC = (gasto) => {
+    // El RUC es opcional, solo se usa para reportes
+    return false;
+};
 // Manejar cambio en tipo de documento
 const onTipoDocumentoChange = (gasto) => {
     const tipoDoc = getTipoDocumento(gasto);
@@ -886,6 +922,7 @@ const onTipoDocumentoChange = (gasto) => {
         gasto.es_declaracion_jurada = true;
         gasto.serie_documento = '';
         gasto.correlativo_documento = '';
+        gasto.ruc_proveedor = '';
     } else {
         gasto.es_declaracion_jurada = false;
     }
@@ -910,6 +947,7 @@ const onDeclaracionJuradaChange = (gasto) => {
             gasto.id_tipo_documento_comprobante = dj.id;
             gasto.serie_documento = '';
             gasto.correlativo_documento = '';
+            gasto.ruc_proveedor = '';
         }
     } else {
         gasto.id_tipo_documento_comprobante = null;
@@ -1017,6 +1055,7 @@ const isGastoCompleto = (gasto) => {
         const comprobanteCompleto = requiereSerieYCorrelativo(gasto)
             ? (!!gasto.serie_documento && !!gasto.correlativo_documento)
             : true;
+        // El RUC es opcional, no se valida
         return evidenciaCompleta && comprobanteCompleto;
     }
 };

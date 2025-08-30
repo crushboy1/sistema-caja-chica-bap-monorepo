@@ -4,6 +4,18 @@ import api from '@/plugins/axios';
 import Swal from 'sweetalert2';
 import GastoDetalleModal from './modals/GastoDetalleModal.vue';
 import { getClassesForAuditoriaBadge } from '@/utils/statusStyles.js';
+import { 
+    Receipt, 
+    Clock, 
+    AlertTriangle, 
+    CheckCircle2, 
+    Download, 
+    X,
+    Search,
+    User,
+    Calendar,
+    Building2
+} from 'lucide-vue-next';
 
 // --- ESTADO DEL COMPONENTE ---
 const props = defineProps({
@@ -33,7 +45,7 @@ const filtros = ref({
 // --- CONSTANTES PARA FILTROS ---
 let debounceTimeout = null;
 const DEBOUNCE_DELAY = 500;
-const MIN_SEARCH_LENGTH = 3;
+const MIN_SEARCH_LENGTH = 1; // Reducido para permitir búsquedas más flexibles en reportes
 
 // --- ESTADO DE PAGINACIÓN ---
 const paginaActual = ref(1);
@@ -159,8 +171,8 @@ const itemsFiltrados = computed(() => {
         } else if (item.gasto) {
             fechaItem = item.gasto.created_at;
             registradorItem = item.gasto.registrador;
-            codigoGastoItem = item.gasto.codigo_gasto?.toLowerCase();
-            glosaItem = item.gasto.glosa?.toLowerCase();
+            codigoGastoItem = item.gasto.codigo_gasto?.toLowerCase() || '';
+            glosaItem = item.gasto.glosa?.toLowerCase() || '';
             estadoItem = item.gasto.estado;
         } else {
             return false; // Item con estructura inesperada
@@ -183,11 +195,11 @@ const itemsFiltrados = computed(() => {
         }
 
         // Aplicar filtro por código/glosa (texto)
-        if (textoBusqueda.length > 0) { // No se usa MIN_SEARCH_LENGTH aquí para permitir búsquedas de 1 o 2 caracteres si el usuario lo desea en reportes
+        if (textoBusqueda.length > 0) {
             if (esGrupo && item.gastos) {
                 return item.gastos.some(g =>
-                    g.codigo_gasto?.toLowerCase().includes(textoBusqueda) ||
-                    g.glosa?.toLowerCase().includes(textoBusqueda)
+                    (g.codigo_gasto?.toLowerCase() || '').includes(textoBusqueda) ||
+                    (g.glosa?.toLowerCase() || '').includes(textoBusqueda)
                 );
             } else if (!esGrupo && item.gasto) {
                 return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
@@ -228,10 +240,15 @@ const fetchGastos = async () => {
     cargando.value = true;
     try {
         const params = { ...filtros.value };
-        // No se eliminan filtros de longitud mínima aquí, se manejan en itemsFiltrados
-        // y en el watcher para triggerSearchWithDebounce.
+        
+        // Limpiar parámetros vacíos para evitar filtros innecesarios
+        Object.keys(params).forEach(key => {
+            if (params[key] === '' || params[key] === null || params[key] === undefined) {
+                delete params[key];
+            }
+        });
 
-        // Llamada al nuevo endpoint de reportes
+        // Llamada al endpoint de reportes
         const response = await api.get('/v1/gastos/reportes', { params });
         items.value = response.data; // La data ya viene lista y agrupada/formateada del backend
 
@@ -291,8 +308,15 @@ const exportarGastos = async () => {
     exportando.value = true;
     try {
         const params = { ...filtros.value }; // Enviar todos los filtros actuales al backend para la exportación
+        
+        // Limpiar parámetros vacíos para evitar filtros innecesarios
+        Object.keys(params).forEach(key => {
+            if (params[key] === '' || params[key] === null || params[key] === undefined) {
+                delete params[key];
+            }
+        });
 
-        // Llamada al nuevo endpoint de exportación
+        // Llamada al endpoint de exportación
         const response = await api.post('/v1/gastos/exportar-reporte', params, {
             responseType: 'blob', // Importante para manejar la descarga de archivos
         });
@@ -378,10 +402,19 @@ onMounted(() => {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div class="relative">
                     <label for="filtro_codigo_gasto_reporte"
-                        class="block text-sm font-medium text-gray-700 mb-1">Código/Glosa</label>
-                    <input type="text" id="filtro_codigo_gasto_reporte" v-model="filtros.texto"
-                        placeholder="Buscar por código o glosa"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                        class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <Receipt class="w-4 h-4 mr-1" />
+                        Código/Glosa
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="filtro_codigo_gasto_reporte" v-model="filtros.texto"
+                            placeholder="Buscar por código o glosa"
+                            class="mt-1 block w-full p-2 pr-8 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                        <button v-if="filtros.texto" @click="filtros.texto = ''" 
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                            <X class="w-4 h-4" />
+                        </button>
+                    </div>
                     <div v-if="filtros.texto.length > 0 && filtros.texto.length < MIN_SEARCH_LENGTH"
                         class="text-xs text-amber-600 mt-1">
                         Mínimo {{ MIN_SEARCH_LENGTH }} caracteres
@@ -389,10 +422,19 @@ onMounted(() => {
                 </div>
                 <div class="relative">
                     <label for="filtro_registrador_reporte"
-                        class="block text-sm font-medium text-gray-700 mb-1">Registrador</label>
-                    <input type="text" id="filtro_registrador_reporte" v-model="filtros.registrador_name"
-                        placeholder="Nombre o Apellido"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                        class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <User class="w-4 h-4 mr-1" />
+                        Registrador
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="filtro_registrador_reporte" v-model="filtros.registrador_name"
+                            placeholder="Nombre o Apellido"
+                            class="mt-1 block w-full p-2 pr-8 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                        <button v-if="filtros.registrador_name" @click="filtros.registrador_name = ''" 
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                            <X class="w-4 h-4" />
+                        </button>
+                    </div>
                     <div v-if="filtros.registrador_name.length > 0 && filtros.registrador_name.length < MIN_SEARCH_LENGTH"
                         class="text-xs text-amber-600 mt-1">
                         Mínimo {{ MIN_SEARCH_LENGTH }} caracteres
@@ -400,9 +442,12 @@ onMounted(() => {
                 </div>
 
                 <div class="relative">
-                    <label for="filtro_area_reporte" class="block text-sm font-medium text-gray-700 mb-1">Área</label>
+                    <label for="filtro_area_reporte" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <Building2 class="w-4 h-4 mr-1" />
+                        Área
+                    </label>
                     <select id="filtro_area_reporte" v-model="filtros.area_id"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
                         <option value="">Todas</option>
                         <option v-for="area in areas" :key="area.id" :value="area.id">
                             {{ area.name }}
@@ -412,9 +457,12 @@ onMounted(() => {
 
                 <div>
                     <label for="filtro_estado_reporte"
-                        class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                        class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <AlertTriangle class="w-4 h-4 mr-1" />
+                        Estado
+                    </label>
                     <select id="filtro_estado_reporte" v-model="filtros.estado"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
                         <option value="Todos">Todos</option>
                         <option value="Pendiente de Aprobación">Pendiente Aprobación Jefatura</option>
                         <option value="Pendiente de Validación DJ">Pendiente Validación DJ</option>
@@ -425,16 +473,32 @@ onMounted(() => {
                     </select>
                 </div>
                 <div>
-                    <label for="filtro_fecha_inicio_reporte" class="block text-sm font-medium text-gray-700 mb-1">Fecha
-                        Desde</label>
-                    <input type="date" id="filtro_fecha_inicio_reporte" v-model="filtros.fecha_inicio"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                    <label for="filtro_fecha_inicio_reporte" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <Calendar class="w-4 h-4 mr-1" />
+                        Fecha Desde
+                    </label>
+                    <div class="relative">
+                        <input type="date" id="filtro_fecha_inicio_reporte" v-model="filtros.fecha_inicio"
+                            class="mt-1 block w-full p-2 pr-8 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                        <button v-if="filtros.fecha_inicio" @click="filtros.fecha_inicio = ''" 
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                            <X class="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
                 <div>
-                    <label for="filtro_fecha_fin_reporte" class="block text-sm font-medium text-gray-700 mb-1">Fecha
-                        Hasta</label>
-                    <input type="date" id="filtro_fecha_fin_reporte" v-model="filtros.fecha_fin"
-                        class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-purple-bap focus:ring-purple-bap">
+                    <label for="filtro_fecha_fin_reporte" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        <Calendar class="w-4 h-4 mr-1" />
+                        Fecha Hasta
+                    </label>
+                    <div class="relative">
+                        <input type="date" id="filtro_fecha_fin_reporte" v-model="filtros.fecha_fin"
+                            class="mt-1 block w-full p-2 pr-8 border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap">
+                        <button v-if="filtros.fecha_fin" @click="filtros.fecha_fin = ''" 
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                            <X class="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -442,14 +506,11 @@ onMounted(() => {
                 <div class="flex items-center space-x-3">
                     <button v-if="hayFiltrosActivos" @click="limpiarFiltros"
                         class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="2"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                        Limpiar
+                        <X class="w-4 h-4 mr-2" />
+                        Limpiar Filtros
                     </button>
                     <button @click="exportarGastos" :disabled="exportando"
-                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
+                        class="bg-verde-bap hover:bg-verde-bap-dark text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
                         <span v-if="exportando" class="flex items-center">
                             <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg"
                                 fill="none" viewBox="0 0 24 24">
@@ -462,11 +523,7 @@ onMounted(() => {
                             Exportando...
                         </span>
                         <span v-else class="flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                </path>
-                            </svg>
+                            <Download class="w-4 h-4 mr-2" />
                             Exportar a Excel
                         </span>
                     </button>
@@ -475,33 +532,68 @@ onMounted(() => {
         </div>
 
         <!-- Contadores -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="bg-blue-100 p-4 rounded-lg shadow-md text-center">
-                <h4 class="text-sm font-semibold text-blue-800 uppercase">Total Gastos</h4>
-                <p class="text-2xl font-bold text-blue-900">{{ estadisticas.todos.count }}</p>
-                <p class="text-sm text-blue-700">{{ currencyFormatter.format(estadisticas.todos.amount) }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Gastos -->
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl shadow-lg border border-blue-200 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shadow-sm">
+                        <Receipt class="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-blue-600/80">Total Gastos</p>
+                        <p class="text-2xl font-bold text-blue-700">{{ estadisticas.todos.count }}</p>
+                        <p class="text-sm text-blue-600/70">{{ currencyFormatter.format(estadisticas.todos.amount) }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="bg-yellow-100 p-4 rounded-lg shadow-md text-center">
-                <h4 class="text-sm font-semibold text-yellow-800 uppercase">Pendientes</h4>
-                <p class="text-2xl font-bold text-yellow-900">{{ estadisticas.pendientes.count }}</p>
-                <p class="text-sm text-yellow-700">{{ currencyFormatter.format(estadisticas.pendientes.amount) }}</p>
+
+            <!-- Pendientes -->
+            <div class="bg-gradient-to-br from-amber-50 to-amber-100 p-6 rounded-xl shadow-lg border border-amber-200 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shadow-sm">
+                        <Clock class="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-amber-600/80">Pendientes</p>
+                        <p class="text-2xl font-bold text-amber-700">{{ estadisticas.pendientes.count }}</p>
+                        <p class="text-sm text-amber-600/70">{{ currencyFormatter.format(estadisticas.pendientes.amount) }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="bg-red-100 p-4 rounded-lg shadow-md text-center">
-                <h4 class="text-sm font-semibold text-red-800 uppercase">Observados/Rechazados</h4>
-                <p class="text-2xl font-bold text-red-900">{{ estadisticas.observados.count }}</p>
-                <p class="text-sm text-red-700">{{ currencyFormatter.format(estadisticas.observados.amount) }}</p>
+
+            <!-- Observados/Rechazados -->
+            <div class="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-xl shadow-lg border border-red-200 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shadow-sm">
+                        <AlertTriangle class="w-6 h-6 text-red-600" />
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-red-600/80">Observados/Rechazados</p>
+                        <p class="text-2xl font-bold text-red-700">{{ estadisticas.observados.count }}</p>
+                        <p class="text-sm text-red-600/70">{{ currencyFormatter.format(estadisticas.observados.amount) }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="bg-green-100 p-4 rounded-lg shadow-md text-center">
-                <h4 class="text-sm font-semibold text-green-800 uppercase">Contabilizados</h4>
-                <p class="text-2xl font-bold text-green-900">{{ estadisticas.contabilizados.count }}</p>
-                <p class="text-sm text-green-700">{{ currencyFormatter.format(estadisticas.contabilizados.amount) }}</p>
+
+            <!-- Contabilizados -->
+            <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl shadow-lg border border-green-200 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shadow-sm">
+                        <CheckCircle2 class="w-6 h-6 text-green-600" />
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-green-600/80">Contabilizados</p>
+                        <p class="text-2xl font-bold text-green-700">{{ estadisticas.contabilizados.count }}</p>
+                        <p class="text-sm text-green-600/70">{{ currencyFormatter.format(estadisticas.contabilizados.amount) }}</p>
+                    </div>
+                </div>
             </div>
         </div>
         
 
         <div v-if="cargando || buscando" class="text-center py-16">
             <div class="inline-flex items-center text-lg text-gray-600">
-                <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-purple-bap" xmlns="http://www.w3.org/2000/svg"
+                <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-verde-bap" xmlns="http://www.w3.org/2000/svg"
                     fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
@@ -512,10 +604,7 @@ onMounted(() => {
             </div>
         </div>
         <div v-else-if="!itemsPaginados.length" class="text-center py-16">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Search class="mx-auto h-12 w-12 text-gray-400" />
             <h3 class="mt-2 text-xl font-medium text-gray-900">Sin Resultados</h3>
             <p class="mt-1 text-md">No se encontraron gastos que coincidan con los filtros aplicados.</p>
         </div>
@@ -657,7 +746,7 @@ onMounted(() => {
                                         </div>
                                     </td>
                                     <td class="py-3 px-2 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
-                                    <td class="py-3 px-2 text-center text-gray-600">{{ SAP_SERIE }}</td> <!-- Serie SAP -->
+                                    <td class="py-3 px-2 text-center text-gray-600">{{  new Date(gasto.created_at).getFullYear()  }}</td> <!-- Serie SAP -->
                                     <td class="py-3 px-2 text-center text-gray-600">
                                         <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
                                     </td>
@@ -844,7 +933,7 @@ onMounted(() => {
                     </button>
                     <button v-for="pagina in paginasVisibles" :key="pagina" @click="irAPagina(pagina)"
                         class="w-10 h-10 rounded-lg text-sm font-medium transition-colors duration-200 border" :class="[
-                            paginaActual === pagina ? 'bg-purple-600 text-white border-purple-700 shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200',
+                            paginaActual === pagina ? 'bg-verde-bap text-white border-verde-bap-dark shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200',
                             pagina === '...' ? 'cursor-default' : ''
                         ]">
                         {{ pagina }}
