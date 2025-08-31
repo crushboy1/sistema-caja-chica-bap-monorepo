@@ -27,7 +27,9 @@ return new class extends Migration
             $table->foreignId('id_tipo_documento_comprobante')->constrained('tipos_documento_comprobante');
             $table->string('serie_documento')->nullable();
             $table->string('correlativo_documento')->nullable();
-
+            $table->string('codigo_sn')->nullable();
+            $table->string('ruc_proveedor', 11)->nullable();
+            
             // --- Lógica de Montos y Moneda (Adaptado) ---
             $table->decimal('monto_total', 10, 2);
             $table->decimal('monto_excedido_al_registrar', 10, 2)->nullable();

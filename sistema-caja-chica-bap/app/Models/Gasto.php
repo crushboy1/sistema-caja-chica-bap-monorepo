@@ -32,6 +32,8 @@ class Gasto extends Model
      */
     protected $fillable = [
         'codigo_gasto',
+        'codigo_sn',
+        'ruc_proveedor',
         'id_fondo_efectivo',
         'id_registrador',
         'id_jefe_aprobador',
@@ -97,6 +99,15 @@ class Gasto extends Model
                 // Instanciamos y usamos nuestro servicio centralizado.
                 $generator = new CodeGeneratorService();
                 $gasto->codigo_gasto = $generator->generateForGasto($gasto);
+            }
+            // Generación del Código SN
+            if (is_null($gasto->codigo_sn)) {
+                // Si hay RUC del proveedor, usarlo; si no, usar valor por defecto
+                if (!empty($gasto->ruc_proveedor) && in_array($gasto->tipoDocumento->nombre ?? '', ['Factura', 'Boleta de Venta', 'Recibo por Honorarios'])) {
+                    $gasto->codigo_sn = 'P' . $gasto->ruc_proveedor; 
+                } else {
+                    $gasto->codigo_sn = 'P99999999999';
+                }
             }
         });
     }

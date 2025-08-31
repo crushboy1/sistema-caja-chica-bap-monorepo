@@ -11,6 +11,8 @@ use App\Models\HistorialAprobacionGasto;
 use App\Models\GastoProyectado;
 use App\Models\DjConsolidada;
 use App\Models\TipoDocumentoComprobante;
+use App\Models\Area;
+use App\Models\CentroCosto;
 use App\Rules\UniqueComprobante;
 use App\Traits\RegistersHistory;
 use Illuminate\Support\Facades\Auth;
@@ -136,9 +138,10 @@ class GastoController extends Controller
             'gastos.*.glosa' => 'required|string|max:1000',
             'gastos.*.evidencia' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'gastos.*.es_declaracion_jurada' => 'required|boolean',
-            'gastos.*.id_tipo_documento_comprobante' => 'required_if:gastos.*.es_declaracion_jurada,false|exists:tipos_documento_comprobante,id',
-            'gastos.*.serie_documento' => 'nullable|required_if:gastos.*.es_declaracion_jurada,false|string|max:20',
-            'gastos.*.correlativo_documento' => 'nullable|required_if:gastos.*.es_declaracion_jurada,false|string|max:50',
+            'gastos.*.id_tipo_documento_comprobante' => 'nullable|exists:tipos_documento_comprobante,id',
+            'gastos.*.serie_documento' => 'nullable|string|max:20',
+            'gastos.*.correlativo_documento' => 'nullable|string|max:50',
+            'gastos.*.ruc_proveedor' => 'nullable|string|max:11|regex:/^[0-9]*$/',
             'gastos.*.comentario' => 'nullable|string|max:2000',
             'gastos.*.moneda' => 'sometimes|in:PEN,USD',
             'gastos.*' => [new UniqueComprobante],
@@ -152,22 +155,36 @@ class GastoController extends Controller
             'gastos.*.evidencia.max' => 'El archivo de evidencia no debe superar los 10MB.',
         ];
 
-        // 2. EJECUTAR LA VALIDACIÓN
-        // 2.1. Validación de Duplicados en la rule
+        // 2. EJECUTAR LA VALIDACIÓN BÁSICA
         $validatedData = $request->validate($rules, $messages);
 
-        $user = Auth::user();
-        $fondo = FondoEfectivo::findOrFail($validatedData['id_fondo_efectivo']);
+        // 3. VALIDACIÓN PERSONALIZADA PARA DECLARACIONES JUradas
         $gastosParaCrear = $validatedData['gastos'];
         $comprobantesEnviados = []; // Un array temporal para rastrear los comprobantes de esta solicitud
-        foreach ($gastosParaCrear as $gastoData) {
-            if (
-                isset($gastoData['es_declaracion_jurada']) && !$gastoData['es_declaracion_jurada'] &&
-                !empty($gastoData['id_tipo_documento_comprobante']) &&
-                !empty($gastoData['serie_documento']) &&
-                !empty($gastoData['correlativo_documento'])
-            ) {
-                // Se construye la clave única con el ID del tipo de documento
+        
+        foreach ($gastosParaCrear as $index => $gastoData) {
+            // Validar campos requeridos según el tipo de gasto
+            if (!$gastoData['es_declaracion_jurada']) {
+                // Para gastos que NO son declaración jurada
+                if (empty($gastoData['id_tipo_documento_comprobante'])) {
+                    throw ValidationException::withMessages([
+                        "gastos.{$index}.id_tipo_documento_comprobante" => 'El tipo de documento es obligatorio para gastos que no son declaración jurada.'
+                    ]);
+                }
+                
+                if (empty($gastoData['serie_documento'])) {
+                    throw ValidationException::withMessages([
+                        "gastos.{$index}.serie_documento" => 'La serie del documento es obligatoria para gastos que no son declaración jurada.'
+                    ]);
+                }
+                
+                if (empty($gastoData['correlativo_documento'])) {
+                    throw ValidationException::withMessages([
+                        "gastos.{$index}.correlativo_documento" => 'El correlativo del documento es obligatorio para gastos que no son declaración jurada.'
+                    ]);
+                }
+                
+                // Validar duplicados de comprobantes
                 $claveUnica = $gastoData['id_tipo_documento_comprobante'] . '-' . $gastoData['serie_documento'] . '-' . $gastoData['correlativo_documento'];
 
                 if (isset($comprobantesEnviados[$claveUnica])) {
@@ -179,9 +196,6 @@ class GastoController extends Controller
             }
         }
 
-        // 3. TRANSACCIÓN
-        // Se envuelve toda la lógica en una transacción para garantizar la integridad de los datos.
-        return DB::transaction(function () use ($request, $validatedData) {
             $user = Auth::user();
             $fondo = FondoEfectivo::findOrFail($validatedData['id_fondo_efectivo']);
             $gastosParaCrear = $validatedData['gastos'];
@@ -329,7 +343,6 @@ class GastoController extends Controller
                 'message' => count($gastosCreados) . ' gasto(s) ha(n) sido registrado(s) exitosamente.',
                 'gastos' => $gastosCreados
             ], 201);
-        });
     }
 
     /**
@@ -495,6 +508,7 @@ class GastoController extends Controller
             'id_tipo_documento_comprobante' => 'required_if:es_declaracion_jurada,false|exists:tipos_documento_comprobante,id',
             'serie_documento' => 'nullable|required_if:es_declaracion_jurada,false|string|max:20',
             'correlativo_documento' => 'nullable|required_if:es_declaracion_jurada,false|string|max:50',
+            'ruc_proveedor' => 'nullable|string|max:11|regex:/^[0-9]*$/',
             'monto_total' => 'required|numeric|min:0.01',
             'glosa' => 'required|string|max:1000',
             'comentario_subsanacion' => 'nullable|string|max:2000',
@@ -1078,6 +1092,9 @@ class GastoController extends Controller
         if ($request->filled('fecha_fin')) {
             $query->whereDate('created_at', '<=', $request->fecha_fin); // Filtrar por fecha de registro
         }
+        if ($request->filled('id_gasto_proyectado')) {
+            $query->where('id_gasto_proyectado', $request->id_gasto_proyectado);
+        }
 
         $gastos = $query->orderBy('created_at', 'desc')->get();
 
@@ -1113,7 +1130,7 @@ class GastoController extends Controller
     }
 
     /**
-     * Exporta los gastos a un archivo Excel, aplicando los mismos filtros que el reporte.
+     * Exporta los gastos a un archivo Excel con dos hojas: Cabecera y Detalle.
      * Este método NO modifica el estado de los gastos.
      *
      * @param Request $request
@@ -1126,8 +1143,9 @@ class GastoController extends Controller
         $query = Gasto::with([
             'registrador.area',
             'cuentaContable',
-            'fondoEfectivo',
-            'gastoProyectado',
+            'fondoEfectivo.area',
+            'fondoEfectivo.proyecto',
+            'gastoProyectado.tipoImpuesto',
             'djConsolidada',
             'tipoDocumento'
         ]);
@@ -1160,6 +1178,9 @@ class GastoController extends Controller
         if ($request->filled('fecha_fin')) {
             $query->whereDate('created_at', '<=', $request->fecha_fin);
         }
+        if ($request->filled('id_gasto_proyectado')) {
+            $query->where('id_gasto_proyectado', $request->id_gasto_proyectado);
+        }
 
         $gastosParaExportar = $query->orderBy('id', 'asc')->get();
 
@@ -1170,71 +1191,174 @@ class GastoController extends Controller
             ->where('estado_nuevo', 'Contabilizado')
             ->pluck('created_at', 'id_gasto'); // Clave: id_gasto, Valor: created_at
 
-        $headings = [
-            'Numero Correlativo',
-            'Serie SAP',
-            'Fecha de Contabilización',
-            'Fecha del Documento',
-            //'Dirección de correo',
-            'Moneda del Documento',
-            'Total del Documento',
-            'Tipo Doc. (SAP)',
-            'Glosa para el Asiento',
-            'Tipo Doc. (SUNAT)',
-            'Serie del Documento',
-            'Correlativo del Documento',
-            'Referencia de documento',
-            //'Desc. Cuenta',
-            //'Personal que realizó el gasto',
-            'Evidencia',
-            'Comentarios',
+        // --- DATOS PARA LA HOJA "DETALLE" ---
+        $detalleHeadings = [
+            'Número Correlativo',
+            'Cuenta Contable',
+            'Descripción del Servicio',
+            'Base Imponible',
+            'Tipo de Impuesto',
+            'Centro de Costo',
+            'Proyecto',
+            'Kilowatts',
+            'Retención',
         ];
 
-        $data = $gastosParaExportar->map(function ($gasto) use ($fechasContabilizacion) {
-            // --- LÓGICA DE URL MEJORADA ---
-            $evidenciaUrl = 'N/A';
-            if ($gasto->djConsolidada && $gasto->djConsolidada->ruta_documento_firmado) {
-                // Storage::url genera la URL pública correcta para el disco 'public'.
-                $evidenciaUrl = url(\Storage::url($gasto->djConsolidada->ruta_documento_firmado));
-            } elseif ($gasto->ruta_evidencia) {
-                $evidenciaUrl = url(\Storage::url($gasto->ruta_evidencia));
+        $detalleData = $gastosParaExportar->map(function ($gasto) {
+            // --- LÓGICA DE BASE IMPONIBLE ---
+            $baseImponible = 0;
+            $tipoImpuesto = 'N/A';
+
+            $gastoProyectado = $gasto->gastoProyectado;
+
+            if ($gastoProyectado && $gastoProyectado->tipoImpuesto) {
+                $tipoImpuesto = $gastoProyectado->tipoImpuesto->nombre;
+                $factorCalculo = $gastoProyectado->tipoImpuesto->factor_calculo ?? 1;
+
+                // Calcular base imponible de forma genérica
+                if ($factorCalculo > 0) {
+                    $baseImponible = $gasto->monto_total / $factorCalculo;
+                } else {
+                    // Si el factor no es válido (ej. 0), usar monto total
+                    $baseImponible = $gasto->monto_total;
+                }
+            } else {
+                // Si no hay tipo de impuesto, usar monto total
+                $baseImponible = $gasto->monto_total;
             }
 
-            // --- BÚSQUEDA DE FECHA OPTIMIZADA ---
-            $fechaContabilizacion = $fechasContabilizacion->get($gasto->id);
-            $fechaMostrar = $fechaContabilizacion
-                ? \Carbon\Carbon::parse($fechaContabilizacion)->format('Ymd')
-                : ($gasto->created_at?->format('Ymd') ?? 'N/A');
 
-            $tipoDocumento = $gasto->tipoDocumento->codigo_comprobante ?? 'N/A';
-            $serie = $gasto->serie_documento ?? 'N/A';
-            $correlativo = $gasto->correlativo_documento ?? 'N/A';
-            $documentoCompleto = "{$tipoDocumento}-{$serie}-{$correlativo}";
+            // --- LÓGICA DE CENTRO DE COSTO ---
+            $centroCosto = 'N/A';
+
+            if ($gasto->fondoEfectivo && $gasto->fondoEfectivo->area && $gasto->fondoEfectivo->area->centroCosto) {
+                $centroCosto = $gasto->fondoEfectivo->area->centroCosto->codigo;
+            }
+
+
+            // --- LÓGICA DE PROYECTO ---
+            $proyecto = 'N/A';
+            if ($gasto->fondoEfectivo && $gasto->fondoEfectivo->proyecto) {
+                $proyecto = $gasto->fondoEfectivo->proyecto->nombre ?? 'N/A';
+            }
 
             return [
-                $gasto->id,
-                '323',
-                //verficar del historial de gastos 
-                $fechaMostrar,
-                $gasto->fecha_documento ? $gasto->fecha_documento->format('Ymd') : 'N/A',
-                //$gasto->registrador->email,
-                'SOL',
-                number_format($gasto->monto_total, 2, '.', ''),
-                'dDocument_Service',
-                $gasto->glosa,
-                //$gasto->tipo_documento ?? 'N/A'
-                $tipoDocumento,
-                $serie,
-                $correlativo,
-                $documentoCompleto,
-                //$gasto->cuentaContable->descripcion ?? 'N/A',
-                //$gasto->registrador->name . ' ' . $gasto->registrador->last_name,
-                $evidenciaUrl,
-                $gasto->comentario ?? 'N/A',
+                $gasto->id, // Número Correlativo
+                $gasto->cuentaContable->codigo_cuenta ?? 'N/A', // Cuenta Contable
+                $gasto->glosa, // Descripción del Servicio (Glosa)
+                number_format($baseImponible, 2, '.', ''), // Base Imponible
+                $tipoImpuesto, // Tipo de Impuesto
+                $centroCosto, // Centro de Costo
+                $proyecto, // Proyecto
+                '', // Kilowatts (vacío)
+                'N', // Retención (siempre N)
             ];
         })->toArray();
 
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\GastosReportExport($data, $headings), 'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx');
+        // --- DATOS PARA LA HOJA "CABECERA" ---
+        $cabeceraHeadings = [
+            'Numero Correlativo',
+            'Serie SAP',
+            'Código Del SN',
+            'Fecha de Contabilización',
+            'Fecha del Documento',
+            'Fecha de Vencimiento',
+            'Moneda del Documento',
+            'Tipo de Cambio',
+            'Total del Documento',
+            'Tipo de Documento',
+            'Glosa para el Asiento',
+            'Tipo de Documento',
+            'Serie del Documento',
+            'Correlativo del Documento',
+            'Referencia de documento',
+            'Clasificación de Bienes y Servicios',
+            'Tipo de Rendición',
+            'Serie de Rendición',
+            'Correlativo Rendición',
+            'Referencia de Rendición',
+            'Comentarios',
+        ];
+
+        $cabeceraData = $gastosParaExportar->map(function ($gasto) {
+            // --- LÓGICA DE FECHAS UNIFICADAS ---
+            $fechaDocumento = $gasto->fecha_documento ? \Carbon\Carbon::parse($gasto->fecha_documento) : \Carbon\Carbon::parse($gasto->created_at);
+            $fechaFormateada = $fechaDocumento->format('Ymd');
+            $fechaFormateadaRendicion = $fechaDocumento->format('Ym'); // Formato AAAAMM para rendición
+            
+            
+            // --- LÓGICA DE CÓDIGO DEL SN ---
+            $codigoSN = 'P99999999999'; // Por defecto
+            if (!empty($gasto->ruc_proveedor) && in_array($gasto->tipoDocumento->nombre ?? '', ['Factura', 'Boleta de Venta', 'Recibo por Honorarios'])) {
+                $codigoSN = 'P' . $gasto->ruc_proveedor;
+            }
+
+            // --- LÓGICA DE SERIE Y CORRELATIVO DEL DOCUMENTO ---
+            $tipoDocumento = $gasto->tipoDocumento->codigo_comprobante ?? 'N/A';
+            
+            // Para Declaraciones Juradas
+            if ($gasto->es_declaracion_jurada) {
+                $serie = 'DJ';
+                $correlativo = $fechaFormateadaRendicion; // Fecha del documento
+            } else {
+                // Para otros documentos
+            $serie = $gasto->serie_documento ?? 'N/A';
+            $correlativo = $gasto->correlativo_documento ?? 'N/A';
+            }
+            
+            $documentoCompleto = "{$tipoDocumento}-{$serie}-{$correlativo}";
+
+            // --- LÓGICA DE RENDICIÓN ---
+            // Tipo de Rendición: siempre ER (Entregas a Rendir)
+            $tipoRendicion = 'ER';
+            
+            // Serie de Rendición: acrónimo del ejecutor (3 siglas: primer nombre + dos apellidos)
+            $nombreCompleto = $gasto->registrador->name . ' ' . $gasto->registrador->last_name;
+            $palabras = explode(' ', trim($nombreCompleto));
+            $serieRendicion = '';
+            if (count($palabras) >= 3) {
+                $serieRendicion = strtoupper(substr($palabras[0], 0, 1) . substr($palabras[1], 0, 1) . substr($palabras[2], 0, 1));
+            } elseif (count($palabras) == 2) {
+                $serieRendicion = strtoupper(substr($palabras[0], 0, 1) . substr($palabras[1], 0, 2));
+            } else {
+                $serieRendicion = strtoupper(substr($palabras[0], 0, 3));
+            }
+            
+            // Correlativo Rendición: fecha en formato AAAAMM
+            $correlativoRendicion = $fechaFormateadaRendicion;
+            
+            // Referencia de Rendición: concatenado
+            $referenciaRendicion = "{$tipoRendicion}-{$serieRendicion}-{$correlativoRendicion}";
+
+            return [
+                $gasto->id, // Numero Correlativo
+                $gasto->created_at->format('Y'), // Serie SAP (según año)
+                $codigoSN, // Código Del SN
+                $fechaFormateada, // Fecha de Contabilización
+                $fechaFormateada, // Fecha del Documento
+                $fechaFormateada, // Fecha de Vencimiento
+                'SOL', // Moneda del Documento
+                '', // Tipo de Cambio (vacío)
+                number_format($gasto->monto_total, 2, '.', ''), // Total del Documento
+                'dDocument_Service', // Tipo de Documento (por defecto)
+                $gasto->glosa, // Glosa para el Asiento
+                $tipoDocumento, // Tipo de Documento (SUNAT)
+                $serie, // Serie del Documento
+                $correlativo, // Correlativo del Documento
+                $documentoCompleto, // Referencia de documento
+                $gasto->gastoProyectado->ClasificacionBienServicio->codigo ?? 'N/A', // Clasificación de Bienes y Servicios
+                $tipoRendicion, // Tipo de Rendición (ER)
+                $serieRendicion, // Serie de Rendición (acrónimo)
+                $correlativoRendicion, // Correlativo Rendición (AAAAMM)
+                $referenciaRendicion, // Referencia de Rendición (concatenado)
+                $gasto->comentario ?? 'N/A', // Comentarios
+            ];
+        })->toArray();
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\GastosReportExport($detalleData, $detalleHeadings, $cabeceraData, $cabeceraHeadings), 
+            'reporte_gastos_' . now()->format('Ymd_His') . '.xlsx'
+        );
     }
 
     /**
