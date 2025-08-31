@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('area_proyecto', function (Blueprint $table) {
-             $table->id();
+            $table->id();
             // Se define la columna de la clave foránea.
             $table->unsignedBigInteger('id_area');
             $table->unsignedBigInteger('id_proyecto');

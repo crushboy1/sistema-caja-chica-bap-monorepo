@@ -48,12 +48,12 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)],
             'role_id' => 'required|exists:roles,id',
             'area_id' => 'required|exists:areas,id',
-            'jefe_area_id' => 'nullable|exists:users,id',
             'cargo' => 'nullable|string|max:255',
             'telefono' => 'nullable|string|max:12',
             'activo' => 'sometimes|boolean',
         ]);
-
+        $jefeId = $this->determinarJefeId($validatedData['role_id'], $validatedData['area_id']);
+        $validatedData['jefe_area_id'] = $jefeId;
         $validatedData['password'] = Hash::make($validatedData['password']);
         $user = User::create($validatedData);
 
@@ -88,13 +88,12 @@ class UserController extends Controller
             'password' => ['nullable', 'confirmed', Password::min(8)],
             'role_id' => 'required|exists:roles,id',
             'area_id' => 'required|exists:areas,id',
-            'jefe_area_id' => 'nullable|exists:users,id',
             'cargo' => 'nullable|string|max:255',
             'telefono' => 'nullable|string|max:12',
             'activo' => 'sometimes|boolean',
         ]);
-
-        // Solo actualiza la contraseña si se proporcionó una nueva.
+        $jefeId = $this->determinarJefeId($validatedData['role_id'], $validatedData['area_id'], $user->id);
+        $validatedData['jefe_area_id'] = $jefeId;
         if (!empty($validatedData['password'])) {
             $validatedData['password'] = Hash::make($validatedData['password']);
         } else {
@@ -107,6 +106,42 @@ class UserController extends Controller
             'message' => 'Usuario actualizado exitosamente.',
             'user' => $user->load(['role', 'area'])
         ]);
+    }
+    private function determinarJefeId(int $roleId, int $areaId, ?int $excludeUserId = null): ?int
+    {
+        $roleName = Role::find($roleId)->name;
+        $jefeId = null;
+
+        switch ($roleName) {
+            case 'colaborador':
+                // Para un colaborador, el jefe es el líder de su misma área.
+                $jefeRoleNames = ['jefe_area', 'jefe_administracion', 'gerente_general'];
+                $jefeRoleIds = Role::whereIn('name', $jefeRoleNames)->pluck('id');
+
+                $query = User::where('area_id', $areaId)->whereIn('role_id', $jefeRoleIds);
+                if ($excludeUserId) {
+                    $query->where('id', '!=', $excludeUserId);
+                }
+                $jefeDeArea = $query->first();
+                $jefeId = $jefeDeArea ? $jefeDeArea->id : null;
+                break;
+
+            case 'jefe_area':
+            case 'jefe_administracion':
+                // Para cualquier Jefe de Área o el Jefe de Administración, su jefe es el Gerente General.
+                $gerenteGeneralRoleId = Role::where('name', 'gerente_general')->value('id');
+                $gerenteGeneral = User::where('role_id', $gerenteGeneralRoleId)->first();
+                $jefeId = $gerenteGeneral ? $gerenteGeneral->id : null;
+                break;
+
+            case 'gerente_general':
+            case 'super_admin':
+                // El Gerente General y el Super Admin no tienen jefe.
+                $jefeId = null;
+                break;
+        }
+
+        return $jefeId;
     }
     /**
      * método seguro y ligero para obtener una lista de usuarios

@@ -120,10 +120,10 @@ class FondoEfectivoController extends Controller
     public function getGastosParaDeclarar(FondoEfectivo $fondo)
     {
         // 1. Cargar la solicitud de apertura y la relación con el catálogo de Gastos Proyectados.
-        $fondo->load('solicitudApertura.gastosProyectados');
+        $fondo->load('gastosProyectados');
 
         if (!$fondo->solicitudApertura) {
-            return response()->json([], 404); // No hay solicitud, no hay nada que declarar.
+            return response()->json([], 404);
         }
 
         // 2. Obtener la suma de todos los gastos ya declarados y no rechazados para este fondo,
@@ -136,7 +136,7 @@ class FondoEfectivoController extends Controller
             ->keyBy('id_gasto_proyectado');
 
         // 3. Mapear los gastos proyectados de la solicitud original para calcular su saldo.
-        $gastosParaDeclarar = $fondo->solicitudApertura->gastosProyectados->map(function ($proyeccion) use ($gastosRealizados) {
+        $gastosParaDeclarar = $fondo->gastosProyectados->map(function ($proyeccion) use ($gastosRealizados) {
             $montoAprobado = $proyeccion->pivot->monto_estimado;
             $totalGastado = $gastosRealizados->get($proyeccion->id_gasto_proyectado)->total_gastado ?? 0;
             $saldoRestante = $montoAprobado - $totalGastado;
@@ -153,7 +153,16 @@ class FondoEfectivoController extends Controller
 
         return response()->json($gastosParaDeclarar->values()->all());
     }
+    /**
+     * Devuelve la lista de gastos proyectados vigentes de un fondo específico.
+     * Utiliza la nueva relación directa para asegurar que siempre sea el presupuesto actual.
+     */
+    public function getGastosProyectadosVigentes(FondoEfectivo $fondo)
+    {
+        $fondo->load('gastosProyectados');
 
+        return response()->json($fondo->gastosProyectados);
+    }
     /**
      * Obtiene los fondos activos para el área del usuario.
      * Este método sigue siendo útil para que el usuario seleccione su fondo activo.
@@ -164,51 +173,43 @@ class FondoEfectivoController extends Controller
             $query = FondoEfectivo::query()->where('estado', 'Activo');
 
             // Se aplica la misma lógica de visibilidad que en el método index.
-            $this->applyUserScope($query, $user);
+            $this->applyUserScopeForDeclaration($query, $user);
 
             $fondos = $query->orderBy('codigo_fondo', 'desc')->get(['id_fondo', 'codigo_fondo', 'monto_disponible']);
 
             return response()->json($fondos);
         }
     }
-    private function applyUserScope($query, $user)
+    /**
+     * 
+     * Aplica el scope de visibilidad correcto para el CONTEXTO DE DECLARAR GASTOS.
+     * Esta es la lógica que se usará en el dropdown del formulario de gastos.
+     */
+    private function applyUserScopeForDeclaration($query, $user)
     {
-        if ($user->hasRole('jefe_area')) {
-            // Un jefe de área puede ver:
+
+        if ($user->hasAnyRole(['jefe_area', 'jefe_administracion', 'gerente_general', 'colaborador'])) {
             $query->where(function ($q) use ($user) {
-                // 1. Fondos donde es el responsable directo.
-                $q->where('id_responsable', $user->id);
-                // 2. O fondos donde su área es la principal (esto cubre los fondos de su propio equipo).
-                $q->orWhere('id_area', $user->area_id);
-                // 3. O fondos de proyecto donde su área participa como invitada.
-                $q->orWhere(function ($subQ) use ($user) {
-                    $subQ->where('tipo_fondo', 'Proyecto')
-                        ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
-                            $areaQuery->where('areas.id', $user->area_id);
-                        });
-                });
-            });
-        } elseif ($user->hasRole('colaborador')) {
-            // EXPLICACIÓN: Un colaborador ahora puede ver fondos si CUALQUIERA de las siguientes condiciones se cumple.
-            $query->where(function ($q) use ($user) {
-                // Condición 1: El área principal del fondo es la misma que la del colaborador.
+                // Condición 1: El área principal del fondo es la mía.
                 $q->where('id_area', $user->area_id);
-                // Condición 2: O, el fondo es de tipo 'Proyecto' y el área del colaborador
+                // Condición 2: O, el fondo es de tipo 'Proyecto' y mi área participa.
                 $q->orWhere(function ($subQ) use ($user) {
                     $subQ->where('tipo_fondo', 'Proyecto')
                         ->whereHas('solicitudApertura.areasParticipantes', function ($areaQuery) use ($user) {
                             $areaQuery->where('areas.id', $user->area_id);
                         });
                 });
+                // Condición 3 (solo para Jefes): O, yo soy el responsable directo del fondo.
+                if ($user->hasAnyRole(['jefe_area', 'jefe_administracion', 'gerente_general'])) {
+                    $q->orWhere('id_responsable', $user->id);
+                }
             });
-        } elseif ($user->hasAnyRole(['jefe_administracion', 'gerente_general', 'super_admin'])) {
-            // Los roles de alta jerarquía ven todos los fondos. No se aplica ningún filtro.
+        } elseif ($user->hasRole('super_admin')) {
         } else {
             // Para cualquier otro rol no definido, no se muestran fondos por seguridad.
             $query->whereRaw('1 = 0');
         }
     }
-
     /**
      *
      * @param  int  $id_fondo
@@ -488,7 +489,7 @@ class FondoEfectivoController extends Controller
         $totalGastado = (float) $gastosContabilizados->sum('monto_total');
         $saldoRealParaLiquidar = (float) $fondo->monto_aprobado - $totalGastado;
         $tieneCierreAprobado = $fondo->solicitudCierreAprobada()->exists();
-        $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación','Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado'])->count();
+        $conteoGastosPendientes = $fondo->gastos()->whereIn('estado', ['Pendiente de Aprobación', 'Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado'])->count();
 
         // 2.lógica para determinar montos
         if ($saldoRealParaLiquidar < 0) {
@@ -500,7 +501,7 @@ class FondoEfectivoController extends Controller
         }
 
         // 3. Lógica para determinar la acción requerida y el mensaje
-        $accionRequerida = 'ninguna'; 
+        $accionRequerida = 'ninguna';
         $mensajeEstado = '';
 
         if ($conteoGastosPendientes > 0) {
@@ -516,7 +517,7 @@ class FondoEfectivoController extends Controller
             } else {
                 $mensajeEstado = 'El fondo tiene un sobrante. Se debe registrar la devolución para liquidar.';
             }
-        } else { 
+        } else {
             $accionRequerida = 'ninguna';
             $mensajeEstado = 'El fondo ha sido ejecutado al 100%. No se requiere reposición ni devolución. Puede proceder al cierre mensual o definitivo.';
         }
@@ -530,9 +531,8 @@ class FondoEfectivoController extends Controller
             'total_gastado_contabilizado' => $totalGastado,
             'tiene_gastos_pendientes' => $conteoGastosPendientes > 0,
             'mensaje_estado' => $mensajeEstado,
-            'accion_requerida' => $accionRequerida, 
+            'accion_requerida' => $accionRequerida,
         ]);
-
     }
 
     //El método reponer ahora solo maneja el caso de excedentes (saldo negativo)

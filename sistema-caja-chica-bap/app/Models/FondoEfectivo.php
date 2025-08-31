@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Log;
@@ -54,7 +55,16 @@ class FondoEfectivo extends Model
             }
         });
     }
-    // Se añade la relación con el modelo Proyecto.
+    /**
+     * Define la relación con los gastos proyectados a través de la nueva tabla pivote.
+     * Esta relación representa el presupuesto "vivo" y actual del fondo.
+     */
+    public function gastosProyectados(): BelongsToMany
+    {
+        return $this->belongsToMany(GastoProyectado::class, 'fondo_efectivo_gasto_proyectado', 'fondo_efectivo_id', 'gasto_proyectado_id')
+            ->withPivot('monto_estimado')
+            ->withTimestamps();
+    }
     /**
      * Relación opcional: Un fondo puede pertenecer a un proyecto.
      */
@@ -153,6 +163,11 @@ class FondoEfectivo extends Model
         try {
             $fondoEfectivo->save();
             Log::info('FondoEfectivo creado exitosamente desde solicitud de apertura.', ['fondo_id' => $fondoEfectivo->id_fondo, 'solicitud_id' => $solicitud->id]);
+            $gastosParaPivot = $solicitud->gastosProyectados->mapWithKeys(function ($gasto) {
+                return [$gasto->id_gasto_proyectado => ['monto_estimado' => $gasto->pivot->monto_estimado]];
+            });
+            $fondoEfectivo->gastosProyectados()->sync($gastosParaPivot);
+            Log::info('FondoEfectivo creado y presupuesto inicial sincronizado.', ['fondo_id' => $fondoEfectivo->id_fondo]);
             return $fondoEfectivo;
         } catch (\Exception $e) {
             Log::error('Error al crear FondoEfectivo desde solicitud de apertura: ' . $e->getMessage(), ['solicitud_id' => $solicitud->id, 'error' => $e->getTraceAsString()]);
@@ -194,8 +209,17 @@ class FondoEfectivo extends Model
                 $fondoOriginal->motivo_cierre = $solicitud->motivo_detalle; // Usar el motivo de la solicitud de cierre
                 Log::info('FondoEfectivo cerrado por solicitud.', ['fondo_id' => $fondoOriginal->id_fondo, 'motivo_cierre' => $fondoOriginal->motivo_cierre]);
             }
-
             $fondoOriginal->save();
+            // Si la solicitud es de Incremento o Decremento, sincronizamos la nueva lista de gastos.
+            if (in_array($solicitud->tipo_solicitud, ['Incremento', 'Decremento'])) {
+                $gastosParaPivot = $solicitud->gastosProyectados->mapWithKeys(function ($gasto) {
+                    return [$gasto->id_gasto_proyectado => ['monto_estimado' => $gasto->pivot->monto_estimado]];
+                });
+                // sync() se encarga de añadir, actualizar y eliminar para que coincida con la nueva lista.
+                $fondoOriginal->gastosProyectados()->sync($gastosParaPivot);
+                Log::info('Presupuesto del FondoEfectivo actualizado por solicitud.', ['fondo_id' => $fondoOriginal->id_fondo]);
+            }
+
             return $fondoOriginal;
         } catch (\Exception $e) {
             Log::error('Error al actualizar FondoEfectivo desde solicitud de modificación: ' . $e->getMessage(), ['solicitud_id' => $solicitud->id, 'fondo_original_id' => $fondoOriginal->id_fondo ?? 'N/A', 'error' => $e->getTraceAsString()]);

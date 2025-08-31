@@ -16,5 +16,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/reponer', [FondoEfectivoController::class, 'reponer']);
         Route::post('/devolver', [FondoEfectivoController::class, 'devolver']);
         Route::post('/cierre-mensual',[FondoEfectivoController::class, 'cierreMensual']);
+        Route::get('/gastos-proyectados', [FondoEfectivoController::class, 'getGastosProyectadosVigentes']);
     });
 });

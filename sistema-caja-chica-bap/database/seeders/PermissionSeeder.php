@@ -51,7 +51,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'declaraciones.resubmit', 'display_name' => 'Reenviar Gasto Observado', 'description' => 'Permite a un colaborador corregir y reenviar un gasto observado.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'declaraciones.reposition', 'display_name' => 'Reponer Fondos', 'description' => 'Permite a ADM ejecutar la reposición de un fondo.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             ['name' => 'declaraciones.view.reports', 'display_name' => 'Ver Reportes de Gastos', 'description' => 'Permite generar y ver reportes de gastos (incluyendo contabilizados) para análisis y exportación.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
-
+            ['name' => 'declaraciones.approve.all', 'display_name' => 'Aprobar Gastos de TODAS las Áreas', 'description' => 'Permiso especial (Super Admin) para desbloquear y aprobar gastos de cualquier área.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
             // Este permiso controlará el acceso a las listas de usuarios para los filtros de la UI.
             ['name' => 'users.list.view', 'display_name' => 'Ver Listas de Usuarios', 'description' => 'Permite ver listas de usuarios en selectores y filtros de la UI.', 'created_at' => Carbon::now(), 'updated_at' => Carbon::now()],
         ];

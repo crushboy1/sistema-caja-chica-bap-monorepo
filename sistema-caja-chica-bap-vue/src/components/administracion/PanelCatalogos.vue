@@ -462,13 +462,26 @@ onMounted(async () => {
 
         <!-- Pestañas de Navegación -->
         <div class="border-b border-gray-200 mb-6">
-            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                <button v-for="(config, tab) in catalogConfig" :key="tab" @click="changeTab(tab)"
-                    :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm', activeTab === tab ? 'border-verde-bap text-verde-bap-dark' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
-                    {{ config.title }}
-                </button>
-            </nav>
-        </div>
+  <!-- Tabs para pantallas grandes -->
+  <nav class="hidden lg:flex -mb-px space-x-8" aria-label="Tabs">
+    <button v-for="(config, tab) in catalogConfig" :key="tab" @click="changeTab(tab)"
+      :class="['whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200', 
+               activeTab === tab ? 'border-verde-bap text-verde-bap-dark' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300']">
+      {{ config.title }}
+    </button>
+  </nav>
+
+  <!-- Dropdown para pantallas pequeñas y medianas -->
+  <div class="lg:hidden">
+    <label for="tab-select" class="sr-only">Seleccionar pestaña</label>
+    <select id="tab-select" v-model="activeTab" @change="changeTab(activeTab)"
+      class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-verde-bap focus:border-verde-bap sm:text-sm rounded-md">
+      <option v-for="(config, tab) in catalogConfig" :key="tab" :value="tab">
+        {{ config.title }}
+      </option>
+    </select>
+  </div>
+</div>
 
         <!-- Filtros Dinámicos -->
         <div v-if="activeFiltros && Object.keys(activeFiltros).length > 0"
@@ -737,4 +750,5 @@ onMounted(async () => {
 .animate-modal-scale {
     animation: modal-scale 0.3s ease-out;
 }
+
 </style>

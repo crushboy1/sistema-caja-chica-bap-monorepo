@@ -12,14 +12,26 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
-
+// Propiedad computada para determinar el tipo de fondo de manera segura.
+const tipoFondo = computed(() => {
+    if (!props.solicitud) return 'N/A';
+    if (props.solicitud.tipo_solicitud === 'Apertura') {
+        return props.solicitud.tipo_fondo_solicitado;
+    }
+    // Para modificaciones, el tipo de fondo se encuentra en la información del fondo original.
+    return props.solicitud.solicitud_original?.fondo_efectivo?.tipo_fondo || 'N/A';
+});
+// Propiedad computada para las áreas participantes.
+const areasParticipantes = computed(() => {
+    // Leemos directamente de la relación que ahora viene en la API
+    return props.solicitud?.areas_participantes || [];
+});
 // Propiedad computada para los detalles de gastos, asegurando que sea un array
 const gastosProyectados = computed(() => {
-    // La relación correcta es 'gastos_proyectados'.
     if (props.solicitud && Array.isArray(props.solicitud.gastos_proyectados)) {
         return props.solicitud.gastos_proyectados;
     }
-    return []; // Devuelve un array vacío como fallback seguro.
+    return [];
 });
 
 const nombreRevisorAdm = computed(() => {
@@ -80,15 +92,17 @@ const cerrarModal = () => {
                             <p class="text-sm text-gray-600"><strong>Tipo de Solicitud:</strong> {{
                                 solicitud?.tipo_solicitud || 'N/A'
                             }}</p>
+                            <p class="text-sm text-gray-600"><strong>Tipo de Fondo:</strong> <span class="font-semibold"
+                                    :class="{ 'text-gray-600': tipoFondo === 'Proyecto' }">{{ tipoFondo }}</span></p>
                             <p class="text-sm text-gray-600"><strong>Monto Solicitado:</strong> S/. {{
                                 solicitud?.monto_solicitado ?
                                     parseFloat(solicitud.monto_solicitado).toFixed(2) : '0.00' }}</p>
-                            <p v-if="solicitud.tipo_solicitud !== 'Apertura'">
+                            <p v-if="solicitud.tipo_solicitud !== 'Apertura'" class="text-sm text-gray-600">
                                 <strong>Prioridad:</strong> {{ solicitud.prioridad || 'N/A' }}
                             </p>
                             <p class="text-sm text-gray-600"><strong>Estado Actual:</strong> {{ solicitud?.estado ||
                                 'N/A' }}</p>
-                            <!-- NUEVA SECCIÓN: Código de Fondo Asignado para solicitudes de Apertura Aprobadas -->
+                            <!-- Código de Fondo Asignado para solicitudes de Apertura Aprobadas -->
                             <p v-if="solicitud?.tipo_solicitud === 'Apertura' && solicitud?.estado === 'Aprobada' && solicitud?.fondo_efectivo?.codigo_fondo"
                                 class="text-sm text-gray-600">
                                 <strong>Código de Fondo Asignado:</strong> <span class="text-sm">{{
@@ -107,12 +121,23 @@ const cerrarModal = () => {
                                 solicitud?.solicitante?.area?.name || 'N/A' }}</p>
                         </div>
 
+                        <div v-if="tipoFondo === 'Proyecto' && areasParticipantes.length > 0"
+                            class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
+                            <h4 class="text-lg font-bold text-gray-700 mb-2">Áreas Participantes del Proyecto</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="area in areasParticipantes" :key="area.id"
+                                    class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                                    {{ area.name }}
+                                </span>
+                            </div>
+                        </div>
+
                         <div v-if="solicitud?.tipo_solicitud !== 'Apertura' && solicitud?.solicitud_original?.fondo_efectivo"
                             class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Información del Fondo Original</h4>
                             <p class="text-sm text-gray-600"><strong>Código de Fondo:</strong> {{
                                 solicitud.solicitud_original.fondo_efectivo.codigo_fondo || 'N/A' }}</p>
-                            <p class="text-sm text-gray-600"><strong>Monto Aprobado del Fondo:</strong> S/. {{
+                            <p class="text-sm text-gray-600"><strong>Monto Vigente del Fondo:</strong> S/. {{
                                 solicitud.solicitud_original.fondo_efectivo.monto_aprobado ?
                                     parseFloat(solicitud.solicitud_original.fondo_efectivo.monto_aprobado).toFixed(2) :
                                     '0.00' }}</p>
@@ -150,7 +175,8 @@ const cerrarModal = () => {
                             class="mb-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">
                             <h4 class="text-lg font-bold text-gray-700 mb-2">Aprobadores</h4>
                             <p class="text-sm text-gray-600"><strong>Revisor ADM:</strong> {{ nombreRevisorAdm }}</p>
-                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ nombreAprobadorGg }}</p>
+                            <p class="text-sm text-gray-600"><strong>Aprobador Gerente:</strong> {{ nombreAprobadorGg }}
+                            </p>
                         </div>
 
                         <div class="p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">

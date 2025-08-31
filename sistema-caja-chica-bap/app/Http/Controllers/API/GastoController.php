@@ -339,7 +339,7 @@ class GastoController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user->hasRole('jefe_area') || $user->area_id !== $gasto->registrador->area_id) {
+        if ($gasto->id_jefe_aprobador !== $user->id) {
             return response()->json(['message' => 'No tienes permiso para aprobar este gasto.'], 403);
         }
         if ($gasto->estado !== 'Pendiente de Aprobación') {
@@ -920,8 +920,9 @@ class GastoController extends Controller
         if (!$primerGasto) {
             return response()->json(['message' => 'Este grupo de DJ no contiene gastos válidos.'], 404);
         }
-        // Se comprueba si el usuario actual tiene el rol de 'jefe_area' y si su ID de área coincide con el del registrador del gasto.
-        if (!$user->hasRole('jefe_area') || $user->area_id !== $primerGasto->registrador->area_id) {
+        // Se verifica que el usuario sea el aprobador asignado en el PRIMER gasto del grupo.
+        // Se asume que todos los gastos de una DJ tienen el mismo aprobador.
+        if ($primerGasto->id_jefe_aprobador !== $user->id) {
             return response()->json(['message' => 'No tienes permiso para aprobar este grupo de gastos.'], 403);
         }
         // --- 2. Validación de Estado ---

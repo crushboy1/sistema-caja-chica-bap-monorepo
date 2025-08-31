@@ -94,7 +94,7 @@
                                             Monto: <span class="font-semibold text-verde-bap-dark">{{
                                                 currencyFormatter.format(gasto.monto_total || 0) }}</span>
                                             <span v-if="getTipoDocumentoNombre(gasto)" class="ml-2">• {{
-                                            getTipoDocumentoNombre(gasto) }}</span>
+                                                getTipoDocumentoNombre(gasto) }}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -125,7 +125,7 @@
                                             {{ index + 1 }}
                                         </span>
                                         <h3 class="text-xl font-semibold text-gray-800">Detalle del Gasto #{{ index + 1
-                                        }}</h3>
+                                            }}</h3>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <button type="button" @click="minimizarGasto(index)"
@@ -283,33 +283,33 @@
                                                 <!-- Serie del Documento -->
                                                 <div>
                                                     <label :for="'serie_documento_' + index"
-                                                    class="block text-sm font-medium text-gray-700 mb-2">
-                                                    Serie del Documento
-                                                    <span v-if="requiereSerieYCorrelativo(gasto)"
-                                                        class="text-rojo-bap">*</span>
-                                                </label>
+                                                        class="block text-sm font-medium text-gray-700 mb-2">
+                                                        Serie del Documento
+                                                        <span v-if="!camposSerieCorrelativoDeshabilitados(gasto)"
+                                                            class="text-rojo-bap">*</span>
+                                                    </label>
                                                     <input type="text" :id="'serie_documento_' + index"
-                                                    v-model="gasto.serie_documento"
-                                                    :disabled="!requiereSerieYCorrelativo(gasto)"
-                                                    :required="requiereSerieYCorrelativo(gasto)"
-                                                    class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                    placeholder="Ej: F38Q" />
+                                                        v-model="gasto.serie_documento"
+                                                        :disabled="camposSerieCorrelativoDeshabilitados(gasto)"
+                                                        :required="!camposSerieCorrelativoDeshabilitados(gasto)"
+                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                        placeholder="Ej: F38Q" />
                                                 </div>
 
                                                 <!-- Correlativo del Documento -->
                                                 <div>
                                                     <label :for="'correlativo_documento_' + index"
-                                                    class="block text-sm font-medium text-gray-700 mb-2">
-                                                    Correlativo del Documento
-                                                    <span v-if="requiereSerieYCorrelativo(gasto)"
-                                                        class="text-rojo-bap">*</span>
-                                                </label>
+                                                        class="block text-sm font-medium text-gray-700 mb-2">
+                                                        Correlativo del Documento
+                                                        <span v-if="!camposSerieCorrelativoDeshabilitados(gasto)"
+                                                            class="text-rojo-bap">*</span>
+                                                    </label>
                                                     <input type="text" :id="'correlativo_documento_' + index"
-                                                    v-model="gasto.correlativo_documento"
-                                                    :disabled="!requiereSerieYCorrelativo(gasto)"
-                                                    :required="requiereSerieYCorrelativo(gasto)"
-                                                    class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
-                                                    placeholder="Ej: 8983" />
+                                                        v-model="gasto.correlativo_documento"
+                                                        :disabled="camposSerieCorrelativoDeshabilitados(gasto)"
+                                                        :required="!camposSerieCorrelativoDeshabilitados(gasto)"
+                                                        class="mt-1 block w-full p-3 border border-gray-300 rounded-lg disabled:bg-gray-200 disabled:cursor-not-allowed focus:border-verde-bap focus:ring-verde-bap transition-colors duration-200"
+                                                        placeholder="Ej: 8983" />
                                                 </div>
                                             </div>
                                         </div>
@@ -411,7 +411,7 @@
                                                 </label>
                                             </div>
 
-                                            <!-- MODIFICACIÓN: El área para subir evidencia individual ahora es condicional -->
+                                            <!--  El área para subir evidencia individual ahora es condicional -->
                                             <!-- Solo se muestra si el gasto NO es una DJ -->
                                             <transition name="slide-down">
                                                 <div v-if="!gasto.es_declaracion_jurada">
@@ -541,12 +541,34 @@
                                 </svg>
                                 {{ djConsolidadaFile ? 'Cambiar Archivo' : 'Seleccionar Archivo' }}
                             </label>
-                            <transition name="fade-in">
-                                <p v-if="djConsolidadaFile" class="text-xs text-green-700 mt-2 truncate">
-                                    Archivo: {{ djConsolidadaFile.name }}
-                                </p>
+                            <transition name="fade" mode="out-in">
+                                <div v-if="djConsolidadaFile"
+                                    class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span class="text-sm font-medium text-green-800">{{ djConsolidadaFile.name
+                                                }}</span>
+                                            <span class="text-xs text-green-600 ml-2">({{
+                                                formatFileSize(djConsolidadaFile.size) }})</span>
+                                        </div>
+                                        <button type="button" @click="removerDJConsolidada"
+                                            class="text-red-600 hover:text-red-800 transition-colors duration-200">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </transition>
+
                         </div>
+
                     </div>
                 </div>
             </transition>
@@ -678,7 +700,7 @@ const seccionesVisibles = (gasto) => {
 };
 const minimizarGasto = (index) => {
     if (gastoActivoIndex.value === index) {
-        gastoActivoIndex.value = null; 
+        gastoActivoIndex.value = null;
     }
 };
 const minimizarYContinuar = (index) => {
@@ -873,11 +895,14 @@ const getTipoDocumento = (gasto) => {
 const getTipoDocumentoNombre = (gasto) => {
     return getTipoDocumento(gasto)?.nombre;
 };
-const requiereSerieYCorrelativo = (gasto) => {
+const camposSerieCorrelativoDeshabilitados = (gasto) => {
     const tipoDoc = getTipoDocumento(gasto);
-    if (!tipoDoc) return false;
-    // Esta lógica se puede expandir si se añaden más tipos de documento
-    return ['Factura', 'Boleta de Venta'].includes(tipoDoc.nombre);
+    // Si hay un tipo de documento y su nombre incluye 'Declaración Jurada', se deshabilita.
+    if (tipoDoc && tipoDoc.nombre.includes('Declaración Jurada')) {
+        return true;
+    }
+    // Para cualquier otro caso (otro documento seleccionado o ninguno), los campos están habilitados.
+    return false;
 };
 // Manejar cambio en tipo de documento
 const onTipoDocumentoChange = (gasto) => {
@@ -893,6 +918,11 @@ const onTipoDocumentoChange = (gasto) => {
 const removerArchivo = (index) => {
     gastosADeclarar.value[index].evidencia = null;
     const fileInput = document.getElementById(`evidencia_${index}`);
+    if (fileInput) fileInput.value = '';
+};
+const removerDJConsolidada = () => {
+    djConsolidadaFile.value = null;
+    const fileInput = document.getElementById('dj_consolidada_input');
     if (fileInput) fileInput.value = '';
 };
 const formatFileSize = (bytes) => {
@@ -1014,7 +1044,7 @@ const isGastoCompleto = (gasto) => {
     } else {
         // Si no es DJ, necesita su propia evidencia y, si aplica, serie/correlativo.
         const evidenciaCompleta = !!gasto.evidencia;
-        const comprobanteCompleto = requiereSerieYCorrelativo(gasto)
+        const comprobanteCompleto = camposSerieCorrelativoDeshabilitados(gasto)
             ? (!!gasto.serie_documento && !!gasto.correlativo_documento)
             : true;
         return evidenciaCompleta && comprobanteCompleto;
