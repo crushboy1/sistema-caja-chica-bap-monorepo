@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
+
 class SolicitudFondoController extends Controller
 {
     /**
@@ -44,7 +45,8 @@ class SolicitudFondoController extends Controller
             'revisorAdm:id,name,last_name',
             'aprobadorGerente:id,name,last_name',
             'gastosProyectados',
-
+            'proyecto',
+            'areasParticipantes',
             // Cargar solicitudOriginal completa para mostrar detalles en la UI
             'solicitudOriginal:id,codigo_solicitud,id_solicitante,id_area,tipo_solicitud,motivo_detalle,monto_solicitado,prioridad,estado,motivo_observacion,motivo_descargo,motivo_rechazo_final,id_revisor_adm,id_aprobador_gerente,id_solicitud_original,created_at,updated_at',
 
@@ -176,6 +178,33 @@ class SolicitudFondoController extends Controller
             if ($fondoOriginal->estado !== 'Activo') {
                 throw ValidationException::withMessages(['id_solicitud_original' => 'El fondo efectivo asociado a la solicitud original no está activo y no puede ser modificado. Estado actual: ' . $fondoOriginal->estado]);
             }
+            // --- VALIDACIÓN #1: GASTOS "EN TRÁNSITO" (A NIVEL DE FONDO) ---
+            $estadosEnProceso = ['Pendiente de Aprobación', 'Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado'];
+            $gastosPendientes = $fondoOriginal->gastos()->whereIn('estado', $estadosEnProceso)->count();
+
+            if ($gastosPendientes > 0) {
+                throw ValidationException::withMessages([
+                    'id_solicitud_original' => "No se puede modificar el fondo. Tiene {$gastosPendientes} gasto(s) pendientes de aprobación, validación o corrección."
+                ]);
+            }
+            // --- VALIDACIÓN #2: GASTOS PROYECTADOS "DESTRUIDOS" (A NIVEL DE LÍNEA DE PRESUPUESTO) ---
+            // (Solo se ejecuta si no hay gastos pendientes)
+            // 1. Obtener los IDs de los gastos proyectados que ya han sido ejecutados y cerrados.
+            $idsGastosProyectadosEjecutados = $fondoOriginal->gastos
+                ->whereIn('estado', ['Contabilizado', 'Repuesto'])
+                ->pluck('id_gasto_proyectado')
+                ->unique();
+            // 2. Obtener los IDs de los gastos proyectados que vienen en la nueva solicitud.
+            $idsGastosProyectadosNuevos = collect($request->gastos_proyectados)->pluck('gasto_proyectado_id');
+            // 3. Verificar si algún gasto proyectado ejecutado está AUSENTE en la nueva lista.
+            $gastosEliminados = $idsGastosProyectadosEjecutados->diff($idsGastosProyectadosNuevos);
+            if ($gastosEliminados->isNotEmpty()) {
+                // 4. Si se intentó eliminar uno, bloquear la operación.
+                throw ValidationException::withMessages([
+                    'gastos_proyectados' => 'No se puede eliminar un gasto proyectado que ya tiene gastos contabilizados. Por favor, incluya de nuevo todos los gastos proyectados que ya han sido utilizados en su solicitud.'
+                ]);
+            }
+
             // Validar que no haya solicitudes de modificación pendientes para este mismo fondo
             $existingPendingModification = SolicitudFondo::where('id_solicitud_original', $request->id_solicitud_original)
                 ->whereIn('estado', ['Pendiente Aprobación ADM', 'Observada ADM', 'Pendiente Re-evaluacion', 'Aprobada ADM', 'Pendiente Aprobación GG', 'Observada GG', 'Pendiente Re-evaluacion GG'])
@@ -389,6 +418,8 @@ class SolicitudFondoController extends Controller
                 'revisorAdm:id,name,last_name',
                 'aprobadorGerente:id,name,last_last_name',
                 'gastosProyectados',
+                'proyecto',
+                'areasParticipantes',
                 'historialEstados' => function ($q) {
                     $q->orderBy('created_at', 'asc')
                         ->with('usuarioAccion:id,name,last_name');

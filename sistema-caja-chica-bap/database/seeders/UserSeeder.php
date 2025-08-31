@@ -42,24 +42,6 @@ class UserSeeder extends Seeder
 
         // --- Creación de Usuarios ---
 
-        // 1. Super Admin
-        User::create([
-            'numero_documento_identidad' => '12345678',
-            'last_name' => 'Admin',
-            'name' => 'Super',
-            'cargo' => 'Administrador de Sistema',
-            'email' => 'admin@bap.com',
-            'telefono' => '987654321',
-            'password' => Hash::make('$clave.123'),
-            'role_id' => $superAdminRole->id,
-            'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $tiArea->id,
-            'email_verified_at' => now(),
-            'jefe_area_id' => null,
-            'activo' => true, 
-        ]);
-
-        // 2. Gerente General (Carlos Lopez)
         $gerenteCarlos = User::create([
             'numero_documento_identidad' => '55667788',
             'last_name' => 'Lopez',
@@ -73,10 +55,9 @@ class UserSeeder extends Seeder
             'area_id' => $gerenciaGeneralArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => null,
-            'activo' => true, 
+            'activo' => true,
         ]);
 
-        // 3. Jefe de Administración (Maria Gomez)
         $jefeAdmMaria = User::create([
             'numero_documento_identidad' => '11223344',
             'last_name' => 'Gomez',
@@ -90,10 +71,9 @@ class UserSeeder extends Seeder
             'area_id' => $administracionArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
-            'activo' => true, 
+            'activo' => true,
         ]);
 
-        // 4. Jefe de Área de Gestión Social (Juan Perez)
         $jefeAreaJuan = User::create([
             'numero_documento_identidad' => '87654321',
             'last_name' => 'Perez',
@@ -106,12 +86,11 @@ class UserSeeder extends Seeder
             'tipo_documento_identidad_id' => $dniType->id,
             'area_id' => $gestionSocialArea->id,
             'email_verified_at' => now(),
-            'jefe_area_id' => $jefeAdmMaria->id,
-            'activo' => true, 
+            'jefe_area_id' => $gerenteCarlos->id,
+            'activo' => true,
         ]);
 
-        // 5. Jefe de Área de Proyectos (Laura Torres)
-        User::create([
+        $jefeProyectosLaura = User::create([
             'numero_documento_identidad' => '20000001',
             'last_name' => 'Torres',
             'name' => 'Laura',
@@ -124,27 +103,9 @@ class UserSeeder extends Seeder
             'area_id' => $proyectosArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
-            'activo' => true, 
+            'activo' => true,
         ]);
 
-        // 6. Colaborador (Ana Diaz) que reporta a Juan Perez
-        User::create([
-            'numero_documento_identidad' => '99887766',
-            'last_name' => 'Diaz',
-            'name' => 'Ana',
-            'cargo' => 'Colaborador',
-            'email' => 'ana.diaz@bap.com',
-            'telefono' => '955443322',
-            'password' => Hash::make('123456'),
-            'role_id' => $colaboradorRole->id,
-            'tipo_documento_identidad_id' => $dniType->id,
-            'area_id' => $gestionSocialArea->id,
-            'email_verified_at' => now(),
-            'jefe_area_id' => $jefeAreaJuan->id,
-            'activo' => true, 
-        ]);
-
-        // 7. Jefe de Área de Alianzas (Roberto Garcia)
         User::create([
             'numero_documento_identidad' => '10000001',
             'last_name' => 'Garcia',
@@ -158,7 +119,42 @@ class UserSeeder extends Seeder
             'area_id' => $alianzasArea->id,
             'email_verified_at' => now(),
             'jefe_area_id' => $gerenteCarlos->id,
-            'activo' => true, 
+            'activo' => true,
+        ]);
+
+        // --- Creación de Colaboradores con asignación de jefe ---
+
+        User::create([
+            'numero_documento_identidad' => '99887766',
+            'last_name' => 'Diaz',
+            'name' => 'Ana',
+            'cargo' => 'Colaborador',
+            'email' => 'ana.diaz@bap.com',
+            'telefono' => '955443322',
+            'password' => Hash::make('123456'),
+            'role_id' => $colaboradorRole->id,
+            'tipo_documento_identidad_id' => $dniType->id,
+            'area_id' => $gestionSocialArea->id,
+            'email_verified_at' => now(),
+            'jefe_area_id' => $jefeAreaJuan->id,
+            'activo' => true,
+        ]);
+
+        // --- Super Admin (último para asegurar que no se le asigne jefe) ---
+        User::create([
+            'numero_documento_identidad' => '12345678',
+            'last_name' => 'Admin',
+            'name' => 'Super',
+            'cargo' => 'Administrador de Sistema',
+            'email' => 'admin@bap.com',
+            'telefono' => '987654321',
+            'password' => Hash::make('$clave.123'),
+            'role_id' => $superAdminRole->id,
+            'tipo_documento_identidad_id' => $dniType->id,
+            'area_id' => $tiArea->id,
+            'email_verified_at' => now(),
+            'jefe_area_id' => null,
+            'activo' => true,
         ]);
 
         $this->command->info('Usuarios de prueba creados exitosamente.');

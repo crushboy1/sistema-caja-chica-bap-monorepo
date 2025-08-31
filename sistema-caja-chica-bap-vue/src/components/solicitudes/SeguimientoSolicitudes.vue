@@ -20,6 +20,7 @@ const props = defineProps({
 const solicitudes = ref([]);
 const cargandoSolicitudes = ref(true);
 const buscandoSolicitudes = ref(false);
+const haCargadoInicialmente = ref(false);
 // Variables para el modal de detalles
 const mostrarDetalleModal = ref(false);
 const solicitudSeleccionada = ref(null);
@@ -31,7 +32,7 @@ const solicitudHistorialSeleccionada = ref(null);
 // --- ¡NUEVO! Estado para el modal de edición ---
 const mostrarEditarModal = ref(false);
 const solicitudParaEditar = ref(null);
-const modoEdicion = ref('pendiente'); // 'pendiente' o 'observada'
+const modoEdicion = ref('pendiente');
 
 // Variables para el modal de gestión de solicitudes
 const mostrarGestionModal = ref(false);
@@ -381,15 +382,15 @@ const onSolicitudActualizada = () => {
 
 // Watchers para filtros de selección (disparan búsqueda inmediata)
 watch([filtroEstado, filtroTipoSolicitud, filtroArea], () => {
-    console.log('🔄 Filtros de selección cambiados');
+    if (!haCargadoInicialmente.value) return;
     clearTimeout(debounceTimeout);
-    buscandoSolicitudes.value = true; // Activar overlay
+    buscandoSolicitudes.value = true;
     obtenerSolicitudes();
 });
 
 // Watchers para campos de texto (debounced, con lógica de longitud mínima)
 watch(busquedaNumeroSolicitud, (newValue) => {
-    console.log('🔍 Búsqueda número solicitud:', newValue);
+    if (!haCargadoInicialmente.value) return;
     if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
         triggerSearchWithDebounce();
     } else {
@@ -398,7 +399,7 @@ watch(busquedaNumeroSolicitud, (newValue) => {
 });
 
 watch(busquedaSolicitante, (newValue) => {
-    console.log('🔍 Búsqueda solicitante:', newValue);
+    if (!haCargadoInicialmente.value) return;
     if (newValue.length >= MIN_SEARCH_LENGTH || newValue.length === 0) {
         triggerSearchWithDebounce();
     } else {
@@ -408,7 +409,7 @@ watch(busquedaSolicitante, (newValue) => {
 
 // Watchers para campos de fecha (debounced)
 watch([filtroFechaInicio, filtroFechaFin], () => {
-    console.log('🗓️ Filtros de fecha cambiados (debounced)');
+    if (!haCargadoInicialmente.value) return;
     triggerSearchWithDebounce();
 });
 const obtenerNombreArea = (areaId) => {
@@ -427,14 +428,11 @@ const inicializarFiltroArea = () => {
 // --- Ciclo de Vida ---
 onMounted(() => {
     inicializarFiltroArea();
-    obtenerSolicitudes();
+    obtenerSolicitudes().finally(() => {
+        haCargadoInicialmente.value = true;
+    });
 });
-watch(() => props.usuarioActual, (newUser) => {
-    if (newUser) {
-        inicializarFiltroArea();
-        obtenerSolicitudes();
-    }
-}, { immediate: true });
+
 
 </script>
 

@@ -33,7 +33,7 @@ const fetchData = async () => {
         ]);
         users.value = usersRes.data.users;
         roles.value = rolesRes.data.roles;
-        areas.value = areasRes.data.areas;
+        areas.value = areasRes.data.data;
     } catch (error) {
         console.error("Error al cargar los datos para el panel de usuarios:", error);
         Swal.fire('Error', 'No se pudieron cargar los datos necesarios.', 'error');

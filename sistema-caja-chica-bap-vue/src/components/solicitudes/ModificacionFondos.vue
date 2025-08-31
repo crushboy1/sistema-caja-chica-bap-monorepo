@@ -12,43 +12,43 @@
           </div>
 
           <!-- Filtros de Búsqueda -->
-          <div class="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl shadow-inner mb-6 border border-gray-200">
+          <div
+            class="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl shadow-inner mb-6 border border-gray-200">
             <div class="flex items-center mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 mr-2" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <h4 class="text-lg font-semibold text-gray-700">Filtros de Búsqueda</h4>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <!-- Filtro Código de Fondo -->
               <div class="relative">
                 <label for="filter_codigo_fondo" class="block text-sm font-medium text-gray-700 mb-2">
                   Código de Fondo
                 </label>
-                <input 
-                  type="text" 
-                  id="filter_codigo_fondo" 
-                  v-model="filtro.codigo_fondo"
+                <input type="text" id="filter_codigo_fondo" v-model="filtro.codigo_fondo"
                   class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                  placeholder="Ej: GSO-FON-01-0001" 
-                />
-                <div v-if="buscandoFondos && filtro.codigo_fondo.length > 0" class="absolute right-3 top-11 text-verde-bap">
+                  placeholder="Ej: GSO-FON-01-0001" />
+                <div v-if="buscandoFondos && filtro.codigo_fondo.length > 0"
+                  class="absolute right-3 top-11 text-verde-bap">
                   <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                   </svg>
                 </div>
               </div>
 
               <!-- Filtro Área del Fondo -->
-              <div v-if="usuarioActual && (usuarioActual.role.name === 'jefe_administracion' || usuarioActual.role.name === 'super_admin')">
+              <div
+                v-if="usuarioActual && (usuarioActual.role.name === 'jefe_administracion' || usuarioActual.role.name === 'super_admin')">
                 <label for="filter_area" class="block text-sm font-medium text-gray-700 mb-2">Área del Fondo</label>
-                <select 
-                  id="filter_area" 
-                  v-model="filtro.area_id"
-                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                >
+                <select id="filter_area" v-model="filtro.area_id"
+                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all">
                   <option value="">Todas las Áreas</option>
                   <option v-for="area in areasDisponibles" :key="area.id" :value="area.id">{{ area.name }}</option>
                 </select>
@@ -56,24 +56,17 @@
 
               <!-- Filtro Fecha de Inicio -->
               <div>
-                <label for="filter_fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">Fecha Inicio</label>
-                <input 
-                  type="date" 
-                  id="filter_fecha_inicio" 
-                  v-model="filtro.fecha_inicio"
-                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                />
+                <label for="filter_fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">Fecha
+                  Inicio</label>
+                <input type="date" id="filter_fecha_inicio" v-model="filtro.fecha_inicio"
+                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all" />
               </div>
 
               <!-- Filtro Fecha de Fin -->
               <div>
                 <label for="filter_fecha_fin" class="block text-sm font-medium text-gray-700 mb-2">Fecha Fin</label>
-                <input 
-                  type="date" 
-                  id="filter_fecha_fin" 
-                  v-model="filtro.fecha_fin"
-                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all"
-                />
+                <input type="date" id="filter_fecha_fin" v-model="filtro.fecha_fin"
+                  class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:border-verde-bap focus:ring-2 focus:ring-verde-bap focus:ring-opacity-50 transition-all" />
               </div>
             </div>
 
@@ -81,7 +74,9 @@
             <div v-if="buscandoFondos" class="mt-4 text-sm text-verde-bap flex items-center justify-center">
               <svg class="animate-spin mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
               </svg>
               Buscando fondos...
             </div>
@@ -163,7 +158,8 @@
                 <span class="font-medium text-sm">Código:</span> {{ fondoParaEditar.codigo_fondo }}
               </div>
               <div>
-                <span class="font-medium text-sm">Monto Actual:</span> S/. {{ fondoParaEditar.monto_aprobado.toFixed(2) }}
+                <span class="font-medium text-sm">Monto Actual:</span> S/. {{ fondoParaEditar.monto_aprobado.toFixed(2)
+                }}
               </div>
               <div>
                 <span class="font-medium text-sm">Estado:</span> {{ fondoParaEditar.estado }}
@@ -189,7 +185,7 @@
                   <label class="block text-sm font-medium text-gray-700 mb-2">Responsable del Fondo</label>
                   <div class="p-3 bg-white rounded-lg border border-gray-200 text-gray-800">
                     {{ (fondoParaEditar?.responsable?.name || '') + ' ' + (fondoParaEditar?.responsable?.last_name ||
-                    '') }}
+                      '') }}
                   </div>
                 </div>
                 <div>
@@ -332,17 +328,11 @@
                       <label :for="'gasto_proyectado_' + index" class="block text-sm font-medium text-gray-700 mb-2">
                         Tipo de Gasto <span class="text-red-500">*</span>
                       </label>
-                      <v-select
-                        :id="'gasto_proyectado_' + index"
-                        v-model="gasto.gasto_proyectado_id"
-                        :options="gastosProyectadosCatalogo"
-                        label="descripcion"
+                      <v-select :id="'gasto_proyectado_' + index" v-model="gasto.gasto_proyectado_id"
+                        :options="gastosProyectadosCatalogo" label="descripcion"
                         :reduce="gastoProyectado => gastoProyectado.id_gasto_proyectado"
-                        placeholder="Selecciona un tipo de gasto"
-                        class="mt-1"
-                        required
-                        :selectable="gastoProyectado => !esOpcionDeshabilitada(gastoProyectado.id_gasto_proyectado, gasto.gasto_proyectado_id)"
-                      />
+                        placeholder="Selecciona un tipo de gasto" class="mt-1" required
+                        :selectable="gastoProyectado => !esOpcionDeshabilitada(gastoProyectado.id_gasto_proyectado, gasto.gasto_proyectado_id)" />
 
                     </div>
                     <div>
@@ -368,8 +358,7 @@
             </div>
 
             <!-- SECCIÓN 4: Gastos Proyectados Originales (Solo Lectura) -->
-            <div
-              v-if="fondoParaEditar.solicitud_apertura && fondoParaEditar.solicitud_apertura.gastos_proyectados && fondoParaEditar.solicitud_apertura.gastos_proyectados.length > 0"
+            <div v-if="gastosProyectadosOriginales && gastosProyectadosOriginales.length > 0"
               class="bg-gray-50 p-6 rounded-xl border-l-4 border-gray-300 shadow-sm">
               <h4 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-600" fill="none"
@@ -377,36 +366,38 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Gastos Proyectados Originales
-                <span class="ml-2 text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">Solo Lectura</span>
+                Presupuesto Vigente del Fondo
+                <span class="ml-2 text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">Referencia</span>
               </h4>
 
               <div class="space-y-3">
-                <div v-for="(gastoOriginal, index) in fondoParaEditar.solicitud_apertura.gastos_proyectados"
-                  :key="'original-' + index" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div v-for="(gastoOriginal, index) in gastosProyectadosOriginales" :key="'original-' + index"
+                  class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-600 mb-1">Descripción del Gasto</label>
                       <div class="p-3 bg-gray-50 rounded-lg border text-gray-800">
-                        {{ gastoOriginal.descripcion }}
+                        <!-- Buscamos la descripción en el catálogo para mostrarla -->
+                        {{gastosProyectadosCatalogo.find(g => g.id_gasto_proyectado ===
+                          gastoOriginal.gasto_proyectado_id)?.descripcion || 'N/A' }}
                       </div>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-600 mb-1">Monto Estimado</label>
                       <div class="p-3 bg-gray-50 rounded-lg border text-gray-800 font-semibold">
-                        S/. {{ parseFloat(gastoOriginal.pivot.monto_estimado).toFixed(2) }}
+                        S/. {{ parseFloat(gastoOriginal.monto_estimado).toFixed(2) }}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <!-- Total de gastos originales -->
-                <div class="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                <div class="bg-gray-100 p-4 rounded-lg border border-gray-300 mt-4">
                   <div class="flex justify-between items-center">
-                    <span class="text-lg font-medium text-gray-700">Total Gastos Originales:</span>
+                    <span class="text-lg font-medium text-gray-700">Total Vigente:</span>
                     <span class="text-xl font-bold text-gray-800">
-                      S/. {{fondoParaEditar.solicitud_apertura.gastos_proyectados.reduce((total, gasto) => total +
-                        parseFloat(gasto.pivot.monto_estimado), 0).toFixed(2) }}
+                      S/. {{gastosProyectadosOriginales.reduce((total, gasto) => total +
+                        parseFloat(gasto.monto_estimado), 0).toFixed(2)}}
                     </span>
                   </div>
                 </div>
@@ -511,7 +502,6 @@ const formatearFechaSinHora = (fechaString) => {
   if (!fechaString) return '';
 
   try {
-    // Para fechas que vienen como "2025-07-04" sin hora
     const [año, mes, dia] = fechaString.split('-');
     const fechaLocal = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
 
@@ -525,7 +515,7 @@ const formatearFechaSinHora = (fechaString) => {
     return '';
   }
 };
-// ANOTACIÓN: Se definen las props que el componente necesita de su padre.
+// Se definen las props que el componente necesita de su padre.
 const props = defineProps({
   usuarioActual: {
     type: Object,
@@ -540,7 +530,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'solicitudEnviada']);
 
 // --- ESTADO DEL COMPONENTE ---
-const vistaActual = ref('lista'); // 'lista' o 'formulario'
+const vistaActual = ref('lista');
 const cargandoFondos = ref(true);
 const buscandoFondos = ref(false);
 const fondosExistentes = ref([]);
@@ -555,8 +545,8 @@ const filtro = ref({
 
 // --- ESTADO DEL FORMULARIO ---
 const fondoParaEditar = ref(null);
-
-// CORRECCIÓN: Inicializar formData con estructura completa
+const gastosProyectadosOriginales = ref([]);
+// Inicializar formData con estructura completa
 const formData = ref({
   id_solicitud_original: null,
   tipo_solicitud: 'Incremento',
@@ -671,58 +661,43 @@ const obtenerAreas = async () => {
   }
 };
 
-// CORRECCIÓN: Función principal con mejores guardias de seguridad
-const seleccionarFondoParaEditar = (fondo) => {
+// Función principal con mejores guardias de seguridad
+const seleccionarFondoParaEditar = async (fondo) => {
   try {
+    if (!fondo || !fondo.solicitud_apertura) {
+      throw new Error('El fondo seleccionado no es válido o no tiene una solicitud de apertura asociada.');
+    }
     fondoParaEditar.value = fondo;
-
-    // CORRECCIÓN: Verificar que el fondo tenga la estructura esperada
-    if (!fondo) {
-      throw new Error('Fondo no válido');
-    }
-
-    // Verificar que exista solicitud_apertura
-    if (!fondo.solicitud_apertura) {
-      console.warn('El fondo no tiene solicitud_apertura:', fondo);
-      // Inicializar con valores por defecto
-      formData.value = {
-        id_solicitud_original: fondo.id || null,
-        tipo_solicitud: 'Incremento',
-        motivo_detalle: '',
-        prioridad: 'Media',
-        gastos_proyectados: []
-      };
-    } else {
-      // Procesar gastos proyectados si existen
-      let gastosProyectados = [];
-      if (fondo.solicitud_apertura.gastos_proyectados && Array.isArray(fondo.solicitud_apertura.gastos_proyectados)) {
-        gastosProyectados = cloneDeep(fondo.solicitud_apertura.gastos_proyectados.map(g => ({
-          gasto_proyectado_id: g?.id_gasto_proyectado || null,
-          monto_estimado: parseFloat(g?.pivot?.monto_estimado || 0)
-        })));
-      }
-
-      formData.value = {
-        id_solicitud_original: fondo.solicitud_apertura.id || null,
-        tipo_solicitud: 'Incremento',
-        motivo_detalle: '',
-        prioridad: 'Media',
-        gastos_proyectados: gastosProyectados
-      };
-    }
+    // Llamada al nuevo endpoint para obtener el presupuesto VIGENTE.
+    const response = await api.get(`/v1/fondos-efectivo/${fondo.id_fondo}/gastos-proyectados`);
+    const gastosVigentes = response.data;
+    // Se mapea la respuesta para adaptarla a la estructura del formulario.
+    const gastosFormateados = gastosVigentes.map(g => ({
+      gasto_proyectado_id: g.id_gasto_proyectado || null,
+      monto_estimado: parseFloat(g.pivot.monto_estimado || 0)
+    }));
+    // Se pueblan AMBAS secciones con la misma información vigente.
+    gastosProyectadosOriginales.value = cloneDeep(gastosFormateados);
+    formData.value = {
+      id_solicitud_original: fondo.solicitud_apertura.id,
+      tipo_solicitud: 'Incremento',
+      motivo_detalle: '',
+      prioridad: 'Media',
+      gastos_proyectados: cloneDeep(gastosFormateados)
+    };
 
     vistaActual.value = 'formulario';
 
   } catch (error) {
     console.error('Error al seleccionar fondo para editar:', error);
-    Swal.fire('Error', 'No se pudo cargar la información del fondo seleccionado.', 'error');
+    Swal.fire('Error', 'No se pudo cargar la información del presupuesto vigente del fondo.', 'error');
   }
 };
 
 const volverALaListaInterna = () => {
   vistaActual.value = 'lista';
   fondoParaEditar.value = null;
-  // CORRECCIÓN: Reinicializar formData
+  gastosProyectadosOriginales.value = [];
   formData.value = {
     id_solicitud_original: null,
     tipo_solicitud: 'Incremento',
@@ -852,20 +827,13 @@ watch(filtro, () => {
   }, 500);
 }, { deep: true });
 
-// CORRECCIÓN: Mejorar el watcher con guardias de seguridad
+//  Mejorar el watcher con guardias de seguridad
 watch(() => formData.value?.tipo_solicitud, (newVal) => {
   if (newVal === 'Cierre') {
     formData.value.gastos_proyectados = [];
   } else {
-    // Solo reinicializar si no hay gastos y hay un fondo seleccionado
-    if ((!formData.value.gastos_proyectados || formData.value.gastos_proyectados.length === 0) &&
-      fondoParaEditar.value?.solicitud_apertura?.gastos_proyectados) {
-      formData.value.gastos_proyectados = cloneDeep(
-        fondoParaEditar.value.solicitud_apertura.gastos_proyectados.map(g => ({
-          gasto_proyectado_id: g?.id_gasto_proyectado || null,
-          monto_estimado: parseFloat(g?.pivot?.monto_estimado || 0)
-        }))
-      );
+    if ((!formData.value.gastos_proyectados || formData.value.gastos_proyectados.length === 0) && fondoParaEditar.value) {
+      formData.value.gastos_proyectados = cloneDeep(gastosProyectadosOriginales.value);
     }
   }
 });
