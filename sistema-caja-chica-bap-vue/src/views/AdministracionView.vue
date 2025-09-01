@@ -182,8 +182,8 @@ const handleCardClick = async (section) => {
             // Se activa la nueva sección
             await openSection(section);
         }
-    } catch (error) {
-        console.error('Error al cambiar sección:', error);
+    } catch {
+        //
     } finally {
         // Liberar el lock después de un breve delay
         setTimeout(() => {
@@ -221,12 +221,8 @@ const openSection = async (section) => {
             activeComponent.value = PanelAuditoria;
             break;
         default:
-            console.warn(`Sección desconocida: ${section}`);
             activeComponent.value = null;
     }
-
-    // Log para debugging
-    console.log(`Sección activada: ${section}`);
 };
 
 /**
@@ -235,7 +231,6 @@ const openSection = async (section) => {
 const closeSection = () => {
     activeSection.value = null;
     activeComponent.value = null;
-    console.log('Sección cerrada');
 };
 
 /**

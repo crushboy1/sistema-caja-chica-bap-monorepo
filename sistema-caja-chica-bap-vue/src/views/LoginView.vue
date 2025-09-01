@@ -27,8 +27,8 @@ const handleLogin = async () => {
   }
 
   try {
-    console.log('Intentando login...');
-    const response = await api.post('/auth/login', {
+
+    await api.post('/auth/login', {
       email: email.value,
       password: password.value,
     });
@@ -37,7 +37,6 @@ const handleLogin = async () => {
     router.push('/dashboard');
 
   } catch (error) {
-    console.error('Error de login:', error);
 
     if (error.response) {
       const status = error.response.status;
@@ -67,21 +66,7 @@ const handleLogin = async () => {
   }
 };
 
-// Función para probar la conexión con el backend
-const testConnection = async () => {
-  try {
-    const response = await api.get('/health');
-    console.log('Conexión exitosa:', response.data);
-    alert(`✅ ${response.data.message}`);
-  } catch (error) {
-    console.error('Error de conexión:', error);
-    let errorMessage = '❌ Error de conexión con el backend.';
-    if (error.request) {
-      errorMessage += ' No se pudo recibir respuesta del servidor. ¿Está encendido y accesible?';
-    }
-    alert(errorMessage);
-  }
-};
+
 </script>
 
 <template>
@@ -89,7 +74,7 @@ const testConnection = async () => {
     <header class="w-full bg-white shadow py-4 flex justify-center">
       <img src="/src/assets/images/logo-wt.svg" alt="Logo del BAP" class="h-20" />
     </header>
-    
+
     <main class="flex-grow flex items-center justify-center p-4">
       <AuthCard class=" min-h-[580px]">
         <h2 class="text-3xl font-bold text-gris-bap-dark text-center mb-8">Iniciar Sesión</h2>
@@ -99,7 +84,7 @@ const testConnection = async () => {
           <strong class="font-bold">¡Error!</strong>
           <span class="block sm:inline ml-2">{{ errorMessage }}</span>
         </div>
-        
+
         <form @submit.prevent="handleLogin" class="space-y-4">
           <BaseInput type="email" v-model="email" placeholder="correo@ejemplo.com" autocomplete="email"
             :disabled="isLoading" />
@@ -109,14 +94,6 @@ const testConnection = async () => {
             <span v-else>Iniciar sesión</span>
           </SubmitButton>
         </form>
-
-        <!-- Botón de prueba de conexión (puedes quitarlo en producción) -->
-        <div class="mt-4">
-          <button @click="testConnection" type="button"
-            class="w-full py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            🔧 Probar conexión con backend
-          </button>
-        </div>
 
         <div class="text-center mt-6 text-sm text-gris-bap">
           <p>¿Olvidaste tu contraseña?</p>

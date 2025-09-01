@@ -22,9 +22,6 @@
           <!-- Quick Actions -->
           <div class="flex gap-3">
             <div class="flex gap-3">
-              <button @click="exportarDatos" class="btn-secondary">
-                <Download class="w-4 h-4 mr-2" /> Exportar
-              </button>
               <button @click="fetchDashboardData" class="btn-primary">
                 <RefreshCw class="w-4 h-4 mr-2" /> Actualizar
               </button>
@@ -156,7 +153,7 @@
               allow-refresh>
               <GraficoEvolucionMensual v-if="datosEvolucionMensual && datosEvolucionMensual.length > 0"
                 :chart-data="datosEvolucionMensual" :show-controls="true" :show-summary="true" :default-period="12"
-                @period-changed="actualizarPeriodoEvolucion" />
+                />
             </ChartCard>
 
             <!-- Gráfico Circular - Fondos por Tipo -->
@@ -471,8 +468,8 @@ const fetchDashboardData = async () => {
   try {
     const response = await api.get('/v1/dashboard', { params: filtros.value });
     dashboardData.value = response.data;
-  } catch (error) {
-    console.error("Error al cargar datos del dashboard:", error);
+  } catch {
+  
     Swal.fire({ title: 'Error', text: 'No se pudieron cargar los datos del dashboard.', icon: 'error', confirmButtonColor: '#10B981' });
   } finally {
     cargando.value = false;
@@ -486,8 +483,8 @@ const refreshSingleChart = async (chartName) => {
   try {
     const response = await api.get('/v1/dashboard', { params: filtros.value });
     dashboardData.value = response.data;
-  } catch (error) {
-    console.error(`Error al actualizar gráfico ${chartName}:`, error);
+  } catch {
+    //
   } finally {
     setTimeout(() => {
       currentRefreshing.value = null;
@@ -509,8 +506,8 @@ const fetchFiltersData = async () => {
       ]);
       areas.value = areasRes.data.data;
       usuarios.value = usuariosRes.data;
-    } catch (error) {
-      console.error("Error al cargar datos para filtros:", error);
+    } catch  {
+      //
     }
   }
 };
@@ -524,41 +521,9 @@ const resetearFiltros = () => {
   };
 };
 
-const exportarDatos = async () => {
-  try {
-    const response = await api.get('/v1/dashboard/export', {
-      params: filtros.value,
-      responseType: 'blob'
-    });
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
 
-    await Swal.fire({
-      title: 'Exportación exitosa',
-      text: 'Los datos se han exportado correctamente.',
-      icon: 'success',
-      confirmButtonColor: '#10B981'
-    });
-  } catch (error) {
-    console.error("Error al exportar:", error);
-    await Swal.fire({
-      title: 'Error',
-      text: 'No se pudo exportar los datos.',
-      icon: 'error',
-      confirmButtonColor: '#10B981'
-    });
-  }
-};
 
-const actualizarPeriodoEvolucion = (nuevoPeriodo) => {
-  console.log(`El período del gráfico de evolución ha cambiado a: ${nuevoPeriodo} meses`);
-};
 
 const getRankingClass = (index) => {
   if (index < 3) return 'bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400';
@@ -605,7 +570,7 @@ const handleAlertaAction = (alerta) => {
   if (action) {
     action();
   } else {
-    console.warn('Acción no definida para el tipo de alerta:', alerta.tipo);
+    //
   }
 };
 

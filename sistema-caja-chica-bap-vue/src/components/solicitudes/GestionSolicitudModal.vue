@@ -97,7 +97,6 @@
                         </div>
                     </div>
 
-                    <!-- Cambio: Usar showAccionesSolicitante en lugar de showSolicitanteDescargoAction -->
                     <div v-if="showAccionesSolicitante" class="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
                         <h4 class="text-lg font-bold text-gray-700 mb-4">Acciones de Solicitante</h4>
                         <p class="text-sm text-gray-600 mb-4">La solicitud ha sido observada. Puedes presentar un
@@ -250,17 +249,6 @@ const showAccionesGerenteGeneral = computed(() => {
     }
 
     return esRolAprobadorGg && esEstadoParaGg;
-});
-
-// Determina si se debe mostrar el botón de "Presentar Descargo" para el solicitante.
-// Esta acción está disponible para cualquier solicitante si su solicitud está en estado 'Observada ADM' u 'Observada GG'.
-const showSolicitanteDescargoAction = computed(() => {
-    if (!props.solicitud || !props.usuarioActual) return false;
-
-    const estado = props.solicitud.estado;
-    const usuarioEsSolicitante = props.usuarioActual.id === props.solicitud.id_solicitante;
-
-    return usuarioEsSolicitante && (estado === 'Observada ADM' || estado === 'Observada GG');
 });
 
 
@@ -457,11 +445,6 @@ const ejecutarAccion = async () => {
             }
         }
 
-        console.log('--- Enviando PUT a la API ---');
-        console.log('Endpoint:', endpoint);
-        console.log('Payload:', payload);
-        console.log('-----------------------------');
-
         // Realizar la llamada a la API y CAPTURAR LA RESPUESTA
         const response = await api.put(endpoint, payload);
 
@@ -475,7 +458,6 @@ const ejecutarAccion = async () => {
         Swal.fire('¡Éxito!', successMessageFromAPI, 'success');
         cerrarModal(true); // Cerrar y refrescar la tabla padre
     } catch (error) {
-        console.error(`Error al ejecutar acción '${accionActual.value}':`, error);
         let apiErrorMessage = 'Ha ocurrido un error inesperado.';
         // Mejorar el mensaje de error si la API devuelve detalles de validación
         if (error.response && error.response.data) {
