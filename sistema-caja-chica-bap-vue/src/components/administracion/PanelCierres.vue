@@ -126,12 +126,27 @@
                             <!-- Columna de acciones -->
                             <td class="px-6 py-5 whitespace-nowrap text-center">
                                 <div class="flex items-center justify-center space-x-3">
-                                    <button @click.stop="confirmarCambioEstado(cierre)"
+                                    <div v-if="cierre.estado === 'Cerrado' && cierre.tiene_excepciones_activas"
+                                        class="relative group">
+                                        <div
+                                            class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
+                                            No se puede reabrir : existen excepciones activas
+                                            <div
+                                                class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900">
+                                            </div>
+                                        </div>
+                                        <button disabled
+                                            class="relative px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 bg-green-500 opacity-50 cursor-not-allowed">
+                                            Reabrir
+                                        </button>
+                                    </div>
+
+                                    <button v-else @click.stop="confirmarCambioEstado(cierre)"
                                         :disabled="procesandoCambio === cierre.periodo"
                                         class="relative px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
                                         :class="cierre.estado === 'Cerrado'
                                             ? 'bg-green-500 hover:bg-green-600 focus:ring-green-500 shadow-green-200'
-                                            : 'bg-red-500 hover:bg-red-600 focus:ring-red-500 shadow-red-200'">
+                                            : 'bg-rojo-bap hover:bg-rojo-bap-dark focus:ring-rojo-bap shadow-red-200'">
                                         <span v-if="procesandoCambio === cierre.periodo" class="flex items-center">
                                             <Loader2 class="animate-spin w-4 h-4 mr-2" />
                                             Procesando...
@@ -143,7 +158,7 @@
 
                                     <button v-if="cierre.estado === 'Cerrado'"
                                         @click.stop="abrirModalExcepciones(cierre)"
-                                        class="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2">
+                                        class="px-4 py-2 rounded-lg bg-amarillo-bap hover:bg-amarillo-bap-dark text-white text-sm font-semibold transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amarillo-bap focus:ring-offset-2">
                                         <Settings class="w-4 h-4 inline mr-2" />
                                         Excepciones
                                     </button>
@@ -212,7 +227,7 @@ const fetchCierres = async () => {
 
     } catch (error) {
         console.error("Error al cargar los cierres mensuales:", error);
-        cierres.value = []; 
+        cierres.value = [];
         Swal.fire({
             title: 'Error',
             text: 'No se pudo cargar la configuración de cierres.',
@@ -254,19 +269,31 @@ const formatPeriodo = (periodoStr) => {
         return 'Fecha inválida';
     }
 };
+
 const formatarFechaSinHora = (fechaString) => {
     if (!fechaString) return '';
     try {
         const datePart = fechaString.split('T')[0];
         const [year, month, day] = datePart.split('-');
         return `${day}/${month}/${year}`;
-    } catch (e) {
+    } catch {
         return 'Fecha inválida';
     }
 };
+
 // Función para confirmar cambio de estado
 const confirmarCambioEstado = (cierre) => {
     const nuevoEstado = cierre.estado === 'Cerrado' ? 'Abierto' : 'Cerrado';
+    if (nuevoEstado === 'Abierto' && cierre.tiene_excepciones_activas) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Acción Bloqueada',
+            html: `No se puede reabrir el período de <strong>${formatPeriodo(cierre.periodo)}</strong> porque tiene excepciones activas.<br><br>Por favor, revoque todas las excepciones para este mes desde el panel de gestión de excepciones antes de continuar.`,
+            confirmButtonColor: '#3085d6',
+            confirmButtonText: 'Entendido'
+        });
+        return;
+    }
     const accion = nuevoEstado === 'Cerrado' ? 'cerrar' : 'reabrir';
     const textoAccion = nuevoEstado === 'Cerrado'
         ? 'cerrar el período. Los usuarios ya no podrán registrar gastos en este mes.'
@@ -290,7 +317,7 @@ const confirmarCambioEstado = (cierre) => {
 
 // Función para actualizar el estado del cierre
 const actualizarEstadoCierre = async (cierre, nuevoEstado) => {
-    cargando.value = true;
+    procesandoCambio.value = cierre.periodo;
 
     try {
         const periodo = cierre.periodo.substring(0, 7);
@@ -316,8 +343,9 @@ const actualizarEstadoCierre = async (cierre, nuevoEstado) => {
         console.error("Error al actualizar el estado:", error);
         Swal.fire('Error', error.response?.data?.message || 'No se pudo actualizar el estado.', 'error');
         cargando.value = false;
+    } finally {
+        procesandoCambio.value = null;
     }
-
 };
 
 // Función para cerrar modal de forma controlada
@@ -345,7 +373,7 @@ const onExcepcionCreada = async () => {
 
 // Función para abrir modal de excepciones de forma controlada
 const abrirModalExcepciones = (cierre) => {
-    periodoSeleccionado.value = { ...cierre }; 
+    periodoSeleccionado.value = { ...cierre };
     nextTick(() => {
         mostrarModal.value = true;
     });
@@ -400,5 +428,14 @@ button:focus {
 
 .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Tooltip personalizado */
+.group:hover .group-hover\:opacity-100 {
+    opacity: 1;
+}
+
+.group:hover .group-hover\:visible {
+    visibility: visible;
 }
 </style>

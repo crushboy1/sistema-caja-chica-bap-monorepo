@@ -362,7 +362,7 @@
                 </div>
 
                 <div class="flex space-x-1">
-                    <button v-for="link in pagination.links" :key="link.label" @click="cambiarPagina(link.url)"
+                    <button v-for="(link, index) in linksPaginacion" :key="index" @click="cambiarPagina(link.page)"
                         :disabled="!link.url" :class="[
                             'px-3 py-2 text-sm rounded-md transition-colors duration-150',
                             {
@@ -370,7 +370,8 @@
                                 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50': !link.active && link.url,
                                 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200': !link.url
                             }
-                        ]" v-html="link.label"></button>
+                        ]" v-html="link.label">
+                    </button>
                 </div>
             </div>
         </div>
@@ -434,28 +435,13 @@ const paginaActual = computed(() => {
 const fetchActivityLogs = async (page = 1) => {
     cargando.value = true;
     try {
-        const params = {
-            ...filtros.value,
-            page,
-            per_page: itemsPorPagina.value
-        };
-
+        const params = { ...filtros.value, page, per_page: itemsPorPagina.value };
         const response = await api.get('/v1/activity-logs', { params });
 
         if (response.data.success) {
             logs.value = response.data.data.data || [];
-
-            // Procesar paginación
-            const paginationData = response.data.data;
-            pagination.value = {
-                from: paginationData.from,
-                to: paginationData.to,
-                total: paginationData.total,
-                current_page: paginationData.current_page,
-                last_page: paginationData.last_page,
-                per_page: paginationData.per_page,
-                links: procesarEnlacesPaginacion(paginationData.links || [])
-            };
+            // Se simplifica la asignación de la paginación
+            pagination.value = response.data.data;
         } else {
             throw new Error(response.data.message || 'Error al cargar logs');
         }
@@ -470,7 +456,7 @@ const fetchActivityLogs = async (page = 1) => {
 };
 
 const fetchOpcionesFiltro = async () => {
-    if (opcionesFiltro.value.usuarios.length > 0) return; // Ya cargadas
+    if (opcionesFiltro.value.usuarios.length > 0) return;
 
     cargandoOpciones.value = true;
     try {
@@ -706,15 +692,7 @@ const getGrowthIndicator = (tipo) => {
     const crecientes = ['actividad_hoy', 'usuarios_activos'];
     return crecientes.includes(tipo);
 };
-const procesarEnlacesPaginacion = (links) => {
-    return links.map(link => {
-        if (link.url) {
-            // Corregir URLs de Docker para desarrollo local
-            link.url = link.url.replace('http://caja-chica-app', 'http://localhost:8080');
-        }
-        return link;
-    });
-};
+
 
 const generarNombreArchivo = () => {
     const fecha = new Date().toISOString().slice(0, 10);
@@ -750,20 +728,26 @@ const toggleDetails = async (logId) => {
     }
 };
 
-const cambiarPagina = (url) => {
-    if (!url) return;
-
-    try {
-        const urlObject = new URL(url);
-        const params = new URLSearchParams(urlObject.search);
-        const page = params.get('page') || 1;
-
-        fetchActivityLogs(parseInt(page));
-    } catch (error) {
-        console.error("Error en paginación:", error);
-        mostrarError('Error al cambiar de página');
+const cambiarPagina = (page) => {
+    // Si la página no es un número válido o está fuera de los límites, no hacemos nada.
+    if (isNaN(page) || page < 1 || page > totalPaginas.value) {
+        return;
     }
+    fetchActivityLogs(page);
 };
+// propiedad computada para limpiar los links que vienen del backend
+const linksPaginacion = computed(() => {
+    if (!pagination.value?.links) return [];
+    return pagination.value.links.map(link => {
+        if (link.label.includes('Previous')) {
+            return { ...link, label: 'Anterior', page: paginaActual.value - 1 };
+        }
+        if (link.label.includes('Next')) {
+            return { ...link, label: 'Siguiente', page: paginaActual.value + 1 };
+        }
+        return { ...link, page: parseInt(link.label, 10) };
+    });
+});
 
 const limpiarFiltros = () => {
     filtros.value = {

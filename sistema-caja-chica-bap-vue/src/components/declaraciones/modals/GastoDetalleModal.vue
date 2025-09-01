@@ -22,31 +22,41 @@ const currencyFormatter = new Intl.NumberFormat('es-PE', {
     maximumFractionDigits: 2,
 });
 // --- PROPIEDADES COMPUTADAS PARA EVIDENCIAS ---
-// Devuelve la URL de la evidencia INDIVIDUAL.
-const evidenciaIndividualUrl = computed(() => {
-    return props.gasto?.evidencia_url || (props.gasto?.ruta_evidencia ? `/storage/${props.gasto.ruta_evidencia}` : null);
+
+const evidenciaUrl = computed(() => {
+    if (props.gasto?.dj_consolidada?.ruta_documento_firmado) {
+        return `/storage/${props.gasto.dj_consolidada.ruta_documento_firmado}`;
+    }
+    if (props.gasto?.ruta_evidencia) {
+        return `/storage/${props.gasto.ruta_evidencia}`;
+    }
+    // Fallback por si la URL viene completa desde la API (aunque no debería ser el caso principal)
+    if (props.gasto?.dj_consolidada?.documento_url) {
+        return props.gasto.dj_consolidada.documento_url;
+    }
+    if (props.gasto?.evidencia_url) {
+        return props.gasto.evidencia_url;
+    }
+    return null;
 });
 
-// Devuelve el objeto de la evidencia CONSOLIDADA.
-const djConsolidadaEvidencia = computed(() => {
-    if (!props.gasto?.dj_consolidada) return null;
-    return {
-        url: props.gasto.dj_consolidada.documento_url || (props.gasto.dj_consolidada.ruta_documento_firmado ? `/storage/${props.gasto.dj_consolidada.ruta_documento_firmado}` : null),
-    };
+const tipoEvidencia = computed(() => {
+    if (!evidenciaUrl.value) return 'ninguna';
+    const url = evidenciaUrl.value.toLowerCase();
+    if (url.includes('.pdf')) return 'pdf';
+    const extensionesImagen = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const extension = url.split('.').pop().split('?')[0];
+    if (extensionesImagen.includes(extension)) return 'imagen';
+    return 'documento';
 });
 
-// Determina si la evidencia a mostrar (la individual) es una imagen.
-const esImagen = computed(() => {
-    if (!evidenciaIndividualUrl.value) return false;
-    const extension = evidenciaIndividualUrl.value.split('.').pop().toLowerCase().split('?')[0];
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
+const nombreArchivo = computed(() => {
+    if (!evidenciaUrl.value) return 'evidencia';
+    const codigoGasto = props.gasto?.codigo_gasto || 'gasto';
+    const extension = evidenciaUrl.value.split('.').pop().split('?')[0] || 'file';
+    return `evidencia_${codigoGasto}.${extension}`;
 });
 
-// Determina si la evidencia a mostrar (la individual) es un PDF.
-const esPdf = computed(() => {
-    if (!evidenciaIndividualUrl.value) return false;
-    return evidenciaIndividualUrl.value.toLowerCase().includes('.pdf');
-});
 //Propiedades computadas para acceder a datos anidados de forma segura y limpia.
 const registradorNombre = computed(() => `${props.gasto?.registrador?.name || ''} ${props.gasto?.registrador?.last_name || ''}`.trim() || 'N/A');
 const registradorRol = computed(() => props.gasto?.registrador?.role?.display_name || 'N/A');
@@ -87,15 +97,35 @@ const cerrarModal = () => {
 };
 
 // Función para manejar la descarga del archivo. Esto es más fiable que el atributo `download`
-const handleDownload = (url, filename) => {
-    if (url) {
+const descargarEvidencia = async () => {
+    if (!evidenciaUrl.value) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sin evidencia',
+            text: 'No hay evidencia disponible para descargar.'
+        });
+        return;
+    }
+
+    try {
+        // Crear enlace de descarga
         const link = document.createElement('a');
-        link.href = url;
-        // El atributo 'download' con un valor fuerza al navegador a descargar el archivo
-        link.setAttribute('download', filename || '');
+        link.href = evidenciaUrl.value;
+        link.setAttribute('download', nombreArchivo.value);
+        link.setAttribute('target', '_blank');
+
+        // Agregar al DOM temporalmente y hacer click
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+    } catch (error) {
+        console.error('Error al descargar:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de descarga',
+            text: 'No se pudo descargar la evidencia. Inténtalo de nuevo.'
+        });
     }
 };
 </script>
@@ -246,50 +276,115 @@ const handleDownload = (url, filename) => {
                                     </path>
                                 </svg>
                                 Evidencia Adjunta
+                                <span v-if="props.gasto?.dj_consolidada"
+                                    class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                    Consolidada
+                                </span>
                             </h4>
 
-                            <!-- CASO 1: El gasto tiene una evidencia individual (imagen) -->
-                            <div v-if="esImagen" class="mt-2">
-                                <a :href="evidenciaIndividualUrl" target="_blank" rel="noopener noreferrer"
-                                    class="block group">
-                                    <img :src="evidenciaIndividualUrl" alt="Evidencia del gasto"
-                                        class="w-full h-auto max-h-60 object-contain rounded-lg border border-gray-300 shadow-soft group-hover:shadow-glow-verde transition-all">
-                                </a>
-                                <!-- El botón de descarga para evidencia de gasto individual ha sido deshabilitado temporalmente -->
+                            <!-- Sin evidencia -->
+                            <div v-if="tipoEvidencia === 'ninguna'" class="text-center py-8">
+                                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p class="text-sm text-gray-500">No se adjuntó evidencia para este gasto</p>
                             </div>
 
-                            <!-- CASO 2: El gasto tiene evidencia en formato PDF (individual o consolidada) -->
-                            <div v-else-if="esPdf || (djConsolidadaEvidencia && djConsolidadaEvidencia.url)" class="mt-2">
-                                <div
-                                    class="flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
-                                    <svg class="w-12 h-12 text-rojo-bap" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z">
-                                        </path>
-                                    </svg>
-                                    <a :href="esPdf ? evidenciaIndividualUrl : djConsolidadaEvidencia.url"
-                                        target="_blank" rel="noopener noreferrer"
-                                        class="mt-2 text-sm text-verde-bap-dark hover:underline font-semibold">
-                                        Ver PDF en nueva pestaña
+                            <!-- Con evidencia -->
+                            <div v-else class="mt-2">
+                                <!-- IMAGEN -->
+                                <div v-if="tipoEvidencia === 'imagen'" class="text-center">
+                                    <a :href="evidenciaUrl" target="_blank" rel="noopener noreferrer"
+                                        class="block group">
+                                        <img :src="evidenciaUrl" :alt="`Evidencia del gasto ${gasto?.codigo_gasto}`"
+                                            class="w-full h-auto max-h-60 object-contain rounded-lg border border-gray-300 shadow-soft group-hover:shadow-glow-verde transition-all mx-auto"
+                                            @error="$event.target.src = '/images/image-error.png'">
                                     </a>
+                                    <p class="text-xs text-gray-500 mt-2">Click en la imagen para ver en tamaño completo en otra pestaña
+                                    </p>
                                 </div>
-                                <div v-if="djConsolidadaEvidencia && djConsolidadaEvidencia.url" class="flex justify-center mt-4">
-                                    <!-- Se usa la función `handleDownload` para una descarga más fiable -->
-                                    <button @click="handleDownload(djConsolidadaEvidencia.url, `documento_gasto_${gasto?.codigo_gasto}.pdf`)"
-                                        class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+
+                                <!-- PDF -->
+                                <div v-else-if="tipoEvidencia === 'pdf'" class="text-center">
+                                    <div
+                                        class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-red-50 to-orange-50 rounded-lg border-2 border-dashed border-red-300">
+                                        <svg class="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <h5 class="text-lg font-semibold text-gray-800 mb-2">Documento PDF</h5>
+                                        <p class="text-sm text-gray-600 mb-4">La evidencia está en formato PDF</p>
+                                        <a :href="evidenciaUrl" target="_blank" rel="noopener noreferrer"
+                                            class="inline-flex items-center space-x-2 px-4 py-2 bg-rojo-bap-dark hover:bg-rojo-bap-hover text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <span>Ver PDF en nueva pestaña</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- DOCUMENTO GENÉRICO -->
+                                <div v-else class="text-center">
+                                    <div
+                                        class="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg border-2 border-dashed border-gray-300">
+                                        <svg class="w-16 h-16 text-gray-500 mb-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <h5 class="text-lg font-semibold text-gray-800 mb-2">Documento</h5>
+                                        <p class="text-sm text-gray-600 mb-4">Evidencia en formato de documento</p>
+                                        <a :href="evidenciaUrl" target="_blank" rel="noopener noreferrer"
+                                            class="inline-flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <span>Ver Documento</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- Botón de descarga universal -->
+                                <div class="flex justify-center mt-6">
+                                    <button @click="descargarEvidencia"
+                                        class="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
-                                            </path>
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                         </svg>
-                                        <span>Descargar DJ Consolidada</span>
+                                        <span>Descargar Evidencia</span>
                                     </button>
                                 </div>
-                            </div>
 
-                            <!-- CASO 3: No hay ninguna evidencia (salvaguarda) -->
-                            <p v-else class="text-sm text-gray-500 mt-2">No se adjuntó evidencia para este gasto.</p>
+                                <!-- Información adicional -->
+                                <div class="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                                    <div class="flex items-start">
+                                        <svg class="w-5 h-5 text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div class="text-sm text-blue-800">
+                                            <p class="font-medium">Información de la evidencia:</p>
+                                            <p>• Tipo: {{ tipoEvidencia.charAt(0).toUpperCase() + tipoEvidencia.slice(1)
+                                                }}</p>
+                                            <p v-if="props.gasto?.dj_consolidada">• Documento consolidado (DJ firmada)
+                                            </p>
+                                            <p v-else>• Documento individual adjunto</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div v-if="gasto?.historial_aprobaciones && gasto.historial_aprobaciones.length > 0"
                             class="mt-6 p-4 border border-gray-200 rounded-md bg-white/70 backdrop-blur-sm shadow-inner">

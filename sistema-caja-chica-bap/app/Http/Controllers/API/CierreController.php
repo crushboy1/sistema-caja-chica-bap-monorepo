@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\CierreMensual;
+use App\Models\ExcepcionCierre;
 use App\Services\ActivityLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,16 @@ class CierreController extends Controller
 
         $year = $validated['year'] ?? Carbon::now()->year;
 
+        $excepcionesActivas = ExcepcionCierre::where('fecha_expiracion', '>=', Carbon::today())
+            ->whereHas('cierreMensual', function ($query) use ($year) {
+                $query->whereYear('periodo', $year);
+            })
+            ->with('cierreMensual:id,periodo') 
+            ->get();
+        
+        $excepcionesPorPeriodo = $excepcionesActivas->keyBy(function ($item) {
+            return Carbon::parse($item->cierreMensual->periodo)->format('Y-m');
+        });
         // Obtener solo los cierres del año solicitado.
         $query = CierreMensual::whereYear('periodo', $year);
         $cierres = $query->get();
@@ -54,11 +65,13 @@ class CierreController extends Controller
                 continue;
             }
 
-            $resultado[] = $cierreExistente ?? [
+            $cierreParaEnviar = $cierreExistente ?? [
                 'id' => null,
                 'periodo' => $fechaPeriodo->format('Y-m-d'),
                 'estado' => 'Abierto',
             ];
+            $cierreParaEnviar['tiene_excepciones_activas'] = $excepcionesPorPeriodo->has($periodoKey);
+            $resultado[] = $cierreParaEnviar;
         }
         return response()->json($resultado);
     }
@@ -76,7 +89,19 @@ class CierreController extends Controller
         $user = Auth::user();
         // El primer día del mes a partir del formato 'Y-m'.
         $fechaPeriodo = Carbon::createFromFormat('Y-m', $validated['periodo'])->startOfMonth();
-
+        if ($validated['estado'] === 'Abierto') {
+            $existenExcepciones = ExcepcionCierre::where('fecha_expiracion', '>=', Carbon::today())
+                ->whereHas('cierreMensual', function ($query) use ($fechaPeriodo) {
+                    $query->where('periodo', $fechaPeriodo);
+                })
+                ->exists();
+            
+            if ($existenExcepciones) {
+                return response()->json([
+                    'message' => 'No se puede reabrir el período porque existen excepciones activas. Por favor, revoque todas las excepciones para este mes antes de continuar.'
+                ], 409);
+            }
+        }
         // Se busca el registro del mes o se crea si no existe.
         $cierre = CierreMensual::firstOrNew(
             ['periodo' => $fechaPeriodo],
@@ -84,7 +109,12 @@ class CierreController extends Controller
         );
         // Capturamos el estado antes del cambio
         $estadoAnterior = $cierre->estado ?? 'Abierto';
-
+        if ($estadoAnterior === $validated['estado']) {
+            return response()->json([
+                'message' => "El período {$validated['periodo']} ya se encuentra en estado '{$validated['estado']}'.",
+                'cierre' => $cierre,
+            ]);
+        }
         $cierre->estado = $validated['estado'];
         $cierre->id_usuario_accion = $user->id;
         $cierre->save();

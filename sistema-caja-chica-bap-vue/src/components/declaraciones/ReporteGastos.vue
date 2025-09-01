@@ -19,7 +19,7 @@ import {
 } from 'lucide-vue-next';
 import vSelect from 'vue-select';
 import 'vue-select/dist/vue-select.css';
-
+import { useRoute, useRouter } from 'vue-router';
 // Estilos personalizados para vue-select y tabla
 const customStyles = `
 <style>
@@ -209,18 +209,19 @@ const props = defineProps({
 // --- ESTADO DE DATOS ---
 const items = ref([]); // Almacena la data cruda de la API (gastos individuales y grupos DJ)
 const areas = ref([]);
-const gastosProyectados = ref([]); // Lista de gastos proyectados
+const gastosProyectados = ref([]);
 const cargando = ref(true);
 const buscando = ref(false);
 const exportando = ref(false);
-
+const router = useRouter();
+const route = useRoute();
 // --- ESTADO DE FILTROS ---
 const filtros = ref({
     texto: '', // Para buscar por código o glosa
     registrador_name: '',
     fecha_inicio: '',
     fecha_fin: '',
-    gastoProyectado: 'Todos', // 👈 nuevo filtro
+    gastoProyectado: 'Todos',
     estado: 'Todos', // Permite filtrar por todos los estados posibles
     area_id: '',
 });
@@ -410,20 +411,35 @@ const itemsFiltrados = computed(() => {
 
         // Aplicar filtro por código/glosa (texto)
         if (textoBusqueda.length > 0) {
-            if (esGrupo && item.gastos) {
-                return item.gastos.some(g =>
-                    (g.codigo_gasto?.toLowerCase() || '').includes(textoBusqueda) ||
-                    (g.glosa?.toLowerCase() || '').includes(textoBusqueda)
-                );
-            } else if (!esGrupo && item.gasto) {
-                return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
+            const esCodigosMultiples = textoBusqueda.includes(',');
+            if (esCodigosMultiples) {
+                const codigosBuscados = textoBusqueda.split(',').map(c => c.trim().toLowerCase());
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g => codigosBuscados.includes(g.codigo_gasto?.toLowerCase()));
+                } else if (!esGrupo && item.gasto) {
+                    return codigosBuscados.includes(codigoGastoItem);
+                }
+            } else {
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g => (g.codigo_gasto?.toLowerCase() || '').includes(textoBusqueda) || (g.glosa?.toLowerCase() || '').includes(textoBusqueda));
+                } else if (!esGrupo && item.gasto) {
+                    return codigoGastoItem.includes(textoBusqueda) || glosaItem.includes(textoBusqueda);
+                }
             }
             return false;
         }
         return true;
     });
 });
-
+const aplicarFiltrosDesdeURL = () => {
+    const query = route.query;
+    if (query.alerta && query.codigos) {
+        if (query.alerta === 'desviacion' || query.alerta === 'tardia') {
+            filtros.value.texto = query.codigos;
+        }
+        router.replace({ query: {} });
+    }
+};
 const totalItems = computed(() => itemsFiltrados.value.length);
 
 const totalPaginas = computed(() => {
@@ -608,6 +624,7 @@ watch(filtros, () => {
 // en itemsFiltrados ya no los usa para descartar la búsqueda (solo para mostrar el mensaje).
 
 onMounted(() => {
+    aplicarFiltrosDesdeURL();
     fetchGastos();
     fetchAreas();
     fetchGastosProyectados();
@@ -861,24 +878,22 @@ onMounted(() => {
             <div class="overflow-x-auto shadow-lg rounded-lg">
                 <table class="min-w-full bg-white border border-gray-200 rounded-lg report-table">
                     <thead class="bg-gray-100">
-                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
-                            
-
-                            <th class="py-3 px-3 text-center font-semibold w-16"></th> <!-- Expander -->
-                            <th class="py-3 px-3 text-center font-semibold w-32">Número Correlativo</th>
-                            <th class="py-3 px-3 text-center font-semibold w-40">Tipo</th>
-                            <th class="py-3 px-3 text-center font-semibold w-32">Código</th>
-                            <th class="py-3 px-3 text-center font-semibold w-48">Glosa / Descripción</th>
-                            <th class="py-3 px-3 text-center font-semibold w-32">Cód. Cuenta</th>
-                            <th class="py-3 px-3 text-center font-semibold w-40">Desc. Cuenta</th>
-                            <th class="py-3 px-3 text-center font-semibold w-40">Proyección Gasto</th>
-                            <th class="py-3 px-3 text-center font-semibold w-32">Fecha Doc.</th>
-                            <th class="py-3 px-3 text-center font-semibold w-32">Monto</th>
-                            <th class="py-3 px-3 text-center font-semibold w-40">Estado</th>
-                            <th class="py-3 px-3 text-center font-semibold w-40">Registrador</th>
-                            <th class="py-3 px-3 text-center font-semibold w-32">Área</th>
-                            <th class="py-3 px-3 text-center font-semibold w-24">Evidencia</th>
-                            <th class="py-3 px-3 text-center font-semibold w-24">Acciones</th>
+                        <tr class="text-gray-700 uppercase text-xs leading-normal">
+                            <th class="py-3 px-2 text-center font-semibold "></th> <!-- Expander -->
+                            <th class="py-3 px-2 text-center font-semibold w-20">Número Correlativo</th>
+                            <th class="py-3 px-2 text-center font-semibold w-28">Tipo</th>
+                            <th class="py-3 px-2 text-center font-semibold w-28">Código</th>
+                            <th class="py-3 px-2 text-center font-semibold w-40">Glosa / Descripción</th>
+                            <th class="py-3 px-2 text-center font-semibold w-24">Cód. Cuenta</th>
+                            <th class="py-3 px-2 text-center font-semibold w-32">Desc. Cuenta</th>
+                            <th class="py-3 px-2 text-center font-semibold w-32">Proyección Gasto</th>
+                            <th class="py-3 px-2 text-center font-semibold w-24">Fecha Doc.</th>
+                            <th class="py-3 px-2 text-center font-semibold w-24">Monto</th>
+                            <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
+                            <th class="py-3 px-2 text-center font-semibold w-28">Registrador</th>
+                            <th class="py-3 px-2 text-center font-semibold w-24">Área</th>
+                            <th class="py-3 px-2 text-center font-semibold w-20">Evidencia</th>
+                            <th class="py-3 px-2 text-center font-semibold w-20">Acciones</th>
                         </tr>
                     </thead>
 
@@ -899,8 +914,8 @@ onMounted(() => {
                                         </svg>
                                     </button>
                                 </td>
-                                <td class="py-3 px-3 text-center">—</td> <!-- Número Correlativo -->
-                                <td class="py-3 px-3">
+                                <td class="py-3 px-2 text-center">—</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-2">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
                                             <div
@@ -921,38 +936,38 @@ onMounted(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3 px-3">
-                                    <div class="font-mono text-sm font-medium text-blue-800">DJ-{{
+                                <td class="py-3 px-2">
+                                    <div class="font-mono text-center text-sm font-medium text-blue-800">DJ-{{
                                         item.id_dj_consolidada }}</div>
                                     <div class="text-xs text-blue-600">Consolidada</div>
                                 </td>
-                                <td class="py-3 px-3 text-sm text-gray-700">Gastos consolidados</td>
-                                <td class="py-3 px-3 text-left text-xs">—</td>
-                                <td class="py-3 px-3 text-left text-xs">—</td>
-                                <td class="py-3 px-3 text-left text-xs">—</td>
-                                <td class="py-3 px-3 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}</td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center text-sm text-gray-700">Gastos consolidados</td>
+                                <td class="py-3 px-2 text-center text-xs">—</td>
+                                <td class="py-3 px-2 text-center text-xs">—</td>
+                                <td class="py-3 px-2 text-center text-xs">—</td>
+                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}</td>
+                                <td class="py-3 px-2 text-center">
                                     <div class="font-bold text-lg text-blue-800">{{
                                         currencyFormatter.format(item.monto_total_grupo || 0)
                                         }}</div>
                                     <div class="text-xs text-gray-500">Total consolidado</div>
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.estado_grupo)">{{ item.estado_grupo
                                         }}</span>
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
                                     <div class="text-xs text-gray-500">{{ item.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-3 text-left text-xs">{{ item.registrador?.area?.name }}</td>
-                                <td class="py-3 px-3 text-center text-xs">
+                                <td class="py-3 px-2 text-left text-xs">{{ item.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-center text-xs">
                                     <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     </a>
                                     <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
-                                <td class="py-3 px-3 text-center">     
+                                <td class="py-3 px-2 text-center">     
                                 </td>
                             </tr>
 
@@ -962,45 +977,45 @@ onMounted(() => {
                                 :key="`${item.id_dj_consolidada}-${gasto.id}`"
                                     class="dj-item-row transition-colors text-xs"
                                     :class="{ 'border-b-2 border-blue-200': index === item.gastos.length - 1 }">
-                                    <td class="py-3 px-3 text-center border-l-4 border-blue-400">
+                                    <td class="py-3 px-2 text-center border-l-4 border-blue-400">
                                         <div 
                                             class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
                                             <span class="text-blue-600 text-xs font-bold">{{ index + 1 }}</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-3 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
-                                    <td class="py-3 px-3 text-center text-gray-600">
+                                    <td class="py-3 px-2 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
+                                    <td class="py-3 px-2 text-center text-gray-600">
                                         <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
                                     </td>
-                                    <td class="py-3 px-3 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}</td>
-                                    <td class="py-3 px-3 text-center text-gray-700">{{ gasto.glosa }}</td>
-                                    <td class="py-3 px-3 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
+                                    <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}</td>
+                                    <td class="py-3 px-2 text-center text-gray-700">{{ gasto.glosa }}</td>
+                                    <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
                                         {{ gasto.cuenta_contable?.codigo_cuenta }}
                                     </td>
-                                    <td class="py-3 px-3 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
+                                    <td class="py-3 px-2 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
                                         {{ gasto.cuenta_contable?.descripcion }}
                                     </td>
-                                    <td class="py-3 px-3 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
+                                    <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
                                         {{ gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                     </td>
                                     
-                                    <td class="py-3 px-3 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
-                                    <td class="py-3 px-3 text-center text-gray-800 font-semibold">
+                                    <td class="py-3 px-2 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
+                                    <td class="py-3 px-2 text-center text-gray-800 font-semibold">
                                         {{ currencyFormatter.format(parseFloat(gasto.monto_total || 0)) }}
                                     </td>
-                                    <td class="py-3 px-3 text-center">
-                                        <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
+                                    <td class="py-3 px-2 text-center">
+                                        <span 
                                             :class="getClassesForAuditoriaBadge(gasto.estado)">
                                             {{ gasto.estado }}
                                         </span>
                                     </td>
-                                    <td class="py-3 px-3 text-center text-gray-500">
+                                    <td class="py-3 px-2 text-center text-gray-500">
                                         <div class="text-sm font-medium text-gray-900">{{ gasto.registrador?.name }}
                                             </div>
                                         <div class="text-xs text-gray-500">{{ gasto.registrador?.last_name }}</div>
                                     </td>
-                                    <td class="py-3 px-3 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
-                                    <td class="py-3 px-3 text-center text-gray-500">
+                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
+                                    <td class="py-3 px-2 text-center text-gray-500">
                                         <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         </a>
@@ -1010,7 +1025,7 @@ onMounted(() => {
                                         </a>
                                         <span v-else class="text-xs text-gray-400">N/A</span>
                                     </td>
-                                    <td class="py-3 px-3 text-center">
+                                    <td class="py-3 px-2 text-center">
                                         <div class="flex space-x-1 justify-center">
                                             <button @click="verDetalles(gasto)"
                                                 class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition-colors"
@@ -1029,7 +1044,7 @@ onMounted(() => {
 
                             <!-- Fila de Gasto Individual (Standalone) -->
                             <tr v-if="!item.es_grupo" class="standalone-row transition-colors">
-                                <td class="py-3 px-3">
+                                <td class="py-3 px-2">
                                     <div class="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
@@ -1039,8 +1054,8 @@ onMounted(() => {
                                         </svg>
                                     </div>
                                 </td>
-                                <td class="py-3 px-3 text-center">{{ item.gasto?.id }}</td> <!-- Número Correlativo -->
-                                <td class="py-3 px-3">
+                                <td class="py-3 px-2 text-center">{{ item.gasto?.id }}</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-2">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
                                             <div
@@ -1060,46 +1075,46 @@ onMounted(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3 px-3">
-                                    <div class="font-mono text-sm font-medium text-verde-bap-dark">{{
+                                <td class="py-3 px-2">
+                                    <div class="text-center font-mono text-sm font-medium text-verde-bap-dark">{{
                                         item.gasto?.codigo_gasto }}</div>
-                                    <div class="text-xs text-verde-bap">Código único</div>
+                                    <div class="text-center text-xs text-verde-bap">Código único</div>
                                 </td>
-                                <td class="py-3 px-3 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
+                                <td class="py-3 px-2 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
                                 
-                                <td class="py-3 px-3 text-left text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
+                                <td class="py-3 px-2 text-center text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
                                     {{ item.gasto.cuenta_contable?.codigo_cuenta }}
                                 </td>
-                                <td class="py-3 px-3 text-left text-xs" :title="item.gasto.cuenta_contable?.descripcion">
+                                <td class="py-3 px-2 text-center text-xs" :title="item.gasto.cuenta_contable?.descripcion">
                                     {{ item.gasto.cuenta_contable?.descripcion }}
                                 </td>
-                                <td class="py-3 px-3 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
+                                <td class="py-3 px-2 text-center text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
                                     {{ item.gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                 </td>
 
-                                <td class="py-3 px-3 text-center text-gray-500">{{ formatDate(item.gasto?.fecha_documento)
+                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.fecha_documento)
                                     }}</td>
-                                <td class="py-3 px-3 text-center font-semibold text-lg text-verde-bap-dark">
+                                <td class="py-3 px-2 text-center font-semibold text-lg text-verde-bap-dark">
                                     {{ currencyFormatter.format(parseFloat(item.gasto?.monto_total || 0)) }}
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.gasto?.estado)">{{ item.gasto?.estado
                                         }}</span>
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
                                     </div>
                                     <div class="text-xs text-gray-500">{{ item.gasto?.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-3 text-left text-xs">{{ item.gasto.registrador?.area?.name }}</td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center text-xs">{{ item.gasto.registrador?.area?.name }}</td>
+                                <td class="py-3 px-2 text-center">
                                     <a v-if="item.gasto.evidencia_url" :href="item.gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
                                         <svg v-if="isPdf(item.gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 01-2 2v12a2 2 0 002 2z"></path></svg>
                                     </a>
                                     <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-2 text-center">
                                     <div class="flex space-x-1 justify-center">
                                         <button @click="verDetalles(item.gasto)"
                                             class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors"
