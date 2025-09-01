@@ -124,13 +124,30 @@ const itemsFiltrados = computed(() => {
 
         // Aplicar filtro por código/glosa (texto)
         if (codigoBusqueda.length >= MIN_SEARCH_LENGTH) {
-            if (esGrupo && item.gastos) {
-                return item.gastos.some(g =>
-                    g.codigo_gasto?.toLowerCase().includes(codigoBusqueda) ||
-                    g.glosa?.toLowerCase().includes(codigoBusqueda)
-                );
-            } else if (!esGrupo && item.gasto) {
-                return codigoGastoItem.includes(codigoBusqueda) || glosaItem.includes(codigoBusqueda);
+            // Verificar si contiene comas (códigos múltiples)
+            const esCodigosMultiples = codigoBusqueda.includes(',');
+            
+            if (esCodigosMultiples) {
+                // Para códigos múltiples, hacer coincidencia exacta
+                const codigosBuscados = codigoBusqueda.split(',').map(c => c.trim().toLowerCase());
+                
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g => 
+                        codigosBuscados.includes(g.codigo_gasto?.toLowerCase())
+                    );
+                } else if (!esGrupo && item.gasto) {
+                    return codigosBuscados.includes(item.gasto.codigo_gasto?.toLowerCase());
+                }
+            } else {
+                // Para búsqueda individual, mantener lógica original
+                if (esGrupo && item.gastos) {
+                    return item.gastos.some(g =>
+                        g.codigo_gasto?.toLowerCase().includes(codigoBusqueda) ||
+                        g.glosa?.toLowerCase().includes(codigoBusqueda)
+                    );
+                } else if (!esGrupo && item.gasto) {
+                    return codigoGastoItem.includes(codigoBusqueda) || glosaItem.includes(codigoBusqueda);
+                }
             }
             return false;
         }
@@ -234,7 +251,7 @@ const fetchGastos = async () => {
 const aplicarFiltrosDesdeURL = () => {
     const query = route.query;
     // Se busca específicamente la alerta de 'monto_inusual' y los códigos.
-    if (query.alerta === 'monto_inusual' && query.codigos) {
+    if (query.alerta === 'inusual' && query.codigos) {
         filtros.value.codigo_gasto = query.codigos;
 
         // Opcional: Mostrar un mensaje al usuario para darle contexto.
@@ -758,7 +775,7 @@ onMounted(async () => {
                                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
                                             </button>
-                                            <!-- Botón de Rechazar para gastos individuales en grupos - SE ELIMINA -->
+                                            
                                         </div>
                                     </td>
                                 </tr>
