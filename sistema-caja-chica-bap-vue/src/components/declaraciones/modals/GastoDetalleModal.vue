@@ -31,7 +31,7 @@ const evidenciaIndividualUrl = computed(() => {
 const djConsolidadaEvidencia = computed(() => {
     if (!props.gasto?.dj_consolidada) return null;
     return {
-        url: props.gasto.dj_consolidada.documento_url || `/storage/${props.gasto.dj_consolidada.ruta_documento}`,
+        url: props.gasto.dj_consolidada.documento_url || (props.gasto.dj_consolidada.ruta_documento_firmado ? `/storage/${props.gasto.dj_consolidada.ruta_documento_firmado}` : null),
     };
 });
 
@@ -84,6 +84,19 @@ const formatearFecha = (fechaString) => {
 // Función para cerrar el modal
 const cerrarModal = () => {
     emit('close');
+};
+
+// Función para manejar la descarga del archivo. Esto es más fiable que el atributo `download`
+const handleDownload = (url, filename) => {
+    if (url) {
+        const link = document.createElement('a');
+        link.href = url;
+        // El atributo 'download' con un valor fuerza al navegador a descargar el archivo
+        link.setAttribute('download', filename || '');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 };
 </script>
 
@@ -242,21 +255,11 @@ const cerrarModal = () => {
                                     <img :src="evidenciaIndividualUrl" alt="Evidencia del gasto"
                                         class="w-full h-auto max-h-60 object-contain rounded-lg border border-gray-300 shadow-soft group-hover:shadow-glow-verde transition-all">
                                 </a>
-                                <div class="flex justify-center mt-4">
-                                    <a :href="evidenciaIndividualUrl" download
-                                        class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
-                                            </path>
-                                        </svg>
-                                        <span>Descargar Evidencia</span>
-                                    </a>
-                                </div>
+                                <!-- El botón de descarga para evidencia de gasto individual ha sido deshabilitado temporalmente -->
                             </div>
 
                             <!-- CASO 2: El gasto tiene evidencia en formato PDF (individual o consolidada) -->
-                            <div v-else-if="esPdf || djConsolidadaEvidencia" class="mt-2">
+                            <div v-else-if="esPdf || (djConsolidadaEvidencia && djConsolidadaEvidencia.url)" class="mt-2">
                                 <div
                                     class="flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
                                     <svg class="w-12 h-12 text-rojo-bap" fill="none" stroke="currentColor"
@@ -271,16 +274,17 @@ const cerrarModal = () => {
                                         Ver PDF en nueva pestaña
                                     </a>
                                 </div>
-                                <div class="flex justify-center mt-4">
-                                    <a :href="esPdf ? evidenciaIndividualUrl : djConsolidadaEvidencia.url" download
+                                <div v-if="djConsolidadaEvidencia && djConsolidadaEvidencia.url" class="flex justify-center mt-4">
+                                    <!-- Se usa la función `handleDownload` para una descarga más fiable -->
+                                    <button @click="handleDownload(djConsolidadaEvidencia.url, `documento_gasto_${gasto?.codigo_gasto}.pdf`)"
                                         class="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
                                             </path>
                                         </svg>
-                                        <span>Descargar {{ esPdf ? 'Evidencia' : 'DJ Consolidada' }}</span>
-                                    </a>
+                                        <span>Descargar DJ Consolidada</span>
+                                    </button>
                                 </div>
                             </div>
 
