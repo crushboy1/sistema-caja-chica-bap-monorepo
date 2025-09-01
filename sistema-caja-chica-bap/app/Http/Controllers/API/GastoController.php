@@ -100,6 +100,13 @@ class GastoController extends Controller
                 $q->where('area_id', $request->area_id);
             });
         }
+
+        if ($request->filled('gastoProyectado_descripcion') && $request->gastoProyectado_descripcion !== 'Todos') {
+            $query->whereHas('gastoProyectado', function ($q) use ($request) {
+                $q->where('descripcion', $request->gastoProyectado_descripcion);
+            });
+        }
+        
         if ($request->filled('estado') && $request->estado !== 'Todos') {
             $query->where('estado', $request->estado);
         }

@@ -14,8 +14,189 @@ import {
     Search,
     User,
     Calendar,
-    Building2
+    Building2,
+    DollarSign // Añadido para el filtro de Gasto Proyectado
 } from 'lucide-vue-next';
+import vSelect from 'vue-select';
+import 'vue-select/dist/vue-select.css';
+
+// Estilos personalizados para vue-select y tabla
+const customStyles = `
+<style>
+.v-select {
+  @apply w-full;
+}
+
+.v-select .vs__dropdown-toggle {
+  @apply border border-gray-300 rounded-md shadow-sm focus:border-verde-bap focus:ring-verde-bap;
+  @apply min-h-[38px] bg-white;
+  @apply transition-all duration-200;
+}
+
+.v-select .vs__dropdown-toggle:hover {
+  @apply border-gray-400;
+}
+
+.v-select .vs__dropdown-toggle:focus-within {
+  @apply border-verde-bap ring-2 ring-verde-bap ring-opacity-20;
+}
+
+.v-select .vs__selected-options {
+  @apply max-w-full flex-1;
+}
+
+.v-select .vs__selected {
+  @apply max-w-full truncate;
+  @apply text-sm font-medium text-gray-900;
+  @apply bg-gray-100 rounded px-2 py-1;
+}
+
+.v-select .vs__dropdown-menu {
+  @apply border border-gray-300 rounded-md shadow-lg;
+  @apply bg-white z-50;
+  @apply max-h-60 overflow-y-auto;
+  @apply min-w-full;
+}
+
+.v-select .vs__dropdown-option {
+  @apply text-sm py-2 px-3;
+  @apply hover:bg-gray-50 cursor-pointer;
+  @apply transition-colors duration-150;
+  @apply whitespace-normal;
+  @apply break-words;
+  @apply leading-relaxed;
+}
+
+.v-select .vs__dropdown-option--highlight {
+  @apply bg-verde-bap text-white;
+}
+
+.v-select .vs__dropdown-option--selected {
+  @apply bg-verde-bap bg-opacity-10 text-verde-bap;
+}
+
+.v-select .vs__clear {
+  @apply text-gray-400 hover:text-gray-600;
+  @apply transition-colors duration-150;
+  @apply p-1 rounded;
+}
+
+.v-select .vs__search {
+  @apply text-sm text-gray-900;
+  @apply placeholder-gray-500;
+}
+
+.v-select .vs__actions {
+  @apply pr-2 flex items-center;
+}
+
+.v-select .vs__open-indicator {
+  @apply text-gray-400 transition-transform duration-200;
+}
+
+.v-select.vs--open .vs__open-indicator {
+  @apply transform rotate-180;
+}
+
+/* Manejo de texto largo - permitir que se vea todo */
+.v-select .vs__selected {
+  white-space: normal;
+  overflow: visible;
+  word-wrap: break-word;
+  max-width: calc(100% - 80px); /* Dejar espacio para el botón clear y flecha */
+  line-height: 1.4;
+  min-height: 24px;
+  padding: 4px 8px;
+}
+
+/* Ajuste de tamaño de texto según longitud */
+.v-select.text-sm .vs__selected {
+  @apply text-sm;
+}
+
+.v-select.text-xs .vs__selected {
+  @apply text-xs;
+}
+
+/* Responsive para móviles */
+@media (max-width: 640px) {
+  .v-select .vs__selected {
+    max-width: calc(100% - 70px);
+  }
+}
+
+/* Estilos para la tabla */
+.report-table {
+  @apply border-collapse;
+}
+
+.report-table th {
+  @apply font-semibold text-gray-700 bg-gray-100 border-b border-gray-200;
+  @apply sticky top-0 z-10;
+}
+
+.report-table td {
+  @apply border-b border-gray-100;
+}
+
+.report-table tr:hover {
+  @apply bg-gray-50;
+}
+
+.report-table tr:hover td {
+  @apply bg-gray-50;
+}
+
+/* Estilos para grupos DJ */
+.dj-group-row {
+  @apply bg-gradient-to-r from-blue-50 to-indigo-50;
+  @apply border-l-4 border-blue-500;
+}
+
+.dj-group-row:hover {
+  @apply from-blue-100 to-indigo-100;
+}
+
+/* Estilos para gastos individuales del grupo */
+.dj-item-row {
+  @apply bg-gray-50;
+  @apply border-l-4 border-blue-400;
+}
+
+.dj-item-row:hover {
+  @apply bg-gray-100;
+}
+
+/* Estilos para gastos standalone */
+.standalone-row {
+  @apply hover:bg-gray-50;
+}
+
+/* Scroll horizontal suave */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f7fafc;
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+</style>
+`;
 
 // --- ESTADO DEL COMPONENTE ---
 const props = defineProps({
@@ -28,6 +209,7 @@ const props = defineProps({
 // --- ESTADO DE DATOS ---
 const items = ref([]); // Almacena la data cruda de la API (gastos individuales y grupos DJ)
 const areas = ref([]);
+const gastosProyectados = ref([]); // Lista de gastos proyectados
 const cargando = ref(true);
 const buscando = ref(false);
 const exportando = ref(false);
@@ -38,6 +220,7 @@ const filtros = ref({
     registrador_name: '',
     fecha_inicio: '',
     fecha_fin: '',
+    gastoProyectado: 'Todos', // 👈 nuevo filtro
     estado: 'Todos', // Permite filtrar por todos los estados posibles
     area_id: '',
 });
@@ -85,11 +268,32 @@ const mapTipoDocumentoSunat = {
 
 const getTipoDocumentoSunat = (tipo) => mapTipoDocumentoSunat[tipo] || 'N/A';
 
+const getSerieDocumento = (g) => {
+    if (!g) return 'N/A';
+    // Para Declaraciones Juradas, la serie por defecto es "DJ"
+    if (g.tipo_documento === 'Declaración Jurada') {
+        return 'DJ';
+    }
+    // Para otros documentos, usar la serie ingresada
+    return g.serie_documento || 'N/A';
+};
+
+const getCorrelativoDocumento = (g) => {
+    if (!g) return 'N/A';
+    // Para Declaraciones Juradas, usar la fecha del documento o fecha de ejecución
+    if (g.tipo_documento === 'Declaración Jurada') {
+        return g.fecha_documento ? formatDate(g.fecha_documento) : 
+               g.fecha_gasto ? formatDate(g.fecha_gasto) : 'N/A';
+    }
+    // Para otros documentos, usar el correlativo ingresado
+    return g.correlativo_documento || 'N/A';
+};
+
 const getReferenciaDocumento = (g) => {
     if (!g) return 'N/A';
-    const tipo = getTipoDocumentoSunat(g.tipo_documento);
-    const serie = g.serie_documento || 'N/A';
-    const correlativo = g.correlativo_documento || 'N/A';
+    const tipo = g.tipo_documento || 'N/A';
+    const serie = getSerieDocumento(g);
+    const correlativo = getCorrelativoDocumento(g);
     return `${tipo}-${serie}-${correlativo}`;
 };
 
@@ -190,7 +394,17 @@ const itemsFiltrados = computed(() => {
 
         const pasaArea = !filtros.value.area_id || (registradorItem && registradorItem.area?.id == filtros.value.area_id);
 
-        if (!pasaFecha || !pasaRegistrador || !pasaEstado || !pasaArea) {
+        // Filtro de gasto proyectado
+        let pasaGastoProyectado = true;
+        if (filtros.value.gastoProyectado && filtros.value.gastoProyectado !== 'Todos') {
+            if (esGrupo && item.gastos) {
+                pasaGastoProyectado = item.gastos.some(g => g.gasto_proyectado?.descripcion === filtros.value.gastoProyectado);
+            } else if (!esGrupo && item.gasto) {
+                pasaGastoProyectado = item.gasto.gasto_proyectado?.descripcion === filtros.value.gastoProyectado;
+            }
+        }
+
+        if (!pasaFecha || !pasaRegistrador || !pasaEstado || !pasaArea || !pasaGastoProyectado) {
             return false;
         }
 
@@ -283,6 +497,7 @@ const limpiarFiltros = () => {
         registrador_name: '',
         fecha_inicio: '',
         fecha_fin: '',
+        gastoProyectado: 'Todos',
         estado: 'Todos',
         area_id: '',
     };
@@ -361,6 +576,16 @@ const fetchAreas = async () => {
     }
 };
 
+const fetchGastosProyectados = async () => {
+    try {
+        const response = await api.get('/v1/gastos-proyectados');
+        gastosProyectados.value = response.data.gastos_proyectados;
+    } catch (error) {
+        console.error("Error al cargar los gastos proyectados:", error);
+        Swal.fire('Error', 'No se pudieron cargar los gastos proyectados para el filtro.', 'error');
+    }
+};
+
 // Paginación
 const irAPagina = (pagina) => {
     if (typeof pagina === 'number' && pagina >= 1 && pagina <= totalPaginas.value) {
@@ -385,11 +610,14 @@ watch(filtros, () => {
 onMounted(() => {
     fetchGastos();
     fetchAreas();
+    fetchGastosProyectados();
 });
 </script>
 
 <template>
     <div class="p-6 bg-white rounded-lg shadow-md animate-fade-in-up">
+        <!-- Estilos personalizados para vue-select y tabla -->
+        <div v-html="customStyles"></div>
         <div class="text-center mb-8">
             <h2 class="text-3xl font-bold text-gray-800 mb-2">Reporte de Gastos</h2>
             <p class="text-gray-500 max-w-2xl mx-auto">
@@ -455,6 +683,7 @@ onMounted(() => {
                     </select>
                 </div>
 
+
                 <div>
                     <label for="filtro_estado_reporte"
                         class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
@@ -500,6 +729,22 @@ onMounted(() => {
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Filtro por Gasto Proyectado - Fila separada -->
+            <div class="mt-4">
+                <label for="gastoProyectado" class="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    <DollarSign class="w-4 h-4 mr-1" />
+                    Gasto Proyectado
+                </label>
+                <v-select
+                  v-model="filtros.gastoProyectado"
+                  :options="['Todos', ...gastosProyectados.map(g => g.descripcion)]"
+                  :reduce="val => val"
+                  placeholder="Seleccione un gasto proyectado"
+                  clearable
+                  class="mt-1 w-full"
+                />
             </div>
 
             <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end items-center h-8">
@@ -614,37 +859,26 @@ onMounted(() => {
                     registrosPorPagina, totalItems) }}</strong> de <strong>{{ totalItems }}</strong> registros
             </div>
             <div class="overflow-x-auto shadow-lg rounded-lg">
-                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg report-table">
                     <thead class="bg-gray-100">
                         <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
                             
 
-                            <th class="py-3 px-2 text-center font-semibold"></th> <!-- Expander -->
-                            <th class="py-3 px-2 text-center font-semibold">Número Correlativo</th>
-                            <th class="py-3 px-2 text-center font-semibold">Serie SAP</th>
-                            <th class="py-3 px-2 text-center font-semibold">Tipo</th>
-                            <th class="py-3 px-2 text-center font-semibold">Código</th>
-                            <th class="py-3 px-2 text-center font-semibold">Glosa / Descripción</th>
-                            <th class="py-3 px-2 text-center font-semibold">Cód. Cuenta</th>
-                            <th class="py-3 px-2 text-center font-semibold">Desc. Cuenta</th>
-                            <th class="py-3 px-2 text-center font-semibold">Fondo</th>
-                            <th class="py-3 px-2 text-center font-semibold">Proyección Gasto</th>
-                            <th class="py-3 px-2 text-center font-semibold">Tipo Doc. (SAP)</th>
-                            <th class="py-3 px-2 text-center font-semibold">Tipo Doc. (SUNAT)</th>
-                            <th class="py-3 px-2 text-center font-semibold">Serie</th>
-                            <th class="py-3 px-2 text-center font-semibold">Correlativo</th>
-                            <th class="py-3 px-2 text-center font-semibold">Referencia Doc</th>
-                            <th class="py-3 px-2 text-center font-semibold">Fecha Doc.</th>
-                            <th class="py-3 px-2 text-center font-semibold">Fecha Contab.</th>
-                            <th class="py-3 px-2 text-center font-semibold">Moneda</th>
-                            <th class="py-3 px-2 text-center font-semibold">Monto</th>
-                            <th class="py-3 px-2 text-center font-semibold w-48">Estado</th>
-                            <th class="py-3 px-2 text-center font-semibold">Registrador</th>
-                            <th class="py-3 px-2 text-center font-semibold">Área</th>
-                            <th class="py-3 px-2 text-center font-semibold">Comentario Adicional</th>
-                            <th class="py-3 px-2 text-center font-semibold">Correo Electrónico</th>
-                            <th class="py-3 px-2 text-center font-semibold">Evidencia</th>
-                            <th class="py-3 px-2 text-center font-semibold">Acciones</th>
+                            <th class="py-3 px-3 text-center font-semibold w-16"></th> <!-- Expander -->
+                            <th class="py-3 px-3 text-center font-semibold w-32">Número Correlativo</th>
+                            <th class="py-3 px-3 text-center font-semibold w-40">Tipo</th>
+                            <th class="py-3 px-3 text-center font-semibold w-32">Código</th>
+                            <th class="py-3 px-3 text-center font-semibold w-48">Glosa / Descripción</th>
+                            <th class="py-3 px-3 text-center font-semibold w-32">Cód. Cuenta</th>
+                            <th class="py-3 px-3 text-center font-semibold w-40">Desc. Cuenta</th>
+                            <th class="py-3 px-3 text-center font-semibold w-40">Proyección Gasto</th>
+                            <th class="py-3 px-3 text-center font-semibold w-32">Fecha Doc.</th>
+                            <th class="py-3 px-3 text-center font-semibold w-32">Monto</th>
+                            <th class="py-3 px-3 text-center font-semibold w-40">Estado</th>
+                            <th class="py-3 px-3 text-center font-semibold w-40">Registrador</th>
+                            <th class="py-3 px-3 text-center font-semibold w-32">Área</th>
+                            <th class="py-3 px-3 text-center font-semibold w-24">Evidencia</th>
+                            <th class="py-3 px-3 text-center font-semibold w-24">Acciones</th>
                         </tr>
                     </thead>
 
@@ -653,8 +887,8 @@ onMounted(() => {
                             :key="item.es_grupo ? `grupo-${item.id_dj_consolidada || ''}` : `gasto-${item.gasto?.id || ''}`">
                             <!-- Fila de Grupo DJ -->
                             <tr v-if="item.es_grupo"
-                                class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200">
-                                <td class="py-3 px-2 text-center">
+                                class="dj-group-row hover:from-blue-100 hover:to-indigo-100 transition-all duration-200">
+                                <td class="py-3 px-3 text-center">
                                     <button @click="toggleGroup(item.id_dj_consolidada)"
                                         class="p-2 rounded-full hover:bg-blue-200 transition-colors">
                                         <svg class="w-5 h-5 text-blue-600 transition-transform duration-200"
@@ -665,9 +899,8 @@ onMounted(() => {
                                         </svg>
                                     </button>
                                 </td>
-                                <td class="py-3 px-2 text-center">—</td> <!-- Número Correlativo -->
-                                <td class="py-3 px-2 text-center">—</td> <!-- Serie SAP -->
-                                <td class="py-3 px-2">
+                                <td class="py-3 px-3 text-center">—</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-3">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
                                             <div
@@ -688,48 +921,38 @@ onMounted(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3 px-2">
+                                <td class="py-3 px-3">
                                     <div class="font-mono text-sm font-medium text-blue-800">DJ-{{
                                         item.id_dj_consolidada }}</div>
                                     <div class="text-xs text-blue-600">Consolidada</div>
                                 </td>
-                                <td class="py-3 px-2 text-sm text-gray-700">Gastos consolidados</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-center">—</td> <!-- Tipo Doc (SAP) -->
-                                <td class="py-3 px-2 text-center">—</td> <!-- Tipo Doc (SUNAT) -->
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-left text-xs">—</td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}</td>
-                                <td class="py-3 px-2 text-center">—</td> <!-- Fecha Contab -->
-                                <td class="py-3 px-2 text-center">—</td> <!-- Moneda -->
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-sm text-gray-700">Gastos consolidados</td>
+                                <td class="py-3 px-3 text-left text-xs">—</td>
+                                <td class="py-3 px-3 text-left text-xs">—</td>
+                                <td class="py-3 px-3 text-left text-xs">—</td>
+                                <td class="py-3 px-3 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}</td>
+                                <td class="py-3 px-3 text-center">
                                     <div class="font-bold text-lg text-blue-800">{{
                                         currencyFormatter.format(item.monto_total_grupo || 0)
                                         }}</div>
                                     <div class="text-xs text-gray-500">Total consolidado</div>
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.estado_grupo)">{{ item.estado_grupo
                                         }}</span>
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
                                     <div class="text-xs text-gray-500">{{ item.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs">{{ item.registrador?.area?.name }}</td>
-                                <td class="py-3 px-2 text-left text-xs text-gray-500">Múltiples comentarios</td>
-                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.registrador?.email">{{ item.registrador?.email }}</td>
-                                <td class="py-3 px-2 text-center text-xs">
+                                <td class="py-3 px-3 text-left text-xs">{{ item.registrador?.area?.name }}</td>
+                                <td class="py-3 px-3 text-center text-xs">
                                     <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     </a>
                                     <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
-                                <td class="py-3 px-2 text-center">     
+                                <td class="py-3 px-3 text-center">     
                                 </td>
                             </tr>
 
@@ -737,59 +960,47 @@ onMounted(() => {
                             <template v-if="item.es_grupo && expandedGroups.has(item.id_dj_consolidada)">
                                 <tr v-for="(gasto, index) in item.gastos" 
                                 :key="`${item.id_dj_consolidada}-${gasto.id}`"
-                                    class="bg-gray-50 hover:bg-gray-100 transition-colors text-xs"
+                                    class="dj-item-row transition-colors text-xs"
                                     :class="{ 'border-b-2 border-blue-200': index === item.gastos.length - 1 }">
-                                    <td class="py-3 px-2 text-center border-l-4 border-blue-400">
+                                    <td class="py-3 px-3 text-center border-l-4 border-blue-400">
                                         <div 
                                             class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
                                             <span class="text-blue-600 text-xs font-bold">{{ index + 1 }}</span>
                                         </div>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
-                                    <td class="py-3 px-2 text-center text-gray-600">{{  new Date(gasto.created_at).getFullYear()  }}</td> <!-- Serie SAP -->
-                                    <td class="py-3 px-2 text-center text-gray-600">
+                                    <td class="py-3 px-3 text-center text-gray-600">{{ gasto.id }}</td> <!-- Número Correlativo -->
+                                    <td class="py-3 px-3 text-center text-gray-600">
                                         <span class="text-xs bg-gray-200 px-2 py-1 rounded">Parte del grupo</span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}</td>
-                                    <td class="py-3 px-2 text-center text-gray-700">{{ gasto.glosa }}</td>
-                                    <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
+                                    <td class="py-3 px-3 text-center text-gray-600 font-mono">{{ gasto.codigo_gasto }}</td>
+                                    <td class="py-3 px-3 text-center text-gray-700">{{ gasto.glosa }}</td>
+                                    <td class="py-3 px-3 text-left text-xs font-mono text-gray-600" :title="gasto.cuenta_contable?.codigo_cuenta">
                                         {{ gasto.cuenta_contable?.codigo_cuenta }}
                                     </td>
-                                    <td class="py-3 px-2 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
+                                    <td class="py-3 px-3 text-left text-xs" :title="gasto.cuenta_contable?.descripcion">
                                         {{ gasto.cuenta_contable?.descripcion }}
                                     </td>
-                                    <td class="py-3 px-2 text-left text-xs">
-                                        {{ gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
-                                    </td>
-                                    <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
+                                    <td class="py-3 px-3 text-left text-xs max-w-[150px] truncate" :title="gasto.gasto_proyectado?.descripcion">
                                         {{ gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                     </td>
-                                    <td class="py-3 px-2 text-left text-xs">{{ SAP_TIPO_DOCUMENTO }}</td> <!-- Tipo Doc SAP -->
-                                    <td class="py-3 px-2 text-left text-xs">{{ getTipoDocumentoSunat(gasto.tipo_documento) }}</td> <!-- Tipo Doc SUNAT -->
-                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.serie_documento || 'N/A' }}</td>
-                                    <td class="py-3 px-2 text-left text-xs font-mono">{{ gasto.correlativo_documento || 'N/A' }}</td>
-                                    <td class="py-3 px-2 text-left text-xs">{{ getReferenciaDocumento(gasto) }}</td>
-                                    <td class="py-3 px-2 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
-                                    <td class="py-3 px-2 text-center">{{ getFechaContabilizacion(gasto) }}</td>
-                                    <td class="py-3 px-2 text-center">{{ MONEDA_DOCUMENTO }}</td>
-                                    <td class="py-3 px-2 text-center text-gray-800 font-semibold">
+                                    
+                                    <td class="py-3 px-3 text-center">{{ formatDate(gasto.fecha_documento) }}</td>
+                                    <td class="py-3 px-3 text-center text-gray-800 font-semibold">
                                         {{ currencyFormatter.format(parseFloat(gasto.monto_total || 0)) }}
                                     </td>
-                                    <td class="py-3 px-2 text-center">
+                                    <td class="py-3 px-3 text-center">
                                         <span class="px-2 py-1 font-semibold leading-tight rounded-full text-xs"
                                             :class="getClassesForAuditoriaBadge(gasto.estado)">
                                             {{ gasto.estado }}
                                         </span>
                                     </td>
-                                    <td class="py-3 px-2 text-center text-gray-500">
+                                    <td class="py-3 px-3 text-center text-gray-500">
                                         <div class="text-sm font-medium text-gray-900">{{ gasto.registrador?.name }}
                                             </div>
                                         <div class="text-xs text-gray-500">{{ gasto.registrador?.last_name }}</div>
                                     </td>
-                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
-                                    <td class="py-3 px-2 text-left text-xs">{{ gasto.comentario || 'N/A' }}</td>
-                                    <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="gasto.registrador?.email">{{ gasto.registrador?.email }}</td>
-                                    <td class="py-3 px-2 text-center text-gray-500">
+                                    <td class="py-3 px-3 text-left text-xs">{{ gasto.registrador?.area?.name }}</td>
+                                    <td class="py-3 px-3 text-center text-gray-500">
                                         <a v-if="item.dj_consolidada && item.dj_consolidada.documento_firmado_url" :href="item.dj_consolidada.documento_firmado_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver DJ Consolidada">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         </a>
@@ -799,7 +1010,7 @@ onMounted(() => {
                                         </a>
                                         <span v-else class="text-xs text-gray-400">N/A</span>
                                     </td>
-                                    <td class="py-3 px-2 text-center">
+                                    <td class="py-3 px-3 text-center">
                                         <div class="flex space-x-1 justify-center">
                                             <button @click="verDetalles(gasto)"
                                                 class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 transition-colors"
@@ -817,8 +1028,8 @@ onMounted(() => {
                             </template>
 
                             <!-- Fila de Gasto Individual (Standalone) -->
-                            <tr v-if="!item.es_grupo" class="hover:bg-gray-50 transition-colors">
-                                <td class="py-3 px-2">
+                            <tr v-if="!item.es_grupo" class="standalone-row transition-colors">
+                                <td class="py-3 px-3">
                                     <div class="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
                                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
@@ -828,9 +1039,8 @@ onMounted(() => {
                                         </svg>
                                     </div>
                                 </td>
-                                <td class="py-3 px-2 text-center">{{ item.gasto?.id }}</td> <!-- Número Correlativo -->
-                                <td class="py-3 px-2 text-center">{{ SAP_SERIE }}</td> <!-- Serie SAP -->
-                                <td class="py-3 px-2">
+                                <td class="py-3 px-3 text-center">{{ item.gasto?.id }}</td> <!-- Número Correlativo -->
+                                <td class="py-3 px-3">
                                     <div class="flex items-center space-x-2">
                                         <div class="flex-shrink-0">
                                             <div
@@ -850,57 +1060,46 @@ onMounted(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3 px-2">
+                                <td class="py-3 px-3">
                                     <div class="font-mono text-sm font-medium text-verde-bap-dark">{{
                                         item.gasto?.codigo_gasto }}</div>
                                     <div class="text-xs text-verde-bap">Código único</div>
                                 </td>
-                                <td class="py-3 px-2 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
+                                <td class="py-3 px-3 text-center text-gray-700">{{ item.gasto?.glosa }}</td>
                                 
-                                <td class="py-3 px-2 text-left text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
+                                <td class="py-3 px-3 text-left text-xs font-mono text-gray-600" :title="item.gasto.cuenta_contable?.codigo_cuenta">
                                     {{ item.gasto.cuenta_contable?.codigo_cuenta }}
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs" :title="item.gasto.cuenta_contable?.descripcion">
+                                <td class="py-3 px-3 text-left text-xs" :title="item.gasto.cuenta_contable?.descripcion">
                                     {{ item.gasto.cuenta_contable?.descripcion }}
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs">
-                                    {{ item.gasto.fondo_efectivo?.codigo_fondo || 'N/A' }}
-                                </td>
-                                <td class="py-3 px-2 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
+                                <td class="py-3 px-3 text-left text-xs max-w-[150px] truncate" :title="item.gasto.gasto_proyectado?.descripcion">
                                     {{ item.gasto.gasto_proyectado?.descripcion || 'N/A' }}
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs">{{ SAP_TIPO_DOCUMENTO }}</td> <!-- Tipo Doc SAP -->
-                                <td class="py-3 px-2 text-left text-xs">{{ getTipoDocumentoSunat(item.gasto.tipo_documento) }}</td> <!-- Tipo Doc SUNAT -->
-                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.serie_documento || 'N/A' }}</td>
-                                <td class="py-3 px-2 text-left text-xs font-mono">{{ item.gasto.correlativo_documento || 'N/A' }}</td>
-                                <td class="py-3 px-2 text-left text-xs">{{ getReferenciaDocumento(item.gasto) }}</td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.fecha_documento)
+
+                                <td class="py-3 px-3 text-center text-gray-500">{{ formatDate(item.gasto?.fecha_documento)
                                     }}</td>
-                                <td class="py-3 px-2 text-center text-gray-500">{{ getFechaContabilizacion(item.gasto) }}</td>
-                                <td class="py-3 px-2 text-center">{{ MONEDA_DOCUMENTO }}</td>
-                                <td class="py-3 px-2 text-center font-semibold text-lg text-verde-bap-dark">
+                                <td class="py-3 px-3 text-center font-semibold text-lg text-verde-bap-dark">
                                     {{ currencyFormatter.format(parseFloat(item.gasto?.monto_total || 0)) }}
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-center">
                                     <span :class="getClassesForAuditoriaBadge(item.gasto?.estado)">{{ item.gasto?.estado
                                         }}</span>
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-center">
                                     <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
                                     </div>
                                     <div class="text-xs text-gray-500">{{ item.gasto?.registrador?.last_name }}</div>
                                 </td>
-                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.registrador?.area?.name }}</td>
-                                <td class="py-3 px-2 text-left text-xs">{{ item.gasto.comentario || 'N/A' }}</td>
-                                <td class="py-3 px-2 text-left text-xs text-gray-500 truncate" :title="item.gasto.registrador?.email">{{ item.gasto.registrador?.email }}</td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-left text-xs">{{ item.gasto.registrador?.area?.name }}</td>
+                                <td class="py-3 px-3 text-center">
                                     <a v-if="item.gasto.evidencia_url" :href="item.gasto.evidencia_url" target="_blank" class="inline-block p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors" title="Ver Evidencia">
                                         <svg v-if="isPdf(item.gasto.evidencia_url)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 01-2 2v12a2 2 0 002 2z"></path></svg>
                                     </a>
                                     <span v-else class="text-xs text-gray-400">N/A</span>
                                 </td>
-                                <td class="py-3 px-2 text-center">
+                                <td class="py-3 px-3 text-center">
                                     <div class="flex space-x-1 justify-center">
                                         <button @click="verDetalles(item.gasto)"
                                             class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors"
