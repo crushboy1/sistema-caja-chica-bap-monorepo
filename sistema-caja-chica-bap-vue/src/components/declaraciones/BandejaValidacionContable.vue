@@ -28,7 +28,6 @@ const items = ref([]);
 const areas = ref([]);
 const cargando = ref(true);
 const buscando = ref(false);
-const exportando = ref(false);
 const router = useRouter();
 const route = useRoute();
 const inicializacionCompleta = ref(false);
@@ -39,7 +38,7 @@ const filtros = ref({
     registrador_name: '',
     fecha_inicio: '',
     fecha_fin: '',
-    estado: 'Todos', // 'Pendiente de Validación DJ', 'Pendiente de Validación Contable', 'Observado', 'Rechazado', 'Contabilizado'
+    estado: 'Todos',
     area_id: '',
 });
 
@@ -211,7 +210,7 @@ const canValidateDjDocument = (item) => {
 const fetchGastos = async () => {
     cargando.value = true;
     try {
-       const params = { ...filtros.value, scope: 'validacion_contable' }; // Asegurarse de enviar el scope correcto
+        const params = { ...filtros.value, scope: 'validacion_contable' }; // Asegurarse de enviar el scope correcto
         // Los filtros de longitud mínima se aplican en la propiedad computada itemsFiltrados
         // y en los watchers, no es necesario borrarlos aquí.
 
@@ -226,7 +225,6 @@ const fetchGastos = async () => {
         }
 
     } catch (error) {
-        console.error("Error al cargar gastos para validación contable:", error);
         Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al cargar los gastos.', 'error');
     } finally {
         cargando.value = false;
@@ -310,7 +308,6 @@ const getGastoDetailsForAction = (item) => {
 
     // Asegurarse de que el ID sea un valor válido antes de retornarlo
     if (id === undefined || id === null) {
-        console.error("ERROR: ID del gasto/grupo es nulo o indefinido. Item problemático:", item);
         return { id: null, codigo: 'ID_NO_VALIDO', isGroup: isGroup }; // Retornar un valor nulo para que la acción falle en el frontend
     }
 
@@ -420,53 +417,7 @@ const gestionarAccionAdm = async (itemOriginal, accion) => {
         Swal.fire('¡Acción Completada!', 'La operación se realizó con éxito.', 'success');
         fetchGastos(); // Refrescar la tabla para reflejar los cambios de estado
     } catch (error) {
-        console.error(`Error al ejecutar la acción ${accion}:`, error);
         Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error inesperado.', 'error');
-    }
-};
-
-const exportarGastos = async () => {
-    exportando.value = true;
-    try {
-        // Asegurarse de que los filtros se envíen correctamente al backend
-        const params = { ...filtros.value, scope: 'exportar' }; // Puedes añadir un scope específico para la exportación si tu backend lo usa
-
-        const response = await api.post('/v1/gastos/exportar', params, {
-            responseType: 'blob', // Importante para manejar la descarga de archivos
-        });
-
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        const filename = 'reporte_gastos_sap_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-
-        // Limpieza
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        Swal.fire({
-            icon: 'success', title: '¡Exportación Exitosa!',
-            text: 'El archivo Excel ha sido generado y descargado.',
-            timer: 3000, showConfirmButton: false,
-        });
-
-        // No es necesario llamar a fetchGastos aquí a menos que la exportación cambie el estado de los gastos en la DB.
-        // Si la exportación marca los gastos como "Contabilizado", entonces sí, llama a fetchGastos().
-        // Si no, la lista no necesita actualizarse automáticamente por la exportación.
-        // fetchGastos(); 
-
-    } catch (error) {
-        if (error.response && error.response.status === 404) {
-            Swal.fire('Información', 'No se encontraron gastos que coincidan con los filtros actuales para exportar.', 'info');
-        } else {
-            Swal.fire('Error', error.response?.data?.message || 'Ocurrió un error al generar el archivo de exportación.', 'error');
-        }
-        console.error("Error al exportar gastos:", error);
-    } finally {
-        exportando.value = false;
     }
 };
 
@@ -474,8 +425,7 @@ const fetchAreas = async () => {
     try {
         const response = await api.get('/v1/areas');
         areas.value = response.data.data;
-    } catch (error) {
-        console.error("Error al cargar las áreas:", error);
+    } catch  {
         Swal.fire('Error', 'No se pudieron cargar las áreas para el filtro.', 'error');
     }
 };
@@ -605,28 +555,7 @@ onMounted(async () => {
                         </svg>
                         Limpiar
                     </button>
-                    <button @click="exportarGastos" :disabled="exportando"
-                        class="bg-rojo-bap hover:bg-rojo-bap-dark text-white font-bold py-2 px-5 rounded-full transition-colors shadow-lg flex items-center text-sm">
-                        <span v-if="exportando" class="flex items-center">
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                    stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                </path>
-                            </svg>
-                            Exportando...
-                        </span>
-                        <span v-else class="flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                </path>
-                            </svg>
-                            Exportar a Excel
-                        </span>
-                    </button>
+
                 </div>
             </div>
         </div>
@@ -667,6 +596,7 @@ onMounted(async () => {
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Monto</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold w-48">Estado</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Registrador</th>
+                            <th scope="col" class="py-3 px-4 text-center font-semibold">Área</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Fecha Registro</th>
                             <th scope="col" class="py-3 px-4 text-center font-semibold">Acciones</th>
                         </tr>
@@ -731,12 +661,15 @@ onMounted(async () => {
                                     <div class="text-sm font-medium text-gray-900">{{ item.registrador?.name }}</div>
                                     <div class="text-xs text-gray-500">{{ item.registrador?.last_name }}</div>
                                 </td>
+                                <td class="py-3 px-2 text-center text-gray-500">
+                                    {{ item.registrador?.area?.name || 'N/A' }}
+                                </td>
                                 <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.fecha_registro) }}
                                 </td>
                                 <td class="py-3 px-2 text-center">
                                     <div class="flex flex-col items-center justify-center space-y-2">
                                         <div class="flex space-x-1">
-                                            <!-- NUEVO: Botón Validar Documento DJ -->
+                                            <!-- Botón Validar Documento DJ -->
                                             <button v-if="canValidateDjDocument(item)"
                                                 @click="gestionarAccionAdm(item, 'validateDjDocument')"
                                                 class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-all duration-300"
@@ -800,6 +733,7 @@ onMounted(async () => {
                                     <td class="py-3 px-2 text-center">
                                         <span class="text-xs text-gray-500">-</span>
                                     </td>
+                                    <td class="py-3 px-2 text-center text-gray-500">-</td>
                                     <td class="py-3 px-2 text-center text-gray-500">-</td>
                                     <td class="py-3 px-2 text-center text-gray-500">-</td>
                                     <td class="py-3 px-2 text-center">
@@ -879,6 +813,9 @@ onMounted(async () => {
                                     <div class="text-sm font-medium text-gray-900">{{ item.gasto?.registrador?.name }}
                                     </div>
                                     <div class="text-xs text-gray-500">{{ item.gasto?.registrador?.last_name }}</div>
+                                </td>
+                                <td class="py-3 px-2 text-center text-gray-500">
+                                    {{ item.gasto?.registrador?.area?.name || 'N/A' }}
                                 </td>
                                 <td class="py-3 px-2 text-center text-gray-500">{{ formatDate(item.gasto?.created_at) }}
                                 </td>

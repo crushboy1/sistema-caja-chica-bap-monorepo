@@ -175,8 +175,7 @@ const inicializarFormulario = () => {
       // MODO CREACIÓN: Simplemente se resetea el formulario. El usuario ya viene en las props.
       resetearFormulario();
     }
-  } catch (error) {
-    console.error('Error al inicializar el formulario de apertura:', error);
+  } catch {
     Swal.fire('Error', 'Ocurrió un error al preparar el formulario.', 'error');
   } finally {
     cargando.value = false;
@@ -417,8 +416,6 @@ const manejarEnvio = async () => {
         emit('solicitudEnviada', response.data.solicitud);
       }
 
-      console.log('Respuesta del servidor:', response.data);
-
     } catch (error) {
       console.error('Error al crear la solicitud:', error);
       let errorMessage = 'Error en la operación de solicitud. Por favor, inténtalo de nuevo.';
@@ -441,7 +438,6 @@ const manejarEnvio = async () => {
     }
   } else {
     // Si el usuario cancela, no se hace nada y el formulario permanece abierto
-    console.log('Envío de solicitud cancelado por el usuario.');
   }
 };
 

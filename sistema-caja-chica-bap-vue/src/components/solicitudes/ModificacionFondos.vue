@@ -510,8 +510,7 @@ const formatearFechaSinHora = (fechaString) => {
       month: '2-digit',
       year: 'numeric'
     });
-  } catch (error) {
-    console.error('Error al formatear fecha sin hora:', error);
+  } catch {
     return '';
   }
 };
@@ -643,8 +642,8 @@ const obtenerFondosExistentes = async () => {
       ...fondo,
       monto_aprobado: parseFloat(fondo.monto_aprobado)
     }));
-  } catch (error) {
-    console.error('Error al obtener fondos existentes:', error);
+  } catch {
+  
     Swal.fire('Error', 'No se pudieron cargar los fondos activos.', 'error');
   } finally {
     cargandoFondos.value = false;
@@ -656,8 +655,8 @@ const obtenerAreas = async () => {
   try {
     const response = await api.get('/v1/areas');
     areasDisponibles.value = response.data.data;
-  } catch (error) {
-    console.error('Error al obtener áreas:', error);
+  } catch {
+    //
   }
 };
 
@@ -688,8 +687,7 @@ const seleccionarFondoParaEditar = async (fondo) => {
 
     vistaActual.value = 'formulario';
 
-  } catch (error) {
-    console.error('Error al seleccionar fondo para editar:', error);
+  } catch  {
     Swal.fire('Error', 'No se pudo cargar la información del presupuesto vigente del fondo.', 'error');
   }
 };
@@ -713,7 +711,7 @@ const cerrarComponente = () => emit('close');
 // --- Lógica de Envío del Formulario ---
 const manejarEnvio = async () => {
   try {
-    // CORRECCIÓN: Verificar que fondoParaEditar existe
+    // Verificar que fondoParaEditar existe
     if (!fondoParaEditar.value) {
       Swal.fire('Error', 'No hay un fondo seleccionado para modificar.', 'error');
       return;
@@ -804,7 +802,6 @@ const manejarEnvio = async () => {
       emit('solicitudEnviada');
     }
   } catch (error) {
-    console.error('Error en manejarEnvio:', error);
     const errorMessage = error.response?.data?.message || 'Ocurrió un error al enviar la solicitud.';
     Swal.fire('Error', errorMessage, 'error');
   }

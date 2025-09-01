@@ -87,8 +87,8 @@
         </div>
 
         <!-- Card 2: Modificación de Fondos -->
-        <div v-if="canCreateSolicitud" @click="handleCardClick('modificacion')" @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
+        <div v-if="canCreateSolicitud" @click="handleCardClick('modificacion')"
+          class="group relative overflow-hidden rounded-3xl cursor-pointer
                            bg-gradient-to-br from-amarillo-bap to-amarillo-bap-dark
                            transition-all duration-500 ease-out
                            transform hover:scale-105 hover:-translate-y-3
@@ -150,7 +150,7 @@
         </div>
 
         <!-- Card 3: Seguimiento de Solicitudes -->
-        <div v-if="canViewSeguimiento" @click="handleCardClick('seguimiento')" @mouseenter="handleMouseEnter"
+        <div v-if="canViewSeguimiento" @click="handleCardClick('seguimiento')" 
           @mouseleave="handleMouseLeave" class="group relative overflow-hidden rounded-3xl cursor-pointer
                            bg-gradient-to-br from-rojo-bap to-rojo-bap-dark
                            transition-all duration-500 ease-out
@@ -326,17 +326,13 @@ const handleCardClick = async (section) => {
       cardAnimationState.value[section] = null
     }, 200)
 
-  } catch (error) {
-    console.error('Error al procesar click:', error)
+  } catch  {
+    // console.error eliminado
   } finally {
     setTimeout(() => {
       isLoading.value = false
     }, 150)
   }
-}
-
-const handleMouseLeave = (event) => {
-  // Limpiar cualquier estado temporal
 }
 
 const handleSolicitudEnviada = () => {
@@ -395,8 +391,8 @@ onMounted(async () => {
     proyectos.value = proyectosResponse.data.proyectos;
     gastosProyectadosCatalogo.value = gastosProyectadosResponse.data.gastos_proyectados;
     areas.value = areasResponse.data.data;
-  } catch (error) {
-    console.error('Error al cargar datos iniciales para SolicitudFondoView:', error);
+  } catch  {
+    // console.error eliminado
   } finally {
     isLoading.value = false;
   }

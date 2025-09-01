@@ -357,9 +357,7 @@ const obtenerUsuarioAutenticado = async () => {
   try {
     const response = await api.get('/auth/user');
     usuarioActual.value = response.data;
-    console.log('✅ Usuario y Rol asignados correctamente:', usuarioActual.value?.name, rolUsuario.value);
-  } catch (error) {
-    console.error('❌ Error al obtener datos del usuario autenticado:', error);
+  } catch  {
     Swal.fire({
       icon: 'error',
       title: 'Error de Autenticación',
@@ -381,7 +379,6 @@ const obtenerFondos = async () => {
     // No resetear la página aquí permite mantener la paginación si solo cambian los datos.
     // Se reseteará solo al cambiar filtros manualmente.
   } catch (error) {
-    console.error('❌ Error al obtener fondos:', error);
     Swal.fire({ icon: 'error', title: 'Error al Cargar Fondos', text: error.response?.data?.message || 'Ocurrió un error inesperado.' });
   } finally {
     cargandoFondos.value = false;
@@ -394,8 +391,8 @@ const obtenerAreas = async () => {
   try {
     const response = await api.get('/v1/areas');
     areasDisponibles.value = response.data.data;
-  } catch (error) {
-    console.error('Error al obtener áreas:', error);
+  } catch  {
+    
     Swal.fire({
       icon: 'error',
       title: 'Error',
@@ -429,7 +426,6 @@ const ejecutarCierreMensual = async (fondo) => {
     await Swal.fire('¡Éxito!', response.data.message, 'success');
     await obtenerFondos();
   } catch (error) {
-    console.error("Error al ejecutar el cierre mensual:", error);
     Swal.fire('Error', error.response?.data?.message || 'No se pudo procesar el cierre mensual.', 'error');
   } finally {
     cargandoFondos.value = false;
@@ -448,8 +444,8 @@ const formatearFechaSinHora = (fechaString) => {
       month: '2-digit',
       year: 'numeric'
     });
-  } catch (error) {
-    console.error('Error al formatear fecha sin hora:', error);
+  } catch {
+    
     return '';
   }
 };
@@ -553,8 +549,8 @@ onMounted(async () => {
       await obtenerFondos();
     }
 
-  } catch (error) {
-    console.error("Fallo en la secuencia de inicialización del componente.");
+  } catch {
+   //
   } finally {
     cargandoUsuario.value = false;
   }

@@ -861,7 +861,7 @@ class GastoController extends Controller
         if ($scope === 'aprobacion_jefe') {
             // Para la Bandeja de Aprobación de cualquier Jefe (Área, Proyecto, Admin, Gerente).
             // Muestra los gastos donde el usuario actual ha sido asignado como el aprobador de primer nivel.
-            if ($user->hasAnyRole(['jefe_area', 'gerente_general', 'jefe_administracion'])) {
+            if ($user->hasAnyRole(['jefe_area', 'gerente_general', 'jefe_administracion', 'super_admin'])) {
                 $query->where('estado', 'Pendiente de Aprobación')
                     ->where('id_jefe_aprobador', $user->id);
             } else {

@@ -68,8 +68,8 @@ const fetchAuthenticatedUser = async () => {
   try {
     const response = await api.get('/auth/user');
     user.value = response.data;
-  } catch (error) {
-    console.error('Error al obtener datos del usuario. Redirigiendo al login.', error);
+  } catch {
+    // Error al obtener datos del usuario, redirigir al login
     router.push('/login');
   } finally {
     isLoadingUser.value = false;
@@ -80,11 +80,11 @@ const fetchAuthenticatedUser = async () => {
 const handleLogout = async () => {
   try {
     await api.post('/auth/logout');
-  } catch (error) {
-    console.error('Error durante el logout (se redirigirá de todas formas):', error);
+  } catch {
+    // Error durante el logout, continuar con la limpieza del estado
   } finally {
-    user.value = null; // Limpiar el usuario del estado.
-    router.push('/login'); // Redirigir al login.
+    user.value = null;
+    router.push('/login');
   }
 };
 

@@ -41,11 +41,16 @@
                         required
                     >
                         <template #option="{ codigo_fondo, monto_disponible }">
-                            <div class="flex justify-between items-center">
-                                <span>{{ codigo_fondo }}</span>
-                                <span class="text-sm text-gray-500">Saldo: {{ currencyFormatter.format(monto_disponible) }}</span>
-                            </div>
-                        </template>
+    <div class="flex items-center justify-between py-2 px-1">
+        <span class="font-medium flex-1">{{ codigo_fondo }}</span>
+        <div class="flex-shrink-0 text-right">
+            <span class="text-xs text-gray-500 block">Saldo</span>
+            <span class="text-sm font-bold text-verde-bap">
+                {{ currencyFormatter.format(monto_disponible) }}
+            </span>
+        </div>
+    </div>
+</template>
                     </v-select>
                     <transition name="fade-in">
                         <p v-if="fondoSeleccionadoId"
@@ -182,14 +187,14 @@
                                                 label="descripcion"
                                                 :reduce="proyeccion => proyeccion.id_gasto_proyectado"
                                                 placeholder="Seleccione un Gasto Proyectado"
-                                                class="mt-1"
-                                                required
+                                                class="mt-1 "
+                                                required 
                                                 :selectable="proyeccion => !esOpcionDeshabilitada(proyeccion, gasto)"
                                             >
                                                 <template #option="{ descripcion, id_gasto_proyectado }">
                                                     <div class="flex justify-between items-center">
-                                                        <span>{{ descripcion }}</span>
-                                                        <span class="text-sm text-gray-500">
+                                                        <span>{{ descripcion }}</span> 
+                                                        <span class="text-sm font-bold text-verde-bap">
                                                             Saldo: {{ currencyFormatter.format(getSaldoMaximoParaGasto(id_gasto_proyectado, index)) }}
                                                         </span>
                                                     </div>
